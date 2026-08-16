@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `f7fa761`, [Android run 31941189803](https://github.com/soobujmiah/lai/actions/runs/31941189803). Boundaries, catalog validation, coverage, lint, multi-turn Kotlin/JNI contracts, native token counting/metrics/cancellation, memory lifecycle and APK assembly passed. The APK artifact archive is approximately 13.82 MB. Signed catalog publication remains verified by runs 31939187858/31939187860.
+Latest verified remote build: commit `6e29bfe`, [Android run 31942344604](https://github.com/soobujmiah/lai/actions/runs/31942344604). Boundaries, catalog validation, coverage, diagnostics privacy schema/tests, lint, Kotlin/JNI/native runtime and APK assembly passed. The APK artifact archive is approximately 13.85 MB. Signed catalog publication remains verified by runs 31939187858/31939187860.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
@@ -28,7 +28,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | LLM JNI/session interface | Device validated basic | physical model load and 15-token local generation passed; cancellation/metrics pending |
 | llama.cpp CPU inference | Device validated basic | Qwen CPU session loaded and generated locally without reported crash; response/Bangla quality and sustained thermals pending |
 | v0.7 runtime reliability | Build verified | multi-turn templates, token trimming, state machine, Stop, native metrics, storage/memory handling compiled; device validation pending |
-| Diagnostics JSON v1 | Candidate | explicit SAF export, 20-sample local performance history and content exclusion contract added; CI pending |
+| Diagnostics JSON v1 | Build verified | explicit SAF export, 20-sample local history and content-exclusion schema/tests passed; device export inspection pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | requires licensed SDK/runtime and physical device |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
