@@ -31,6 +31,7 @@ include(":platform:download")
 include(":platform:audit")
 include(":platform:device")
 include(":platform:accessibility")
+include(":platform:workspace")
 include(":platform:shizuku")
 
 // Replaceable intelligence/runtime adapters.

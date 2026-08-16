@@ -97,6 +97,7 @@ dependencies {
     implementation(project(":platform:audit"))
     implementation(project(":platform:device"))
     implementation(project(":platform:accessibility"))
+    implementation(project(":platform:workspace"))
     implementation(project(":platform:shizuku"))
     implementation(project(":runtime:llama"))
     implementation(project(":runtime:ocr"))

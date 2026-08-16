@@ -11,6 +11,7 @@
 | `platform:audit` | app-private no-backup JSONL tool audit, fsync append, bounded parsing and hash-chain enforcement | contracts, policy |
 | `platform:device` | Android manufacturer/SoC/API/ABI/CPU facts plus memory, battery, charging and thermal observations | scheduler |
 | `platform:accessibility` | Accessibility service, node capture, screenshots and UI actions | contracts |
+| `platform:workspace` | user-granted SAF tree, persistable permission, canonical child resolution, bounded model discovery and non-secret settings store | contracts, policy |
 | `platform:shizuku` | Shizuku binder/UserService and privileged process boundary | contracts, policy |
 | `runtime:llama` | JNI/C++ llama.cpp adapter | contracts |
 | `runtime:ocr` | OCR Android bitmap adapter seam | contracts |
@@ -27,7 +28,7 @@
 - Only app composes concrete implementations.
 - Only the download platform owns network transport.
 - Only `platform:audit` owns persistent model-tool audit bytes; arguments and outputs never enter its contract.
-- A future SAF workspace owner belongs under `platform`, while settings schemas/discovery decisions remain pure core contracts/policy.
+- A future SAF workspace owner belongs under `platform`, while settings schemas/discovery decisions remain pure core contracts/policy. (Realized: `platform:workspace` owns SAF; `core` owns the contracts/classifier/codec.)
 - A future C++ `TaskGraph` belongs under runtime adapters and schedules compute only; it cannot acquire Android URI, Accessibility, Shizuku, confirmation, or audit authority.
 - Every new module declares its privacy, authority and test boundary in documentation.
 - Feature modules will be introduced for Chat, Dashboard Tools, Reader, Automator and Settings when their state/navigation surfaces are separated from `MainViewModel`; they depend on shared contracts, never concrete vendor APIs or duplicate tool engines.

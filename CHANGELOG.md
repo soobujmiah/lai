@@ -4,6 +4,14 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Phase 2A workspace SAF adapter candidate
+
+- Added the `platform:workspace` Android module: `WorkspaceRepository` (SAF tree grant via `ACTION_OPEN_DOCUMENT_TREE`, persistable read/write permission, canonical child resolution through `DocumentsContract` document IDs, idempotent layout creation), `WorkspaceSettingsStore` (bounded read with fallback-to-defaults, temp-write-then-replace write that verifies the exact v1 schema first), and `WorkspaceDiscovery` (depth/count/size-bounded traversal that streams SHA-256 and classifies via the pure `WorkspacePolicy`).
+- A `content://` URI is never translated into a raw path; `MANAGE_EXTERNAL_STORAGE` is never requested. Discovery registers metadata only and never auto-loads inference.
+- Added a pure JVM test for the GGUF magic detector.
+- Registered the module in the build graph, wired it into `AppContainer`, and added `:platform:workspace:testDebugUnitTest` to the CI test command. No NDK/build-flag changes were needed; the Qwen 1.5B / llama.cpp APK path is unchanged.
+- Remaining: the minimal Chat ⚙ settings bottom sheet, `MainViewModel` integration, and physical SAF grant/discovery device tests.
+
 ### Phase 2A workspace decision layer candidate
 
 - Added `core:contracts` workspace contracts: `WorkspaceGrantState`, canonical `WorkspaceLayout`, `ModelCandidate`, `DiscoveredModel`, `ModelDiscoveryStatus`, and bounded `DiscoveryLimits`.

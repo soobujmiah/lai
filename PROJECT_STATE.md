@@ -9,7 +9,7 @@ Release APK: `https://github.com/soobujmiah/lai/releases/download/v0.8.2/app-rel
 Last documentation/build verification: GitHub Actions run `31959866932`  
 Current physical baseline: Xiaomi/Redmi Turbo 4 Pro, Android API 36, QTI SM8735 / Snapdragon 8s Gen 4
 
-This session advanced **Phase 2A**: items 1 & 2 (typed settings contracts + validation/migration policy) landed first, then the **workspace decision layer** — `core:contracts` workspace contracts and `core:policy` `WorkspacePolicy` (discovery classifier) + `WorkspaceSettingsCodec` (bounded settings encode/decode). All of it is pure JVM with unit coverage. No new Gradle module, Android/JNI/native code, SDK, NDK, or build flag was introduced, so the Qwen 1.5B / llama.cpp APK build path is unchanged; GitHub Actions is expected to compile, test (pure-JVM coverage), lint, and package as before. The Android `platform:workspace` SAF adapter (grant, child resolution, traversal), the bounded SAF store/discovery wiring, the minimal Chat ⚙ UI slice, and `AppContainer`/`MainViewModel` integration remain (items 3, 6–8).
+This session advanced **Phase 2A** substantially: items 1–2 (typed settings contracts + validation/migration policy); then the pure-core **workspace decision layer** (`WorkspacePolicy` classifier + `WorkspaceSettingsCodec`); then the **`platform:workspace` Android SAF adapter** (`WorkspaceRepository`, `WorkspaceSettingsStore`, `WorkspaceDiscovery`) registered in the build graph and wired into `AppContainer`. No native/NDK/build-flag changes were required and the Qwen 1.5B / llama.cpp APK path is unchanged; GitHub Actions now also runs `:platform:workspace:testDebugUnitTest`. Remaining Phase 2A: the minimal Chat ⚙ settings bottom sheet, `MainViewModel`/diagnostics integration, and physical SAF grant/discovery device tests (items 6–8).
 
 This file is a handoff snapshot. `docs/STATUS.md`, `docs/ROADMAP.md`, implementation source, and Git history remain authoritative if a later change conflicts with this snapshot.
 
@@ -526,7 +526,7 @@ Target UI (not implemented): Standalone Tools Dashboard, Chat **+ Attach Tools**
 
 This phase is the dependency for quick settings, Model Center, Dashboard/Chat tool parity, and auto-discovery. Do **not** begin Image Generation, Whisper, SQLCipher, 3B–5B task chaining, or a universal backend manager first.
 
-**Progress (2026-08-17):** items 1 (typed settings contracts) and 2 (validation/migration policy) are implemented with pure-JVM coverage. The **workspace decision layer** is also landed in pure core: `WorkspacePolicy` (discovery classifier — digest dedup, size/format/count limits, reviewed-catalog match) and `WorkspaceSettingsCodec` (bounded, exact-schema settings encode/decode). Items 3 (Android `platform:workspace` SAF adapter), 4–5 SAF wiring, 6 (minimal UI slice), and 7–8 (composition/diagnostics wiring + tests) are the next session. The schema is deliberately text-free, so settings can never store prompts, documents, or credentials.
+**Progress (2026-08-17):** items 1–2 (typed settings contracts + validation/migration policy) and the pure-core **workspace decision layer** (`WorkspacePolicy` classifier + `WorkspaceSettingsCodec`) are landed with pure-JVM coverage. Item 3 (the `platform:workspace` Android SAF adapter: `WorkspaceRepository`, `WorkspaceSettingsStore`, `WorkspaceDiscovery`) is implemented, wired into `AppContainer`, and has a GGUF-magic unit test; items 4–5 SAF logic delegates to the pure layer. Remaining: item 6 (minimal Chat ⚙ settings bottom sheet), item 7 (`MainViewModel`/diagnostics integration), and item 8 (physical SAF grant/discovery device tests). The schema is deliberately text-free, so settings can never store prompts, documents, or credentials.
 
 #### 4.1 Code to add
 
@@ -542,18 +542,18 @@ This phase is the dependency for quick settings, Model Center, Dashboard/Chat to
    - Add deterministic `v1 -> future` migration seam and safe embedded defaults.
    - Add JVM tests for minimum/maximum, NaN/infinity, unknown fields, malformed schema, Bangla-safe round trip, and reset/precedence.
 
-3. **Concrete `platform:workspace` Android module**
+3. **Concrete `platform:workspace` Android module** — ✅ done this session (2026-08-17)
    - Add it to `settings.gradle.kts`, app dependencies, `docs/MODULES.md`, and architecture checks.
    - Implement `WorkspaceRepository` around a user-selected `ACTION_OPEN_DOCUMENT_TREE` URI and persistable permission.
    - Never translate arbitrary `content://` URIs into raw paths and never request `MANAGE_EXTERNAL_STORAGE`.
    - Implement canonical child resolution for `models/`, `tools/`, `config/settings.json`, and `cache/` through provider document IDs.
 
-4. **Bounded settings store**
+4. **Bounded settings store** — ✅ done this session (2026-08-17)
    - Implement `WorkspaceSettingsStore` with strict maximum bytes, strict JSON, temp/new-document verification, safe replacement strategy, and local migration warning.
    - Reject secrets/user-content fields by schema; settings must not become a prompt/document log.
    - Fall back to embedded defaults when no root is granted, the grant is revoked, or the file is malformed.
 
-5. **Bounded discovery service**
+5. **Bounded discovery service** — ✅ done this session (2026-08-17)
    - Implement `WorkspaceDiscovery` with count/depth/time/size limits.
    - Enumerate only granted `models/` and `tools/`; never scan shared storage globally.
    - For `.gguf`: stream size/magic/SHA-256, deduplicate by digest, match catalog when known, otherwise mark `LOCAL_UNREVIEWED`.

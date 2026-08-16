@@ -13,6 +13,9 @@ import dev.lai.runtime.scheduler.InferenceScheduler
 import dev.lai.runtime.scheduler.ModelMemoryEstimator
 import dev.lai.runtime.shell.ElevatedShell
 import dev.lai.runtime.shell.ShizukuController
+import dev.lai.runtime.workspace.WorkspaceDiscovery
+import dev.lai.runtime.workspace.WorkspaceRepository
+import dev.lai.runtime.workspace.WorkspaceSettingsStore
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
@@ -32,6 +35,9 @@ class AppContainer(context: Context) {
     val runtimeEnvironment = AndroidRuntimeEnvironmentProvider(context)
     val ocrService = BanglaOcrService()
     val agentRuntime = AgentRuntime(elevatedShell, shizukuController, ocrService)
+    val workspaceRepository = WorkspaceRepository(context)
+    val workspaceSettingsStore = WorkspaceSettingsStore(workspaceRepository)
+    val workspaceDiscovery = WorkspaceDiscovery(workspaceRepository)
 
     private val _events = MutableSharedFlow<AppRuntimeEvent>(extraBufferCapacity = 4)
     val events = _events.asSharedFlow()
