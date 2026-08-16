@@ -4,6 +4,14 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Phase 2A workspace decision layer candidate
+
+- Added `core:contracts` workspace contracts: `WorkspaceGrantState`, canonical `WorkspaceLayout`, `ModelCandidate`, `DiscoveredModel`, `ModelDiscoveryStatus`, and bounded `DiscoveryLimits`.
+- Added `core:policy` `WorkspacePolicy`: a pure discovery classifier that turns SAF-observed files into REVIEWED / LOCAL_UNREVIEWED / REJECTED statuses with size/format/digest validation, case-insensitive SHA-256 deduplication, reviewed-catalog matching, a deterministic path ordering, and a registration count limit. Registration never allocates weights or auto-loads inference.
+- Added `core:policy` `WorkspaceSettingsCodec`: bounded encode/decode of the non-secret `settings.json` with a strict maximum byte size and strict JSON; lenient read falls back to embedded defaults, while strict write verification (`verifyForStorage`) requires the exact v1 schema — no unknown fields — so the file can never become a prompt/document/credential dump.
+- Added pure-JVM coverage in both modules (catalog match, unknown digest, oversized/unsupported/missing-digest/duplicate rejection, count limit, ordering, codec round trip, absent/oversized/malformed/out-of-range handling, and write-time rejection of unknown fields).
+- No new Gradle module, Android/JNI/native code, SDK, NDK, or build flag was required; exercised by the existing `coverageCheck` test step, so the Qwen 1.5B / llama.cpp APK build path is unchanged. The Android SAF workspace adapter (`platform:workspace`) and minimal UI slice remain pending.
+
 ### Phase 2A typed settings foundation candidate
 
 - Added `SettingsDocumentV1` to `core:contracts`: versioned, typed, non-secret product settings for LLM, image generation, voice, and search, each with bounded numeric/boolean ranges and embedded defaults.
