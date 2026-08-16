@@ -64,8 +64,8 @@ class SettingsPolicy {
         val issues = mutableListOf<SettingsIssue>()
         checkLlm(document.llm, "llm", issues)
         checkImage(document.imageGeneration, "imageGeneration", issues)
-        checkVoice(document.voice, issues)
-        checkSearch(document.search, issues)
+        checkVoice(document.voice, "voice", issues)
+        checkSearch(document.search, "search", issues)
         return SettingsValidation(issues)
     }
 

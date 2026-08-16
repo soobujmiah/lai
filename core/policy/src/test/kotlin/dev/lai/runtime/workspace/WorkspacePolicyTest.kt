@@ -1,7 +1,10 @@
 package dev.lai.runtime.workspace
 
+import dev.lai.runtime.settings.ImageGenerationSettings
 import dev.lai.runtime.settings.LlmSettings
+import dev.lai.runtime.settings.SearchSettings
 import dev.lai.runtime.settings.SettingsDocumentV1
+import dev.lai.runtime.settings.VoiceSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

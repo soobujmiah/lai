@@ -71,12 +71,13 @@ class SettingsPolicyTest {
 
     @Test
     fun `non finite floats are rejected`() {
-        assertEquals(setOf("non_finite_number"), invalidCodes(json("""{"llm":{"temperature":NaN}}""")))
-        assertEquals(setOf("non_finite_number"), invalidCodes(json("""{"llm":{"temperature":Infinity}}""")))
-        assertEquals(setOf("non_finite_number"), invalidCodes(json("""{"llm":{"topP":Infinity}}""")))
-        assertEquals(setOf("non_finite_number"), invalidCodes(json("""{"voice":{"speechRate":NaN}}""")))
-        assertEquals(setOf("non_finite_number"), invalidCodes(json("""{"search":{"minScore":Infinity}}""")))
-        assertEquals(setOf("non_finite_number"), invalidCodes(json("""{"imageGeneration":{"guidanceScale":-Infinity}}""")))
+        fun errorCodes(document: SettingsDocumentV1) = policy.validate(document).errors.map { it.code }.toSet()
+        assertEquals(setOf("non_finite_number"), errorCodes(SettingsDocumentV1(llm = LlmSettings(temperature = Float.NaN))))
+        assertEquals(setOf("non_finite_number"), errorCodes(SettingsDocumentV1(llm = LlmSettings(temperature = Float.POSITIVE_INFINITY))))
+        assertEquals(setOf("non_finite_number"), errorCodes(SettingsDocumentV1(llm = LlmSettings(topP = Float.POSITIVE_INFINITY))))
+        assertEquals(setOf("non_finite_number"), errorCodes(SettingsDocumentV1(voice = VoiceSettings(speechRate = Float.NaN))))
+        assertEquals(setOf("non_finite_number"), errorCodes(SettingsDocumentV1(search = SearchSettings(minScore = Float.POSITIVE_INFINITY))))
+        assertEquals(setOf("non_finite_number"), errorCodes(SettingsDocumentV1(imageGeneration = ImageGenerationSettings(guidanceScale = Float.NEGATIVE_INFINITY))))
     }
 
     @Test
