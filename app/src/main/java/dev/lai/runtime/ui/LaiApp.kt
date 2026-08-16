@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -43,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.lai.runtime.BuildConfig
 import dev.lai.runtime.R
 import dev.lai.runtime.shell.ShizukuState
 
@@ -246,6 +249,16 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
             Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         }
         item {
+            StatusCard(
+                title = if (BuildConfig.AIR_GAPPED) "Air-gapped edition" else "Connected local-first edition",
+                detail = if (BuildConfig.AIR_GAPPED) {
+                    "This APK has no Android network permission. Models can enter only through the system file picker."
+                } else {
+                    "Network permission is isolated to explicit, digest-pinned model downloads. User content is never transmitted."
+                },
+            )
+        }
+        item {
             Card {
                 Row(
                     Modifier.fillMaxWidth().padding(16.dp),
@@ -283,11 +296,18 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
 
 @Composable
 private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
+    val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importRecommendedModel)
+    }
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.model_setup), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "Models download directly to app-private storage. Every artifact requires a reviewed SHA-256.",
+                if (BuildConfig.AIR_GAPPED) {
+                    "Air-gapped edition: Android grants no network permission. Select the reviewed GGUF file; verification is fully local."
+                } else {
+                    "Connected edition: model downloads are explicit and digest-pinned. No prompts or generated content are transmitted."
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
             val recommended = state.recommendedModel
@@ -300,11 +320,23 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
                         "${recommended.bytes / 1_048_576} MB • ${recommended.quantization} • ${recommended.license}",
                         style = MaterialTheme.typography.labelSmall,
                     )
-                    Button(
-                        onClick = viewModel::installRecommendedModel,
-                        enabled = !state.busy && state.installedModels.none { it.id == recommended.id },
-                    ) {
-                        Text(if (state.installedModels.any { it.id == recommended.id }) "Installed" else "Download securely")
+                    val isInstalled = state.installedModels.any { it.id == recommended.id }
+                    if (isInstalled) {
+                        Button(onClick = {}, enabled = false) { Text("Installed") }
+                    } else if (BuildConfig.AIR_GAPPED) {
+                        Button(onClick = { modelPicker.launch(arrayOf("*/*")) }, enabled = !state.busy) {
+                            Text("Import reviewed GGUF")
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = viewModel::installRecommendedModel, enabled = !state.busy) {
+                                Text("Download securely")
+                            }
+                            OutlinedButton(
+                                onClick = { modelPicker.launch(arrayOf("*/*")) },
+                                enabled = !state.busy,
+                            ) { Text("Import file") }
+                        }
                     }
                 }
             }
@@ -336,7 +368,8 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
                 }
                 HorizontalDivider()
             }
-            OutlinedTextField(
+            if (!BuildConfig.AIR_GAPPED) {
+                OutlinedTextField(
                 value = state.modelName,
                 onValueChange = viewModel::setModelName,
                 label = { Text(stringResource(R.string.model_name)) },
@@ -356,18 +389,21 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
                 label = { Text(stringResource(R.string.model_sha)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-            )
+                )
+            }
             state.downloadProgress?.let { progress ->
                 progress.fraction?.let { fraction ->
                     LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
                 } ?: LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 Text("${progress.downloadedBytes / 1_048_576} MB", style = MaterialTheme.typography.labelSmall)
             }
-            Button(
-                onClick = viewModel::downloadModel,
-                enabled = !state.busy && state.modelName.isNotBlank() && state.modelUrl.isNotBlank() &&
-                    state.modelSha.matches(Regex("^[a-fA-F0-9]{64}$")),
-            ) { Text(stringResource(R.string.download)) }
+            if (!BuildConfig.AIR_GAPPED) {
+                Button(
+                    onClick = viewModel::downloadModel,
+                    enabled = !state.busy && state.modelName.isNotBlank() && state.modelUrl.isNotBlank() &&
+                        state.modelSha.matches(Regex("^[a-fA-F0-9]{64}$")),
+                ) { Text(stringResource(R.string.download)) }
+            }
         }
     }
 }

@@ -10,7 +10,8 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 |---|---|---|
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
 | Layered module backbone | Ready | eleven-module Gradle/manifest graph compiled and packaged remotely |
-| Zero-egress architecture policy | Ready | only download module owns network/permission; boundary check passed in CI |
+| Zero-egress architecture policy | Ready | only download module owns transport; outbound user data denied; boundary check passes |
+| Air-gapped APK | Candidate | separate app ID, manifest permission removal, local reviewed import and final APK check added; CI pending |
 | Evidence-aware scheduler | Build verified | model loads route through evidence, memory, battery and thermal preflight; physical load validation pending |
 | Reviewed model catalog | Build verified | immutable official Qwen metadata, mandatory digest/size and one-tap UX compiled; device download pending |
 | Android environment provider | Build verified | memory, battery, charging and thermal snapshot compiled and scheduler-integrated; device reading pending |

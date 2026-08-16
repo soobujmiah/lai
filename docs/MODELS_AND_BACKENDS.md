@@ -16,7 +16,7 @@ The app requests neither all-files access nor media storage permission. Uninstal
 
 `core:model` ships immutable metadata only—never weights. The current recommended CPU baseline is the official Qwen 2.5 1.5B Instruct Q4_K_M artifact (1,117,320,736 bytes, Apache-2.0, SHA-256 `6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e`). Metadata and build compatibility are reviewed; Bangla quality and physical-device inference remain explicitly unvalidated until recorded evidence exists.
 
-The UI can install this entry with one tap. Manual URL entry remains Developer Mode only and still requires a full SHA-256.
+The connected UI can install this entry with one tap. The air-gapped UI opens Android's file picker and accepts only bytes matching the same reviewed SHA-256, exact size and GGUF signature. Manual URL entry remains Developer Mode in the connected edition only.
 
 ## Bangla model requirements
 

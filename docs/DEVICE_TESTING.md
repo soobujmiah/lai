@@ -22,6 +22,10 @@ Battery level / plugged:
 Ambient temperature:
 ```
 
+## Connectivity-edition gate
+
+Install both artifacts side by side. Android App Info for `dev.lai.runtime.airgap` must show no network-related permissions. In the air-gapped edition, the reviewed model action must open the system file picker; airplane mode must not change local import/load/generation behavior. In the connected edition, the same reviewed model may be explicitly downloaded. Never infer the permission result from UI text—record App Info or `dumpsys package` evidence.
+
 ## Phase 1 smoke test
 
 1. Install debug APK with `adb install -r`.

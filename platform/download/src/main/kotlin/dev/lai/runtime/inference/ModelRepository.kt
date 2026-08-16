@@ -1,6 +1,8 @@
 package dev.lai.runtime.inference
 
+import android.content.ContentResolver
 import android.content.Context
+import android.net.Uri
 import dev.lai.runtime.core.LaiJson
 import dev.lai.runtime.privacy.DataClass
 import dev.lai.runtime.privacy.DataFlowDirection
@@ -15,6 +17,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.InputStream
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
@@ -35,14 +39,13 @@ class ModelRepository private constructor(
         onProgress: (DownloadProgress) -> Unit = {},
     ): Result<InstalledModel> = withContext(Dispatchers.IO) {
         runCatching {
-            validate(spec)
+            validateDownload(spec)
             modelDir.mkdirs()
-            val finalFile = File(modelDir, "${spec.id}.gguf")
             val partialFile = File(modelDir, "${spec.id}.gguf.part")
             val existingBytes = partialFile.takeIf(File::exists)?.length() ?: 0L
             val request = Request.Builder()
                 .url(spec.url)
-                .header("User-Agent", "LAI-Android/0.1")
+                .header("User-Agent", "LAI-Android/0.4")
                 .apply { if (existingBytes > 0) header("Range", "bytes=$existingBytes-") }
                 .build()
 
@@ -55,55 +58,47 @@ class ModelRepository private constructor(
                 val total = response.body?.contentLength()?.takeIf { it >= 0 }?.plus(base)
                     ?: spec.expectedBytes
                 response.body?.byteStream()?.use { input ->
-                    java.io.FileOutputStream(partialFile, append).buffered().use { output ->
-                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                        var downloaded = base
-                        var lastReport = 0L
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            output.write(buffer, 0, read)
-                            downloaded += read
-                            if (downloaded - lastReport >= PROGRESS_STEP_BYTES) {
-                                onProgress(DownloadProgress(downloaded, total))
-                                lastReport = downloaded
-                            }
-                        }
-                        output.flush()
-                        onProgress(DownloadProgress(downloaded, total))
-                    }
+                    streamToPartial(input, partialFile, append, base, total, onProgress)
                 } ?: error("Server returned an empty body")
             }
 
-            val digest = sha256(partialFile)
-            val expected = requireNotNull(spec.sha256).lowercase()
-            check(digest == expected) { "SHA-256 mismatch; partial file retained for inspection" }
-            spec.expectedBytes?.let { expectedBytes ->
-                check(partialFile.length() == expectedBytes) {
-                    "Artifact size mismatch: expected $expectedBytes, received ${partialFile.length()}"
-                }
-            }
-            check(partialFile.length() > 4) { "Downloaded model is empty" }
-            FileInputStream(partialFile).use { stream ->
-                val magic = ByteArray(4)
-                check(stream.read(magic) == 4 && magic.contentEquals("GGUF".encodeToByteArray())) {
-                    "Downloaded file is not a GGUF model"
-                }
-            }
-            if (finalFile.exists()) check(finalFile.delete()) { "Could not replace existing model" }
-            check(partialFile.renameTo(finalFile)) { "Could not finalize model file" }
-
-            val installed = InstalledModel(
+            verifyAndActivate(
                 id = spec.id,
                 displayName = spec.displayName,
-                fileName = finalFile.name,
-                bytes = finalFile.length(),
-                sha256 = digest,
-                sourceUrl = spec.url,
-                installedAtEpochMs = System.currentTimeMillis(),
+                expectedSha256 = requireNotNull(spec.sha256),
+                expectedBytes = spec.expectedBytes,
+                partialFile = partialFile,
+                sourceLabel = spec.url,
             )
-            writeRegistry(readRegistry().filterNot { it.id == installed.id } + installed)
-            installed
+        }
+    }
+
+    suspend fun importModel(
+        spec: ModelImportSpec,
+        contentResolver: ContentResolver,
+        uri: Uri,
+        onProgress: (DownloadProgress) -> Unit = {},
+    ): Result<InstalledModel> = withContext(Dispatchers.IO) {
+        runCatching {
+            validateIdentity(spec.id, spec.displayName, spec.sha256)
+            modelDir.mkdirs()
+            val partialFile = File(modelDir, "${spec.id}.gguf.part")
+            if (partialFile.exists()) check(partialFile.delete()) { "Could not replace previous import staging file" }
+            val providerLength = contentResolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
+                descriptor.length.takeIf { it >= 0 }
+            }
+            val total = spec.expectedBytes ?: providerLength
+            contentResolver.openInputStream(uri)?.use { input ->
+                streamToPartial(input, partialFile, append = false, base = 0, total = total, onProgress = onProgress)
+            } ?: error("Android could not open the selected model file")
+            verifyAndActivate(
+                id = spec.id,
+                displayName = spec.displayName,
+                expectedSha256 = spec.sha256,
+                expectedBytes = spec.expectedBytes,
+                partialFile = partialFile,
+                sourceLabel = LOCAL_IMPORT_SOURCE,
+            )
         }
     }
 
@@ -120,12 +115,81 @@ class ModelRepository private constructor(
         true
     }
 
-    private fun validate(spec: ModelSpec) {
-        require(ID.matches(spec.id)) { "Model id must contain lowercase letters, numbers, dot, underscore, or dash" }
-        require(spec.displayName.isNotBlank()) { "Display name is required" }
+    private fun streamToPartial(
+        input: InputStream,
+        partialFile: File,
+        append: Boolean,
+        base: Long,
+        total: Long?,
+        onProgress: (DownloadProgress) -> Unit,
+    ) {
+        FileOutputStream(partialFile, append).buffered().use { output ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            var transferred = base
+            var lastReport = base
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                output.write(buffer, 0, read)
+                transferred += read
+                if (transferred - lastReport >= PROGRESS_STEP_BYTES) {
+                    onProgress(DownloadProgress(transferred, total))
+                    lastReport = transferred
+                }
+            }
+            output.flush()
+            onProgress(DownloadProgress(transferred, total))
+        }
+    }
+
+    private fun verifyAndActivate(
+        id: String,
+        displayName: String,
+        expectedSha256: String,
+        expectedBytes: Long?,
+        partialFile: File,
+        sourceLabel: String,
+    ): InstalledModel {
+        val digest = sha256(partialFile)
+        check(digest == expectedSha256.lowercase()) { "SHA-256 mismatch; staged file was not activated" }
+        expectedBytes?.let { expected ->
+            check(partialFile.length() == expected) {
+                "Artifact size mismatch: expected $expected, received ${partialFile.length()}"
+            }
+        }
+        check(partialFile.length() > 4) { "Selected model is empty" }
+        FileInputStream(partialFile).use { stream ->
+            val magic = ByteArray(4)
+            check(stream.read(magic) == 4 && magic.contentEquals("GGUF".encodeToByteArray())) {
+                "Selected file is not a GGUF model"
+            }
+        }
+        val finalFile = File(modelDir, "$id.gguf")
+        if (finalFile.exists()) check(finalFile.delete()) { "Could not replace existing model" }
+        check(partialFile.renameTo(finalFile)) { "Could not atomically activate model file" }
+        val installed = InstalledModel(
+            id = id,
+            displayName = displayName,
+            fileName = finalFile.name,
+            bytes = finalFile.length(),
+            sha256 = digest,
+            sourceUrl = sourceLabel,
+            installedAtEpochMs = System.currentTimeMillis(),
+        )
+        writeRegistry(readRegistry().filterNot { it.id == installed.id } + installed)
+        return installed
+    }
+
+    private fun validateDownload(spec: ModelSpec) {
         val expectedDigest = requireNotNull(spec.sha256) { "A reviewed SHA-256 is required" }
-        require(expectedDigest.matches(SHA256)) { "Invalid SHA-256" }
+        validateIdentity(spec.id, spec.displayName, expectedDigest)
         reviewArtifactNetwork(spec.url, expectedDigest)
+    }
+
+    private fun validateIdentity(id: String, displayName: String, sha256: String) {
+        require(ID.matches(id)) { "Model id must contain lowercase letters, numbers, dot, underscore, or dash" }
+        require(displayName.isNotBlank()) { "Display name is required" }
+        require(sha256.matches(SHA256)) { "Invalid SHA-256" }
     }
 
     private fun reviewArtifactNetwork(url: String, sha256: String) {
@@ -139,9 +203,7 @@ class ModelRepository private constructor(
                 expectedSha256 = sha256,
             ),
         )
-        require(decision is NetworkDecision.Allow) {
-            (decision as NetworkDecision.Deny).reason
-        }
+        require(decision is NetworkDecision.Allow) { (decision as NetworkDecision.Deny).reason }
     }
 
     private fun readRegistry(): List<InstalledModel> = runCatching {
@@ -176,6 +238,7 @@ class ModelRepository private constructor(
             .followRedirects(true)
             .build()
 
+        private const val LOCAL_IMPORT_SOURCE = "local-import"
         private val ID = Regex("^[a-z0-9][a-z0-9._-]{1,63}$")
         private val SHA256 = Regex("^[a-fA-F0-9]{64}$")
         private const val PROGRESS_STEP_BYTES = 512L * 1024L

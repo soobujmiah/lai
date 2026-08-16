@@ -12,6 +12,14 @@ data class ModelSpec(
 )
 
 @Serializable
+data class ModelImportSpec(
+    val id: String,
+    val displayName: String,
+    val sha256: String,
+    val expectedBytes: Long? = null,
+)
+
+@Serializable
 data class InstalledModel(
     val id: String,
     val displayName: String,

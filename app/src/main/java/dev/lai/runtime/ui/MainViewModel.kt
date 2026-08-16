@@ -2,6 +2,7 @@ package dev.lai.runtime.ui
 
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -273,6 +274,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         startModelDownload(state.value.recommendedModel.toModelSpec())
+    }
+
+    fun importRecommendedModel(uri: Uri) {
+        if (state.value.busy) return
+        val reviewed = state.value.recommendedModel
+        _state.update {
+            it.copy(
+                busy = true,
+                notice = "Verifying selected model locally…",
+                downloadProgress = DownloadProgress(0, reviewed.bytes),
+            )
+        }
+        viewModelScope.launch {
+            val result = container.modelRepository.importModel(
+                spec = reviewed.toImportSpec(),
+                contentResolver = getApplication<Application>().contentResolver,
+                uri = uri,
+            ) { progress -> _state.update { it.copy(downloadProgress = progress) } }
+            result.onSuccess { model ->
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        notice = "Imported and verified ${model.displayName}",
+                        downloadProgress = null,
+                    )
+                }
+                refreshModels()
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(busy = false, notice = error.message ?: "Import failed", downloadProgress = null)
+                }
+            }
+        }
     }
 
     fun downloadModel() {

@@ -20,8 +20,9 @@ The build performs:
 4. immutable-SHA llama.cpp fetch into runner-temporary storage;
 5. Kotlin unit tests and Android lint;
 6. Kotlin/Compose resources and arm64 C++/llama.cpp JNI compilation;
-7. APK assembly and artifact upload;
-8. release upload for a version tag.
+7. connected and air-gapped APK assembly;
+8. final merged-manifest verification with `apkanalyzer`;
+9. artifact upload and version-tag release.
 
 ## Trigger manually
 

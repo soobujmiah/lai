@@ -28,5 +28,8 @@ class ModelContractsTest {
         val json = LaiJson.encodeToString(InstalledModel.serializer(), model)
         assertEquals(model, LaiJson.decodeFromString(InstalledModel.serializer(), json))
         assertNull(ModelSpec("id", "name", "https://huggingface.co/x").sha256)
+        val importSpec = ModelImportSpec("qwen", "Qwen", "b".repeat(64), 1024)
+        assertEquals(1024L, importSpec.expectedBytes)
+        assertEquals(64, importSpec.sha256.length)
     }
 }

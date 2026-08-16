@@ -29,6 +29,9 @@ All notable changes are documented here. The project follows semantic versioning
 - Added per-module pure-JVM coverage ratchets.
 - Added an immutable reviewed model catalog and one-tap digest-pinned baseline installation.
 - Added Android memory/battery/thermal observation and conservative pre-load estimation for scheduler routing.
+- Added connected and air-gapped product flavors with distinct application IDs.
+- Added reviewed local GGUF import through Android's system file picker.
+- Added final APK manifest inspection that rejects network permissions in the air-gapped artifact.
 
 ### Phase 2 candidate
 

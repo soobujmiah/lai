@@ -16,5 +16,7 @@ class ReviewedModelCatalogTest {
         assertFalse(model.banglaQualityValidated)
         assertEquals(model.sha256, model.toModelSpec().sha256)
         assertEquals(model.bytes, model.toModelSpec().expectedBytes)
+        assertEquals(model.sha256, model.toImportSpec().sha256)
+        assertEquals(model.bytes, model.toImportSpec().expectedBytes)
     }
 }

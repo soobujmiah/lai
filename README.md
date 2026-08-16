@@ -13,6 +13,13 @@ LAI is a source-only Android foundation for private, Bangla-first on-device AI a
 - **Source-only Git:** no SDKs, models, APKs, native libraries, caches, or keystores in the repository.
 - **Documentation with code:** behavior, limitations, safety implications, and device evidence are updated in the same change.
 
+## Product editions
+
+- **Connected:** explicit reviewed model downloads only; no prompts, screens, generations or telemetry are transmitted.
+- **Air-gapped:** separate application ID with no Android network permissions; reviewed GGUF models enter only through the system file picker.
+
+CI inspects each final merged APK rather than trusting source manifests or a runtime toggle. Both editions share the same local inference and automation core and can be installed side by side.
+
 ## Current capabilities
 
 | Area | Included now | Intentional boundary |
@@ -106,7 +113,7 @@ See [BUILD_AND_RELEASE.md](docs/BUILD_AND_RELEASE.md) for exact commands and key
 
 ## Model download
 
-Developer Mode offers a one-tap immutable reviewed CPU baseline; advanced manual URLs still require a mandatory SHA-256. `platform:download` is the sole network-owning module; it downloads to `noBackupFilesDir/models`, rechecks redirected hosts, resumes partial transfers, rejects hash/format mismatches, and never requests broad storage permission. No prompts, screen data, generations or telemetry have an outbound path.
+The connected edition offers a one-tap immutable reviewed CPU baseline; advanced manual URLs still require a mandatory SHA-256. The air-gapped edition opens Android's system file picker and verifies the same reviewed SHA-256, exact size and GGUF signature without storing the source URI. `platform:download` is the sole network-owning module; no prompts, screen data, generations or telemetry have an outbound path.
 
 The v0.2 CPU backend can load a compatible GGUF after explicit user selection. Backend requirements and the Qualcomm licensing boundary are in [MODELS_AND_BACKENDS.md](docs/MODELS_AND_BACKENDS.md).
 

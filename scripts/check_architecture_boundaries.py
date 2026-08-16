@@ -75,10 +75,26 @@ def main() -> None:
         for marker in ANALYTICS_MARKERS:
             if marker in lowered:
                 violations.append(f"{rel}: outbound analytics dependency/API is forbidden")
-        if "android.permission.INTERNET" in text and rel != "platform/download/src/main/AndroidManifest.xml":
+        is_airgap_permission_removal = (
+            rel == "app/src/airgap/AndroidManifest.xml" and 'tools:node="remove"' in text
+        )
+        if (
+            "android.permission.INTERNET" in text
+            and rel != "platform/download/src/main/AndroidManifest.xml"
+            and not is_airgap_permission_removal
+        ):
             violations.append(f"{rel}: INTERNET permission belongs only to platform/download")
         if rel.startswith("core/") and re.search(r"^\s*import\s+android\.", text, re.MULTILINE):
             violations.append(f"{rel}: pure core modules cannot import Android APIs")
+
+    airgap_manifest = ROOT / "app/src/airgap/AndroidManifest.xml"
+    if not airgap_manifest.is_file():
+        violations.append("app/src/airgap/AndroidManifest.xml: air-gapped flavor must remove network permissions")
+    else:
+        airgap_text = airgap_manifest.read_text(encoding="utf-8")
+        for permission in ("android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE"):
+            if permission not in airgap_text or 'tools:node="remove"' not in airgap_text:
+                violations.append(f"app/src/airgap/AndroidManifest.xml: must remove {permission}")
 
     for build_file in ROOT.rglob("build.gradle.kts"):
         if any(part in SKIP for part in build_file.parts):

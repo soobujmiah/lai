@@ -1,5 +1,6 @@
 package dev.lai.runtime.model
 
+import dev.lai.runtime.inference.ModelImportSpec
 import dev.lai.runtime.inference.ModelSpec
 
 enum class ArtifactReviewState { METADATA_VERIFIED, BUILD_COMPATIBLE, DEVICE_VALIDATED }
@@ -23,6 +24,13 @@ data class ReviewedModel(
         id = id,
         displayName = displayName,
         url = url,
+        sha256 = sha256,
+        expectedBytes = bytes,
+    )
+
+    fun toImportSpec(): ModelImportSpec = ModelImportSpec(
+        id = id,
+        displayName = displayName,
         sha256 = sha256,
         expectedBytes = bytes,
     )
