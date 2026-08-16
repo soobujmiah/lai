@@ -18,15 +18,13 @@ import java.io.FileInputStream
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-class ModelRepository(
+class ModelRepository private constructor(
     context: Context,
-    private val networkPolicy: LocalFirstPolicy = LocalFirstPolicy(),
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build(),
+    private val networkPolicy: LocalFirstPolicy,
+    private val client: OkHttpClient,
 ) {
+    constructor(context: Context) : this(context, LocalFirstPolicy(), defaultHttpClient())
+
     private val modelDir = File(context.noBackupFilesDir, "models").apply { mkdirs() }
     private val registryFile = File(modelDir, "registry.json")
 
@@ -167,6 +165,12 @@ class ModelRepository(
     }
 
     companion object {
+        private fun defaultHttpClient(): OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .build()
+
         private val ID = Regex("^[a-z0-9][a-z0-9._-]{1,63}$")
         private val SHA256 = Regex("^[a-fA-F0-9]{64}$")
         private const val PROGRESS_STEP_BYTES = 512L * 1024L
