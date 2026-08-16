@@ -10,7 +10,7 @@ import dev.lai.runtime.shell.ShizukuController
 
 class AppContainer(context: Context) {
     val shizukuController = ShizukuController()
-    val elevatedShell = ElevatedShell(shizukuController)
+    val elevatedShell = ElevatedShell(context, shizukuController)
     val modelRepository = ModelRepository(context)
     val inferenceEngine = NativeInferenceEngine()
     val ocrService = BanglaOcrService()

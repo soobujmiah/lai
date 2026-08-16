@@ -81,7 +81,9 @@ class AgentRuntime(
             success = true,
             output = buildJsonObject {
                 put("message", result.message)
-                result.snapshot?.let { put("snapshot", LaiJson.encodeToJsonElement(it)) }
+                result.snapshot?.let {
+                    put("snapshot", LaiJson.encodeToJsonElement(dev.lai.runtime.automation.ScreenSnapshot.serializer(), it))
+                }
             },
         )
     }

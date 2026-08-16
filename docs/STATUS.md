@@ -15,7 +15,7 @@ Legend: **Ready** = implemented and intended to work; **Scaffold** = compiling c
 | Click/type/scroll/global/launch actions | Ready | typed commands; confirmation enforced at agent boundary |
 | Android 11+ accessibility screenshot | Ready | hardware buffer copied to ARGB and closed |
 | Shizuku binder and permission | Ready | state flow, UID, request listener |
-| Elevated operation allowlist | Ready | argv-only policy; no raw shell; tests for injection |
+| Elevated operation allowlist | Ready | Shizuku UserService + argv-only policy; no raw shell; tests for injection |
 | Hugging Face GGUF download | Ready | resume, private storage, SHA-256, GGUF validation |
 | LLM JNI/session interface | Scaffold | stable interface; zero available backends reported |
 | llama.cpp CPU inference | Planned (Phase 2) | no upstream source or binary committed |

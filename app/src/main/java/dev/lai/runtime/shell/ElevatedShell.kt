@@ -1,14 +1,10 @@
 package dev.lai.runtime.shell
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-import rikka.shizuku.Shizuku
+import android.content.Context
 
-class ElevatedShell(private val controller: ShizukuController) {
+class ElevatedShell(context: Context, private val controller: ShizukuController) {
+    private val userService = ShizukuUserServiceClient(context)
+
     suspend fun execute(
         request: PrivilegedCommand,
         confirmationGranted: Boolean,
@@ -21,35 +17,6 @@ class ElevatedShell(private val controller: ShizukuController) {
         if (controller.state.value !is ShizukuState.Ready) {
             return Result.failure(IllegalStateException("Shizuku is not connected and authorized"))
         }
-
-        return runCatching {
-            withContext(Dispatchers.IO) {
-                @Suppress("DEPRECATION")
-                val process = Shizuku.newProcess(approved.argv.toTypedArray(), null, null)
-                try {
-                    coroutineScope {
-                        val stdout = async { process.inputStream.bufferedReader().use { it.readText().take(MAX_OUTPUT) } }
-                        val stderr = async { process.errorStream.bufferedReader().use { it.readText().take(MAX_OUTPUT) } }
-                        val exitCode = withTimeoutOrNull(timeoutMs) {
-                            while (process.isAlive) delay(25)
-                            process.exitValue()
-                        }
-                        if (exitCode == null) process.destroy()
-                        ShellResult(
-                            exitCode = exitCode ?: -1,
-                            stdout = stdout.await(),
-                            stderr = stderr.await(),
-                            timedOut = exitCode == null,
-                        )
-                    }
-                } finally {
-                    if (process.isAlive) process.destroy()
-                }
-            }
-        }
-    }
-
-    companion object {
-        private const val MAX_OUTPUT = 64 * 1024
+        return runCatching { userService.execute(approved.argv, timeoutMs) }
     }
 }

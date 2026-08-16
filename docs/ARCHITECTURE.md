@@ -75,7 +75,7 @@ Selectors are deterministic in this order:
 
 ### Elevated operations
 
-`ShizukuController` observes binder/permission state. `ShellCommandPolicy` accepts named structured operations and emits an argv list. No command string is passed through `sh -c`; package names, namespaces, keys, values, and key codes are validated. Mutations require confirmation. Output is limited to 64 KiB and execution to 10 seconds by default.
+`ShizukuController` observes binder/permission state. `ShellCommandPolicy` accepts named structured operations and emits an argv list. A Shizuku `UserService` executes `ProcessBuilder(argv)` under shell/root identity; the removed/private `newProcess` API is not used. No command string is passed through `sh -c`; package names, namespaces, keys, values, and key codes are validated. Mutations require confirmation. Output is limited to 64 KiB and execution to 10 seconds by default.
 
 ### Model storage
 

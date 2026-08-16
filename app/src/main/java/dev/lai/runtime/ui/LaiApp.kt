@@ -93,7 +93,7 @@ fun LaiApp(viewModel: MainViewModel) {
 }
 
 @Composable
-private fun ModeNavigationItem(
+private fun RowScope.ModeNavigationItem(
     mode: UiMode,
     selected: UiMode,
     label: String,
