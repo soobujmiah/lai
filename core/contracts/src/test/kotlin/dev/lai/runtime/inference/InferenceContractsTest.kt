@@ -1,0 +1,32 @@
+package dev.lai.runtime.inference
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class InferenceContractsTest {
+    @Test
+    fun `generation defaults are bounded and backend capability is explicit`() {
+        val config = GenerationConfig()
+        assertEquals(512, config.maxNewTokens)
+        assertTrue(config.temperature in 0f..2f)
+        val capability = RuntimeCapabilities(
+            nativeLibraryLoaded = true,
+            compiledBackends = setOf(InferenceBackend.CPU),
+            detail = "cpu ready",
+        )
+        assertTrue(InferenceBackend.CPU in capability.compiledBackends)
+        assertFalse(InferenceBackend.QNN in capability.compiledBackends)
+    }
+
+    @Test
+    fun `stream events retain Bangla text and completion count`() {
+        val token = InferenceEvent.Token("বাংলা")
+        val complete = InferenceEvent.Completed(7)
+        val failure = InferenceEvent.Failed("failed")
+        assertEquals("বাংলা", token.text)
+        assertEquals(7, complete.tokensGenerated)
+        assertEquals("failed", failure.message)
+    }
+}
