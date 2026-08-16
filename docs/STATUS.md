@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `a26851e`, [Android run 31953199936](https://github.com/soobujmiah/lai/actions/runs/31953199936). Strict tool schemas/parser tests, trusted one-shot review UI, diagnostics privacy, vendor boundaries, catalog v3, coverage, lint, Kotlin/JNI/native runtime and APK assembly passed. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) previously signed and published revision 3; the exact 1,131-byte asset and detached signature were independently verified.
+Latest release: [`v0.8.0`](https://github.com/soobujmiah/lai/releases/tag/v0.8.0), commit `f377630`, [release run 31953763295](https://github.com/soobujmiah/lai/actions/runs/31953763295). Strict tool schemas/parser tests, trusted one-shot review UI, diagnostics privacy, vendor boundaries, catalog v3, coverage, lint, Kotlin/JNI/native runtime and release APK assembly passed. The published temporary/debug-signed `app-release.apk` is 8,355,060 bytes. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) signed and published revision 3; the exact 1,131-byte catalog asset and detached signature were independently verified.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 

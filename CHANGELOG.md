@@ -89,3 +89,4 @@ All notable changes are documented here. The project follows semantic versioning
 - GitHub Actions run 31951341085 passed opaque backend/device-profile/catalog-v3 contracts, architecture boundaries, coverage, lint, native runtime and APK assembly.
 - Catalog run 31951341094 signed and published revision 3; exact published bytes and detached signature were independently verified.
 - GitHub Actions run 31953199936 passed strict tool-call parser/rejection tests, trusted-review UI compilation, diagnostics privacy, coverage, lint, native runtime and APK assembly.
+- Release run 31953763295 published v0.8.0 with an 8,355,060-byte temporary/debug-signed APK.
