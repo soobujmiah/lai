@@ -4,7 +4,7 @@ Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` (clone URL `https://github.com/soobujmiah/LAI`)  
 Application ID: `dev.lai.runtime`  
 Target device: Xiaomi/Redmi Turbo 4 Pro, Android API 36, QTI SM8735 / Snapdragon 8s Gen 4  
-Latest verified build: GitHub Actions run [`31968037878`](https://github.com/soobujmiah/LAI/actions/runs/31968037878) (commit `34e1281`) — **green** (Phase 2A items 6–8 pushed after it; CI pending)  
+Latest verified build: GitHub Actions run [`31975456732`](https://github.com/soobujmiah/LAI/actions/runs/31975456732) (commit `475f942`) — **green** (Phase 2A items 6–8 + the `PROGRESS_STEP_BYTES` main-fix)  
 Latest device-test release: [`v0.8.2`](https://github.com/soobujmiah/LAI/releases/tag/v0.8.2) (`cbf6ff9`); temporary/debug-signed APK  
 Current graph: **15 Gradle modules** (unchanged this session; Phase 2A items 6–8 completed the vertical slice)
 
@@ -70,21 +70,21 @@ Status vocabulary: **Implemented** = source/contracts exist · **Build verified*
 | Settings validation/migration | Build verified | `SettingsPolicy` validate/sanitize/migrate; range/finite/type/context-dependent checks; unknown-field warnings; deterministic v1 seam | — |
 | Workspace decision layer | Build verified | `WorkspacePolicy.classify` (digest dedup, size/format/count, catalog match) + `WorkspaceSettingsCodec` (bounded, exact-schema) | — |
 | `platform:workspace` SAF adapter | Build verified; device pending | `WorkspaceRepository` (grant, persistable permission, child resolution, layout), `WorkspaceSettingsStore` (temp-write-then-replace), `WorkspaceDiscovery` (bounded traversal + SHA-256 + GGUF magic) | Physical SAF grant/discovery test |
-| Workspace ports | Implemented | `WorkspaceGrantPort` / `SettingsStorePort` / `ModelDiscoveryPort` in `core:contracts`; the SAF adapters implement them so no Android type crosses the seam | — |
-| Settings session semantics | Implemented | `SettingsSession` + `SettingsSessionPolicy`: saved defaults vs one-request override, validate-before-transition, context-aware `maxNewTokens` ceiling | — |
-| Composition wiring | Implemented | `WorkspaceSettingsCoordinator` (pure ports only) owns grant state, session, save/reset, coarse counts; `MainViewModel` binds it and Chat consumes the override once per reply | Physical device pass |
-| Chat ⚙ quick-settings UI | Implemented | `ModalBottomSheet` with creativity/focus/reply-length/memory in plain bilingual language; Apply once · Save default · Reset; ranges mirror `SettingsPolicy` | Physical device pass |
-| Workspace status surface | Implemented | Settings card: `ACTION_OPEN_DOCUMENT_TREE` grant/revoke, status line, manual scan showing coarse REVIEWED / LOCAL_UNREVIEWED counts only | Physical SAF grant/discovery test |
+| Workspace ports | Build verified | `WorkspaceGrantPort` / `SettingsStorePort` / `ModelDiscoveryPort` in `core:contracts`; the SAF adapters implement them so no Android type crosses the seam | — |
+| Settings session semantics | Build verified | `SettingsSession` + `SettingsSessionPolicy`: saved defaults vs one-request override, validate-before-transition, context-aware `maxNewTokens` ceiling | — |
+| Composition wiring | Build verified; device pending | `WorkspaceSettingsCoordinator` (pure ports only) owns grant state, session, save/reset, coarse counts; `MainViewModel` binds it and Chat consumes the override once per reply | Physical device pass |
+| Chat ⚙ quick-settings UI | Build verified; device pending | `ModalBottomSheet` with creativity/focus/reply-length/memory in plain bilingual language; Apply once · Save default · Reset; ranges mirror `SettingsPolicy` | Physical device pass |
+| Workspace status surface | Build verified; device pending | Settings card: `ACTION_OPEN_DOCUMENT_TREE` grant/revoke, status line, manual scan showing coarse REVIEWED / LOCAL_UNREVIEWED counts only | Physical SAF grant/discovery test |
 
 ### 1.6 UI & product surfaces
 
 | Area | Status | Current result | Remaining |
 |---|---|---|---|
 | Compose three-mode shell | Build verified | Chat, Screen Reader, Automator; Developer Mode hidden | Extract feature modules later |
-| Chat | Device validated (basic); ⚙ sheet pending device pass | Local streaming, Stop, New chat, metrics, load controls, **contextual ⚙ quick settings honoured per reply** | Rolling Context Window; physical trim tests |
+| Chat | Device validated (basic); ⚙ sheet build verified, device pending | Local streaming, Stop, New chat, metrics, load controls, **contextual ⚙ quick settings honoured per reply** | Rolling Context Window; physical trim tests |
 | Standalone Tools Dashboard | Planned | Spec exists | Implement over shared contracts |
 | Chat + Attach Tools | Planned | Spec exists | Same contracts as dashboard |
-| Contextual ⚙ quick settings | Implemented (CI/device pending) | LLM-only bottom sheet over shared typed contracts; image/voice/search stay unrendered until a real adapter exists | Physical device pass |
+| Contextual ⚙ quick settings | Build verified; device pending | LLM-only bottom sheet over shared typed contracts; image/voice/search stay unrendered until a real adapter exists | Physical device pass |
 
 ---
 
@@ -331,14 +331,21 @@ Privacy invariants: the settings schema has **no free-text field** (cannot store
 
 ### Phase 2A is code-complete (items 1–8); what remains is verification
 
-All eight Phase 2A items now exist in source. Two gates are still open and must be closed before
-anything here is called finished:
+All eight Phase 2A items exist in source and are **build verified**: run
+[`31975456732`](https://github.com/soobujmiah/LAI/actions/runs/31975456732) (`475f942`) passed the
+source/architecture/catalog/documentation policy, the pure-JVM coverage ratchets, the
+`:platform:audit` / `:platform:download` / `:platform:workspace` / `:app` unit tests and lint, the
+native llama.cpp arm64 build, and debug APK assembly.
 
-1. **CI gate.** Confirm the Actions run for this commit is green — specifically the "Unit tests and
-   lint" step, which is the only real Kotlin compile gate (`scripts/validate_repo.sh` does not
-   compile). Until it passes, everything added this session is *Implemented*, not *Build verified*.
-2. **Device gate (Redmi Turbo 4 Pro, SM8735).** Physically confirm the Phase 2A acceptance list in
-   §4.2 below, then record the result in `docs/device-results/`.
+One gate remains:
+
+1. **Device gate (Redmi Turbo 4 Pro, SM8735).** Physically confirm the Phase 2A acceptance list in
+   §4.1 below, then record the result in `docs/device-results/`.
+
+> Note for the next session: this session also fixed a **pre-existing** main breakage unrelated to
+> Phase 2A. Commit `84862f8` was already red (run `31973297070`): `dcc42d2` deleted
+> `ModelRepository.PROGRESS_STEP_BYTES` while the retained-copy export still referenced it. Restored
+> in `475f942`. Main is green again.
 
 ### 4.1 Phase 2A device acceptance checklist
 

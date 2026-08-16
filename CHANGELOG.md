@@ -14,7 +14,11 @@ All notable changes are documented here. The project follows semantic versioning
 - Added the Settings workspace card: `ACTION_OPEN_DOCUMENT_TREE` grant/revoke, a status line, and a manual scan showing **coarse counts only** (reviewed / local unreviewed) — never a file name, path, or digest.
 - Added 29 pure-JVM tests (11 session-policy, 15 coordinator, 3 codec): session-policy transitions, coordinator behaviour against fake ports (absent workspace → defaults, valid file restores typed values, malformed/oversized falls back without crashing, override never mutates saved defaults, rejected document is never written, failed write keeps previous defaults, save/reset round-trips, revoked grant clears counts), plus truncated-write/unsupported-version/free-text-rejection codec cases.
 - No build-flag or NDK change was required; the Qwen 1.5B / llama.cpp APK path is untouched.
-- Not build-verified until the CI run for this commit passes.
+- **Build verified**: GitHub Actions run `31975456732` (commit `475f942`) passed policy, coverage ratchets, all module unit tests, lint, the native arm64 build, and debug APK assembly.
+
+### Fixed
+
+- Restored `ModelRepository.PROGRESS_STEP_BYTES` (512 KiB), deleted by `dcc42d2` while the retained-copy export at line 166 still referenced it. `main` had been red since that commit (run `31973297070` failed `:platform:download` compilation with `Unresolved reference 'PROGRESS_STEP_BYTES'`); this was a pre-existing break, not a Phase 2A regression.
 
 ### Documentation-first repository audit
 
