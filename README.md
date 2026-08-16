@@ -132,6 +132,7 @@ Use a credential manager or short-lived token. Never place a token in a remote U
 
 ## Documentation index
 
+- [Current project handoff state](PROJECT_STATE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Snapdragon-first vendor backend strategy](docs/VENDOR_BACKEND_STRATEGY.md)
 - [Module ownership](docs/MODULES.md)
