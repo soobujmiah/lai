@@ -1,6 +1,10 @@
 # Implementation status
 
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-17
+
+> The directive-aligned, source-audited status is maintained in [`implementation/current-state.md`](implementation/current-state.md). The canonical full roadmap is [`ROADMAP.md`](ROADMAP.md). This legacy evidence table is retained for detailed build/device history and uses its original evidence vocabulary.
+
+Working-tree candidate: model download/import now has a pre-write expected-size/storage-reserve/8 GiB ceiling with dedicated `platform:download` unit tests and CI wiring. It is **not build verified** until the updated workflow passes.
 
 Latest release: [`v0.8.2`](https://github.com/soobujmiah/lai/releases/tag/v0.8.2), commit `cbf6ff9`, [release run 31958838061](https://github.com/soobujmiah/lai/actions/runs/31958838061). Privacy-safe proposal counters, strengthened exact-format instruction, persistent-ledger/Android file/replay/corruption tests, strict schemas, trusted review UI, diagnostics privacy, vendor boundaries, coverage, lint, Kotlin/JNI/native runtime and release APK assembly passed. The published temporary/debug-signed `app-release.apk` is 8,371,584 bytes. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) signed and published revision 3; the exact 1,131-byte catalog asset and detached signature were independently verified.
 

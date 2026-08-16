@@ -20,6 +20,8 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.OutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
@@ -43,7 +45,11 @@ class ModelRepository private constructor(
             validateDownload(spec)
             modelDir.mkdirs()
             val partialFile = File(modelDir, "${spec.id}.gguf.part")
-            val existingBytes = partialFile.takeIf(File::exists)?.length() ?: 0L
+            var existingBytes = partialFile.takeIf(File::exists)?.length() ?: 0L
+            if (existingBytes > MAX_MODEL_BYTES || spec.expectedBytes?.let { existingBytes > it } == true) {
+                check(partialFile.delete()) { "Could not remove an oversized model staging file" }
+                existingBytes = 0L
+            }
             ensureStorageAvailable(spec.expectedBytes?.minus(existingBytes)?.coerceAtLeast(0))
             val request = Request.Builder()
                 .url(spec.url)
@@ -57,10 +63,21 @@ class ModelRepository private constructor(
                 val append = existingBytes > 0 && response.code == 206
                 if (!append && partialFile.exists()) partialFile.delete()
                 val base = if (append) existingBytes else 0L
-                val total = response.body?.contentLength()?.takeIf { it >= 0 }?.plus(base)
-                    ?: spec.expectedBytes
+                val transferLimit = transferLimit(spec.expectedBytes, base)
+                val responseBytes = response.body?.contentLength()?.takeIf { it >= 0 }
+                responseBytes?.let { length ->
+                    check(length <= transferLimit - base) {
+                        "Model response exceeds the allowed artifact size"
+                    }
+                }
+                val total = responseBytes?.plus(base) ?: spec.expectedBytes
                 response.body?.byteStream()?.use { input ->
-                    streamToPartial(input, partialFile, append, base, total, onProgress)
+                    try {
+                        streamToPartial(input, partialFile, append, base, total, transferLimit, onProgress)
+                    } catch (error: StreamLimitExceededException) {
+                        partialFile.delete()
+                        throw error
+                    }
                 } ?: error("Server returned an empty body")
             }
 
@@ -83,16 +100,32 @@ class ModelRepository private constructor(
     ): Result<InstalledModel> = withContext(Dispatchers.IO) {
         runCatching {
             validateIdentity(spec.id, spec.displayName, spec.sha256)
+            validateExpectedBytes(spec.expectedBytes)
             modelDir.mkdirs()
             val partialFile = File(modelDir, "${spec.id}.gguf.part")
-            ensureStorageAvailable(spec.expectedBytes)
             if (partialFile.exists()) check(partialFile.delete()) { "Could not replace previous import staging file" }
             val providerLength = contentResolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
                 descriptor.length.takeIf { it >= 0 }
             }
             val total = spec.expectedBytes ?: providerLength
+            validateExpectedBytes(total)
+            ensureStorageAvailable(total)
+            val limit = transferLimit(total, base = 0L)
             contentResolver.openInputStream(uri)?.use { input ->
-                streamToPartial(input, partialFile, append = false, base = 0, total = total, onProgress = onProgress)
+                try {
+                    streamToPartial(
+                        input,
+                        partialFile,
+                        append = false,
+                        base = 0,
+                        total = total,
+                        maxTotalBytes = limit,
+                        onProgress = onProgress,
+                    )
+                } catch (error: StreamLimitExceededException) {
+                    partialFile.delete()
+                    throw error
+                }
             } ?: error("Android could not open the selected model file")
             verifyAndActivate(
                 id = spec.id,
@@ -168,30 +201,46 @@ class ModelRepository private constructor(
         }
     }
 
+    /** Maximum final staging size, preserving the storage reserve even when length metadata is absent. */
+    private fun transferLimit(expectedBytes: Long?, base: Long): Long {
+        validateExpectedBytes(expectedBytes)
+        expectedBytes?.let { return it }
+        val available = StatFs(modelDir.absolutePath).availableBytes
+        val writable = (available - STORAGE_RESERVE_BYTES).coerceAtLeast(0L)
+        check(writable > 0L) { "Not enough storage while preserving the safety reserve" }
+        val storageBound = if (base > Long.MAX_VALUE - writable) Long.MAX_VALUE else base + writable
+        return minOf(storageBound, MAX_MODEL_BYTES).also {
+            check(it >= base) { "Existing model staging file exceeds the transfer limit" }
+        }
+    }
+
+    private fun validateExpectedBytes(expectedBytes: Long?) {
+        expectedBytes?.let {
+            require(it in MIN_MODEL_BYTES..MAX_MODEL_BYTES) {
+                "Model size must be between $MIN_MODEL_BYTES and $MAX_MODEL_BYTES bytes"
+            }
+        }
+    }
+
     private fun streamToPartial(
         input: InputStream,
         partialFile: File,
         append: Boolean,
         base: Long,
         total: Long?,
+        maxTotalBytes: Long,
         onProgress: (DownloadProgress) -> Unit,
     ) {
         FileOutputStream(partialFile, append).buffered().use { output ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            var transferred = base
-            var lastReport = base
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                output.write(buffer, 0, read)
-                transferred += read
-                if (transferred - lastReport >= PROGRESS_STEP_BYTES) {
-                    onProgress(DownloadProgress(transferred, total))
-                    lastReport = transferred
-                }
+            copyBounded(
+                input = input,
+                output = output,
+                base = base,
+                maxTotalBytes = maxTotalBytes,
+            ) { transferred ->
+                onProgress(DownloadProgress(transferred, total))
             }
             output.flush()
-            onProgress(DownloadProgress(transferred, total))
         }
     }
 
@@ -236,6 +285,7 @@ class ModelRepository private constructor(
     private fun validateDownload(spec: ModelSpec) {
         val expectedDigest = requireNotNull(spec.sha256) { "A reviewed SHA-256 is required" }
         validateIdentity(spec.id, spec.displayName, expectedDigest)
+        validateExpectedBytes(spec.expectedBytes)
         reviewArtifactNetwork(spec.url, expectedDigest)
     }
 
@@ -293,8 +343,48 @@ class ModelRepository private constructor(
 
         private const val LOCAL_IMPORT_SOURCE = "local-import"
         private const val STORAGE_RESERVE_BYTES = 256L * 1024L * 1024L
+        private const val MIN_MODEL_BYTES = 5L
+        private const val MAX_MODEL_BYTES = 8L * 1024L * 1024L * 1024L
         private val ID = Regex("^[a-z0-9][a-z0-9._-]{1,63}$")
         private val SHA256 = Regex("^[a-fA-F0-9]{64}$")
-        private const val PROGRESS_STEP_BYTES = 512L * 1024L
     }
+}
+
+internal class StreamLimitExceededException(message: String) : IOException(message)
+
+/**
+ * Copies an untrusted stream without ever writing beyond [maxTotalBytes]. The bound is checked
+ * before each write, so a missing or deceptive length cannot consume the device storage reserve.
+ */
+internal fun copyBounded(
+    input: InputStream,
+    output: OutputStream,
+    base: Long,
+    maxTotalBytes: Long,
+    progressStepBytes: Long = 512L * 1024L,
+    onProgress: (Long) -> Unit = {},
+): Long {
+    require(base >= 0L) { "Base byte count must not be negative" }
+    require(maxTotalBytes >= base) { "Transfer limit must include existing bytes" }
+    require(progressStepBytes > 0L) { "Progress step must be positive" }
+
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var transferred = base
+    var lastReport = base
+    while (true) {
+        val read = input.read(buffer)
+        if (read < 0) break
+        if (read == 0) continue
+        if (read.toLong() > maxTotalBytes - transferred) {
+            throw StreamLimitExceededException("Model stream exceeded the $maxTotalBytes-byte transfer limit")
+        }
+        output.write(buffer, 0, read)
+        transferred += read
+        if (transferred - lastReport >= progressStepBytes) {
+            onProgress(transferred)
+            lastReport = transferred
+        }
+    }
+    onProgress(transferred)
+    return transferred
 }

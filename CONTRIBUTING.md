@@ -8,8 +8,10 @@ Every behavioral change must update documentation in the same pull request:
 - implementation boundary → `docs/STATUS.md`;
 - tool schema/policy → `docs/AUTOMATION_TOOLS.md`;
 - threat/control → `docs/SECURITY_AND_SAFETY.md`;
-- build/secrets/dependency → `docs/BUILD_AND_RELEASE.md`;
-- device behavior → `docs/DEVICE_TESTING.md` and redacted evidence.
+- build/secrets/dependency → `docs/BUILD_AND_RELEASE.md` plus third-party/model license registers;
+- device behavior → `docs/DEVICE_TESTING.md` and redacted evidence;
+- roadmap/status → `docs/ROADMAP.md` and `docs/product/feature-matrix.md`;
+- definition/review gate → `docs/product/definition-of-done.md`.
 
 A feature without current docs is incomplete. Do not describe scaffolding as working acceleration or recognition.
 
