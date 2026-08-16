@@ -2,6 +2,10 @@
 
 Build in GitHub Actions, install on the physical phone, collect only redacted evidence, and refine in a new commit. Do not send private screen dumps or tokens.
 
+Recorded results:
+
+- [2026-08-16 — Redmi Turbo 4 Pro, Android 16, Snapdragon 8s Gen 4](device-results/2026-08-16-redmi-turbo-4-pro.md)
+
 ## Device record
 
 ```text

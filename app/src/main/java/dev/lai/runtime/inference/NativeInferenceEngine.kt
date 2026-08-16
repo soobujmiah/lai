@@ -1,13 +1,20 @@
 package dev.lai.runtime.inference
 
+import dev.lai.runtime.core.LaiJson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
-import dev.lai.runtime.core.LaiJson
+import java.util.concurrent.atomic.AtomicBoolean
+
+interface NativeTokenCallback {
+    fun onToken(text: String)
+    fun isCancelled(): Boolean
+}
 
 internal class NativeBindings private constructor() {
     companion object {
@@ -15,7 +22,15 @@ internal class NativeBindings private constructor() {
 
         @JvmStatic external fun runtimeInfo(): String
         @JvmStatic external fun createSession(modelPath: String, backend: String, contextSize: Int): Long
-        @JvmStatic external fun generate(session: Long, prompt: String, configJson: String): String
+        @JvmStatic external fun generate(
+            session: Long,
+            prompt: String,
+            maxNewTokens: Int,
+            temperature: Float,
+            topP: Float,
+            seed: Long,
+            callback: NativeTokenCallback,
+        ): Int
         @JvmStatic external fun destroySession(session: Long)
         @JvmStatic external fun lastError(): String
     }
@@ -25,7 +40,7 @@ internal class NativeBindings private constructor() {
 private data class NativeRuntimeInfo(val backends: List<String> = emptyList(), val detail: String = "")
 
 class NativeInferenceEngine : InferenceEngine {
-    private var session: Long = 0
+    @Volatile private var session: Long = 0
 
     override val capabilities: RuntimeCapabilities by lazy {
         if (!NativeBindings.loaded) {
@@ -56,26 +71,41 @@ class NativeInferenceEngine : InferenceEngine {
         }
     }
 
-    override fun generate(prompt: String, config: GenerationConfig): Flow<InferenceEvent> = flow {
+    override fun generate(prompt: String, config: GenerationConfig): Flow<InferenceEvent> = callbackFlow {
         val handle = session
         if (handle == 0L) {
-            emit(InferenceEvent.Failed("No model is loaded"))
-            return@flow
+            trySend(InferenceEvent.Failed("No model is loaded"))
+            close()
+            return@callbackFlow
         }
-        val response = runCatching {
-            NativeBindings.generate(handle, prompt, LaiJson.encodeToString(GenerationConfig.serializer(), config))
-        }.getOrElse {
-            emit(InferenceEvent.Failed(it.message ?: "Native inference failed"))
-            return@flow
+        val cancelled = AtomicBoolean(false)
+        val worker = launch(Dispatchers.Default) {
+            val count = NativeBindings.generate(
+                session = handle,
+                prompt = prompt,
+                maxNewTokens = config.maxNewTokens.coerceIn(1, 4096),
+                temperature = config.temperature.coerceIn(0f, 2f),
+                topP = config.topP.coerceIn(0.05f, 1f),
+                seed = config.seed,
+                callback = object : NativeTokenCallback {
+                    override fun onToken(text: String) {
+                        if (!cancelled.get()) trySend(InferenceEvent.Token(text))
+                    }
+
+                    override fun isCancelled(): Boolean = cancelled.get()
+                },
+            )
+            if (!cancelled.get()) {
+                if (count >= 0) trySend(InferenceEvent.Completed(count))
+                else trySend(InferenceEvent.Failed(NativeBindings.lastError().ifBlank { "Native inference failed" }))
+            }
+            close()
         }
-        if (response.isBlank()) {
-            emit(InferenceEvent.Failed(NativeBindings.lastError()))
-        } else {
-            // Phase 1 JNI returns a complete response. Concrete backends will expose token callbacks.
-            emit(InferenceEvent.Token(response))
-            emit(InferenceEvent.Completed(response.length))
+        awaitClose {
+            cancelled.set(true)
+            worker.cancel()
         }
-    }.flowOn(Dispatchers.Default)
+    }
 
     override fun close() {
         val handle = session

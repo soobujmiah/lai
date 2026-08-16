@@ -286,7 +286,28 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
             if (state.installedModels.isNotEmpty()) {
                 Text("Installed", fontWeight = FontWeight.SemiBold)
                 state.installedModels.forEach { model ->
-                    Text("• ${model.displayName} (${model.bytes / 1_048_576} MB)")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(model.displayName, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${model.bytes / 1_048_576} MB • ${model.sha256.take(12)}…",
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                        if (state.activeModelId == model.id) {
+                            OutlinedButton(onClick = viewModel::unloadModel, enabled = !state.busy) {
+                                Text("Unload")
+                            }
+                        } else {
+                            Button(onClick = { viewModel.loadModel(model.id) }, enabled = !state.busy) {
+                                Text("Load")
+                            }
+                        }
+                    }
                 }
                 HorizontalDivider()
             }

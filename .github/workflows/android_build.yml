@@ -28,6 +28,7 @@ env:
   ANDROID_BUILD_TOOLS: '35.0.0'
   ANDROID_NDK: '27.0.12077973'
   CMAKE_VERSION: '3.22.1'
+  LLAMA_CPP_COMMIT: 'ad1de39e0708e3ced9c71bb3c82d93a2c046a73f'
 
 jobs:
   source-policy:
@@ -95,15 +96,26 @@ jobs:
             echo "LAI_KEY_PASSWORD=$KEY_PASSWORD"
           } >> "$GITHUB_ENV"
 
+      - name: Fetch pinned llama.cpp source
+        shell: bash
+        run: |
+          bash scripts/ci/fetch_llama_cpp.sh "$LLAMA_CPP_COMMIT" "$RUNNER_TEMP/llama.cpp"
+          echo "LAI_LLAMA_CPP_DIR=$RUNNER_TEMP/llama.cpp" >> "$GITHUB_ENV"
+
       - name: Unit tests and lint
-        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:lintDebug
+        run: >-
+          gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:lintDebug
+          -Plai.enableLlamaCpp=ON
+          -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
 
       - name: Build debug APK and native arm64 library
         if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
         run: >-
           gradle --no-daemon --stacktrace :app:assembleDebug
           -Plai.versionCode=${{ github.run_number }}
-          -Plai.versionName=0.1.${{ github.run_number }}
+          -Plai.versionName=0.2.${{ github.run_number }}
+          -Plai.enableLlamaCpp=ON
+          -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
 
       - name: Build release APK and native arm64 library
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
@@ -113,7 +125,9 @@ jobs:
           if [[ "$VERSION_NAME" == "$GITHUB_REF_NAME" ]]; then VERSION_NAME="0.1.${GITHUB_RUN_NUMBER}"; fi
           gradle --no-daemon --stacktrace :app:assembleRelease \
             -Plai.versionCode="${GITHUB_RUN_NUMBER}" \
-            -Plai.versionName="$VERSION_NAME"
+            -Plai.versionName="$VERSION_NAME" \
+            -Plai.enableLlamaCpp=ON \
+            -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
 
       - name: Inventory native and APK artifacts
         if: always()

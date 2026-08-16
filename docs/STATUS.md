@@ -19,8 +19,8 @@ Legend: **Ready** = implemented and intended to work; **Scaffold** = compiling c
 | Shizuku binder and permission | Ready | state flow, UID, request listener |
 | Elevated operation allowlist | Ready | Shizuku UserService + argv-only policy; no raw shell; tests for injection |
 | Hugging Face GGUF download | Ready | resume, private storage, SHA-256, GGUF validation |
-| LLM JNI/session interface | Scaffold | stable interface; zero available backends reported |
-| llama.cpp CPU inference | Planned (Phase 2) | no upstream source or binary committed |
+| LLM JNI/session interface | Candidate | cancellable per-token callback interface added; awaiting Phase 2 remote build verification |
+| llama.cpp CPU inference | Candidate (Phase 2) | real loader/tokenizer/sampler/streaming adapter added; awaiting CI and device GGUF validation |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | requires licensed SDK/runtime and physical device |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |

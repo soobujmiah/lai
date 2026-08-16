@@ -1,5 +1,7 @@
-# JNI entry points are resolved by their Java names.
+# JNI entry points and callback methods are resolved by their Java names.
 -keep class dev.lai.runtime.inference.NativeBindings { *; }
+-keep interface dev.lai.runtime.inference.NativeTokenCallback { *; }
+-keep class * implements dev.lai.runtime.inference.NativeTokenCallback { *; }
 
 # Shizuku provider, binder APIs, and remotely instantiated UserService.
 -keep class rikka.shizuku.** { *; }

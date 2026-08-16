@@ -9,6 +9,8 @@ import dev.lai.runtime.LaiApplication
 import dev.lai.runtime.agent.ToolCall
 import dev.lai.runtime.automation.AccessibilityGateway
 import dev.lai.runtime.inference.DownloadProgress
+import dev.lai.runtime.inference.InferenceBackend
+import dev.lai.runtime.inference.InferenceEvent
 import dev.lai.runtime.inference.InstalledModel
 import dev.lai.runtime.inference.ModelSpec
 import dev.lai.runtime.shell.ShizukuState
@@ -37,6 +39,7 @@ data class MainUiState(
     val developerMode: Boolean = false,
     val settingsVisible: Boolean = false,
     val installedModels: List<InstalledModel> = emptyList(),
+    val activeModelId: String? = null,
     val modelName: String = "",
     val modelUrl: String = "",
     val modelSha: String = "",
@@ -75,22 +78,57 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun sendMessage() {
         val prompt = state.value.input.trim()
         if (prompt.isEmpty() || state.value.busy) return
+        val immediateMessage = when {
+            state.value.installedModels.isEmpty() ->
+                "লোকাল মডেল এখনো ইনস্টল করা নেই। Settings → Developer mode থেকে একটি GGUF মডেল যোগ করুন।"
+            state.value.activeModelId == null ->
+                "মডেল ইনস্টল করা আছে। Settings → Developer mode থেকে মডেলটি Load করুন।"
+            else -> null
+        }
+        if (immediateMessage != null) {
+            _state.update {
+                it.copy(
+                    input = "",
+                    messages = it.messages + ChatMessage(true, prompt) + ChatMessage(false, immediateMessage),
+                )
+            }
+            return
+        }
+
         _state.update {
             it.copy(
                 input = "",
-                messages = it.messages + ChatMessage(true, prompt),
+                messages = it.messages + ChatMessage(true, prompt) + ChatMessage(false, ""),
                 busy = true,
             )
         }
         viewModelScope.launch {
-            val response = when {
-                state.value.installedModels.isEmpty() ->
-                    "লোকাল মডেল এখনো ইনস্টল করা নেই। Settings → Developer mode থেকে একটি GGUF মডেল যোগ করুন।"
-                container.inferenceEngine.capabilities.compiledBackends.isEmpty() ->
-                    "মডেলটি সংরক্ষিত আছে, কিন্তু এই Phase 1 APK-তে concrete llama.cpp/QNN backend নেই। Native adapter যুক্ত হলে inference চালু হবে।"
-                else -> "Inference backend is available, but model selection is not configured."
+            container.inferenceEngine.generate(prompt).collect { event ->
+                when (event) {
+                    is InferenceEvent.Token -> appendAssistantToken(event.text)
+                    is InferenceEvent.Completed -> _state.update {
+                        it.copy(busy = false, notice = "Generated ${event.tokensGenerated} tokens locally")
+                    }
+                    is InferenceEvent.Failed -> _state.update {
+                        val updated = it.messages.toMutableList()
+                        if (updated.lastOrNull()?.fromUser == false && updated.last().text.isBlank()) {
+                            updated[updated.lastIndex] = ChatMessage(false, "Inference failed: ${event.message}")
+                        }
+                        it.copy(messages = updated, busy = false, notice = event.message)
+                    }
+                }
             }
-            _state.update { it.copy(messages = it.messages + ChatMessage(false, response), busy = false) }
+        }
+    }
+
+    private fun appendAssistantToken(token: String) {
+        _state.update { current ->
+            val messages = current.messages.toMutableList()
+            val last = messages.lastOrNull()
+            if (last != null && !last.fromUser) {
+                messages[messages.lastIndex] = last.copy(text = last.text + token)
+            }
+            current.copy(messages = messages)
         }
     }
 
@@ -134,6 +172,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    fun loadModel(modelId: String) {
+        if (state.value.busy) return
+        val model = state.value.installedModels.firstOrNull { it.id == modelId } ?: return
+        _state.update { it.copy(busy = true, notice = "Loading ${model.displayName}…") }
+        viewModelScope.launch {
+            val result = runCatching { container.modelRepository.resolve(model) }
+                .mapCatching { file ->
+                    container.inferenceEngine.load(file.absolutePath, InferenceBackend.CPU).getOrThrow()
+                }
+            result.onSuccess {
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        activeModelId = model.id,
+                        notice = "${model.displayName} is ready for local chat",
+                    )
+                }
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        activeModelId = null,
+                        notice = error.message ?: "Model loading failed",
+                    )
+                }
+            }
+        }
+    }
+
+    fun unloadModel() {
+        container.inferenceEngine.close()
+        _state.update { it.copy(activeModelId = null, notice = "Model unloaded") }
     }
 
     fun downloadModel() {

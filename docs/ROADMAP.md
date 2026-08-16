@@ -12,7 +12,7 @@
 - [x] Bangla OCR interface/schema and honest placeholder
 - [x] architecture, safety, build, and test documentation
 - [x] first GitHub Actions green build and resulting fixes ([run 31917533925](https://github.com/soobujmiah/lai/actions/runs/31917533925))
-- [ ] physical Snapdragon 8s Gen 4 smoke evidence
+- [x] physical Snapdragon 8s Gen 4 smoke evidence ([Redmi Turbo 4 Pro result](device-results/2026-08-16-redmi-turbo-4-pro.md))
 
 ## Phase 2 — usable local intelligence
 

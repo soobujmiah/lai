@@ -39,12 +39,25 @@ A backend is shown as available only after compile-time linkage and runtime prob
 
 ### CPU / llama.cpp (Phase 2)
 
-- pin upstream by immutable commit;
-- fetch only in GitHub Actions;
-- compile arm64 with Android NDK;
-- expose cancellation and streaming callbacks;
-- bound context, batch, thread count, and memory;
-- run a deterministic prompt/golden UTF-8 smoke test.
+Current candidate pins upstream commit `ad1de39e0708e3ced9c71bb3c82d93a2c046a73f` (release `b10448`). CI verifies the full SHA before compilation; no upstream source is committed.
+
+Implemented in the candidate:
+
+- arm64 Android NDK static linkage into `liblai_runtime.so`;
+- mmap GGUF loading with CPU-only layer policy;
+- explicit 4,096-token context and bounded 512-token prompt batches;
+- 2–8 thread routing based on hardware concurrency;
+- model-native chat-template application with a Bangla-first system message;
+- top-p/temperature/distribution sampling and greedy mode;
+- per-token JNI callbacks, UTF-8/UTF-16-safe conversion, and cooperative cancellation;
+- explicit load/unload controls in Developer Mode.
+
+Still required before calling it device-ready:
+
+- green remote native build for the pinned revision;
+- a deterministic small-model smoke test;
+- physical GGUF load, Bangla generation, cancellation, memory and thermal evidence;
+- session-level conversation history and context-shift policy.
 
 ### Adreno Vulkan (Phase 2)
 

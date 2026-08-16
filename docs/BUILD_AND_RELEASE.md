@@ -17,10 +17,11 @@ The build performs:
 1. source/docs/secret policy validation;
 2. JDK 17 setup;
 3. API 35, Build Tools 35.0.0, NDK 27.0.12077973, and CMake 3.22.1 install on the runner;
-4. Kotlin unit tests and Android lint;
-5. Kotlin/Compose resources and arm64 C++ JNI compilation;
-6. APK assembly and artifact upload;
-7. release upload for a version tag.
+4. immutable-SHA llama.cpp fetch into runner-temporary storage;
+5. Kotlin unit tests and Android lint;
+6. Kotlin/Compose resources and arm64 C++/llama.cpp JNI compilation;
+7. APK assembly and artifact upload;
+8. release upload for a version tag.
 
 ## Trigger manually
 

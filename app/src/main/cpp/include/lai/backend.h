@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -14,10 +15,18 @@ struct GenerationOptions {
     long long seed = -1;
 };
 
+using TokenCallback = std::function<bool(std::string_view)>;
+using CancelCallback = std::function<bool()>;
+
 class BackendSession {
 public:
     virtual ~BackendSession() = default;
-    virtual std::string generate(std::string_view prompt, const GenerationOptions& options) = 0;
+    virtual int generate(
+        std::string_view prompt,
+        const GenerationOptions& options,
+        const TokenCallback& on_token,
+        const CancelCallback& is_cancelled
+    ) = 0;
 };
 
 class Backend {
@@ -33,5 +42,9 @@ public:
 };
 
 std::vector<std::unique_ptr<Backend>> create_backends();
+
+#ifdef LAI_HAS_LLAMA_CPP
+std::unique_ptr<Backend> create_llama_cpu_backend();
+#endif
 
 }  // namespace lai

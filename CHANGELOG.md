@@ -17,6 +17,14 @@ All notable changes are documented here. The project follows semantic versioning
 - Source-only 128 MB and documentation policy checks.
 - Architecture, safety, backend, OCR, automation, build, and device-test documentation.
 
+### Phase 2 candidate
+
+- Added immutable-commit llama.cpp acquisition in GitHub Actions without committing upstream source.
+- Added real CPU GGUF loading, model chat-template formatting, bounded prompt evaluation and sampling.
+- Added cancellable per-token JNI streaming with UTF-8/UTF-16-safe conversion.
+- Added explicit model load/unload controls and live Compose chat updates.
+- Recorded successful Redmi Turbo 4 Pro Phase 1 physical-device evidence.
+
 ### Verified
 
 - GitHub Actions run 31917533925 passed source policy, remote toolchain setup, Kotlin/C++ compilation, unit tests, Android lint, debug APK assembly, and artifact upload.

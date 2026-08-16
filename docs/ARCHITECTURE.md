@@ -79,11 +79,11 @@ Selectors are deterministic in this order:
 
 ### Model storage
 
-`ModelRepository` streams directly to app-private no-backup storage. It supports HTTP Range resume, optional SHA-256, mandatory HTTPS/Hugging Face host policy, and GGUF magic validation. Registry replacement is write-then-rename. The repository contains no weights.
+`ModelRepository` streams directly to app-private no-backup storage. It supports HTTP Range resume, optional SHA-256, mandatory HTTPS/Hugging Face host policy, and GGUF magic validation. Registry replacement is write-then-rename. The repository contains no weights. Installed models are loaded only after an explicit user tap, preventing multi-gigabyte startup allocations.
 
 ### Native inference
 
-Kotlin owns one `InferenceEngine`; JNI maps opaque integer handles to C++ `BackendSession` instances. C++ validates file existence, GGUF magic, context range, and backend availability. The Phase 1 registry contains unavailable adapters to preserve shape without misreporting support.
+Kotlin owns one `InferenceEngine`; JNI maps opaque integer handles to shared C++ `BackendSession` instances. C++ validates file existence, GGUF magic, context range, and backend availability. The Phase 2 CPU candidate uses pinned llama.cpp, clears context memory per request, applies the model chat template, evaluates bounded prompt batches, samples tokens, and streams only complete UTF-8 code-point sequences through a cancellable JNI callback. Vulkan and QNN remain unavailable adapters, so capability reporting stays truthful.
 
 A production adapter must provide:
 
