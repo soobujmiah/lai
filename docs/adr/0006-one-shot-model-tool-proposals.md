@@ -1,6 +1,6 @@
 # ADR 0006: Opt-in one-shot model tool proposals
 
-- Status: Accepted implementation candidate; remote/device verification pending
+- Status: Accepted; build verified, device verification pending
 - Date: 2026-08-16
 
 ## Context
@@ -55,7 +55,7 @@ Costs:
 
 ## Current limitation
 
-This is a one-action proposal mechanism, not an autonomous agent. It has source/unit-test coverage but still needs GitHub compilation and physical validation with the selected Qwen model, Accessibility, Shizuku, rotation/backgrounding, denial, replay attempts, prompt injection, and diagnostics inspection.
+This is a one-action proposal mechanism, not an autonomous agent. GitHub run 31953199936 passed parser tests, coverage, Kotlin/C++, lint and APK assembly, but it still needs physical validation with the selected Qwen model, Accessibility, Shizuku, rotation/backgrounding, denial, replay attempts, prompt injection, and diagnostics inspection.
 
 ## Future migration path
 

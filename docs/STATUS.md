@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `a0b9f29`, [Android run 31951341085](https://github.com/soobujmiah/lai/actions/runs/31951341085). Vendor boundaries, catalog v3, coverage, retained-model SAF path, diagnostics, lint, Kotlin/JNI/native runtime and APK assembly passed. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) signed and published revision 3; the exact 1,131-byte asset and detached signature were independently verified.
+Latest verified remote build: commit `a26851e`, [Android run 31953199936](https://github.com/soobujmiah/lai/actions/runs/31953199936). Strict tool schemas/parser tests, trusted one-shot review UI, diagnostics privacy, vendor boundaries, catalog v3, coverage, lint, Kotlin/JNI/native runtime and APK assembly passed. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) previously signed and published revision 3; the exact 1,131-byte asset and detached signature were independently verified.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
@@ -35,7 +35,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | QAIRT/QNN HTP offload | Planned (Phase 3) | Snapdragon priority; requires a dedicated isolated adapter, converted artifact, licensed SDK/runtime and physical-device evidence |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
 | Bangla handwriting OCR | Planned | dataset/model/license selection required |
-| One-shot LLM tool proposals | Source candidate | opt-in trusted system schema, exact bounded JSON parser, per-tool validation, second dispatch validation, one-time Compose approval and 50-record content-free in-memory audit; CI/device validation pending |
+| One-shot LLM tool proposals | Build verified | opt-in trusted system schema, exact bounded JSON parser, per-tool validation, second dispatch validation, one-time Compose approval and 50-record content-free in-memory audit passed run 31953199936; device validation pending |
 | Autonomous multi-step tool loop | Planned | requires replay-resistant persistent audit, foreground binding, result feedback, loop limits and adversarial device evidence |
 | RAG / STT / TTS plugins | Planned | interfaces to be designed after runtime stabilization |
 
