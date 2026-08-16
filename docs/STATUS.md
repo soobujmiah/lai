@@ -35,7 +35,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | QAIRT/QNN HTP offload | Planned (Phase 3) | Snapdragon priority; requires a dedicated isolated adapter, converted artifact, licensed SDK/runtime and physical-device evidence |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
 | Bangla handwriting OCR | Planned | dataset/model/license selection required |
-| One-shot LLM tool proposals | Build verified; model-compliance gate failed | v0.8.0 produced no valid proposal; stronger exact-format instruction and privacy-safe accepted/rejected/not-tool counters are source candidates for the next retest |
+| One-shot LLM tool proposals | Build verified; model-compliance retest required | v0.8.0 produced no valid proposal; stronger exact-format instruction and privacy-safe accepted/rejected/not-tool counters passed run 31958557120 |
 | Persistent tool audit/replay guard | Build verified v0.8.1 | no-backup JSONL, approval-before-authority fsync, bounded full-chain verification, Android file tests, content-free records and exact-call replay rejection passed run 31956572135; device validation pending |
 | Autonomous multi-step tool loop | Planned | requires foreground binding, typed result provenance/feedback, loop limits, cancellation and adversarial device evidence |
 | RAG / STT / TTS plugins | Planned | interfaces to be designed after runtime stabilization |
