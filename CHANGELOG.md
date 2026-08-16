@@ -27,4 +27,5 @@ All notable changes are documented here. The project follows semantic versioning
 
 ### Verified
 
-- GitHub Actions run 31917533925 passed source policy, remote toolchain setup, Kotlin/C++ compilation, unit tests, Android lint, debug APK assembly, and artifact upload.
+- GitHub Actions run 31917533925 passed the Phase 1 source policy, toolchain, Kotlin/C++, tests, lint, APK, and artifact pipeline.
+- GitHub Actions run 31919286438 passed immutable llama.cpp acquisition, Kotlin tests/lint, full arm64 llama.cpp/ggml/JNI compilation, APK assembly, and artifact upload.

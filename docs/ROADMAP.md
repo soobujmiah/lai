@@ -16,10 +16,11 @@
 
 ## Phase 2 — usable local intelligence
 
-- [ ] pin/fetch llama.cpp in CI
-- [ ] CPU session, cancellation, token streaming
+- [x] pin/fetch llama.cpp in CI
+- [x] CPU session, cancellation, token streaming
 - [ ] GGML Vulkan build and Adreno capability self-test
-- [ ] model selection, load/unload, memory estimator
+- [x] model selection and explicit load/unload
+- [ ] pre-load memory estimator and low-memory refusal
 - [ ] Bangla system prompt/templates and evaluation pack
 - [ ] parse LLM-proposed tool calls with strict schema
 - [ ] trusted confirmation sheet and redacted audit records

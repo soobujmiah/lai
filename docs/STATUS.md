@@ -2,9 +2,9 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `9ac684e`, [GitHub Actions run 31917533925](https://github.com/soobujmiah/lai/actions/runs/31917533925). Source policy, Kotlin/C++, unit tests, lint, APK assembly, and artifact upload passed. The resulting `lai-debug-9` artifact is approximately 10.9 MB.
+Latest verified remote build: commit `6b1f930`, [GitHub Actions run 31919286438](https://github.com/soobujmiah/lai/actions/runs/31919286438). Source policy, immutable llama.cpp fetch, Kotlin tests, lint, arm64 llama.cpp/ggml/JNI compilation, APK assembly, and artifact upload passed. The `lai-debug-16` artifact archive is approximately 13.7 MB.
 
-Legend: **Ready** = implemented and intended to work; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
+Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
 | Capability | Status | Evidence / boundary |
 |---|---|---|
@@ -19,8 +19,8 @@ Legend: **Ready** = implemented and intended to work; **Scaffold** = compiling c
 | Shizuku binder and permission | Ready | state flow, UID, request listener |
 | Elevated operation allowlist | Ready | Shizuku UserService + argv-only policy; no raw shell; tests for injection |
 | Hugging Face GGUF download | Ready | resume, private storage, SHA-256, GGUF validation |
-| LLM JNI/session interface | Candidate | cancellable per-token callback interface added; awaiting Phase 2 remote build verification |
-| llama.cpp CPU inference | Candidate (Phase 2) | real loader/tokenizer/sampler/streaming adapter added; awaiting CI and device GGUF validation |
+| LLM JNI/session interface | Build verified | cancellable per-token callback compiled and packaged; device stream test pending |
+| llama.cpp CPU inference | Build verified (Phase 2) | loader/tokenizer/chat template/sampler compiled; physical GGUF and Bangla validation pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | requires licensed SDK/runtime and physical device |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
