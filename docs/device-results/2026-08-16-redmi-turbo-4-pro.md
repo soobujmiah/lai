@@ -45,14 +45,30 @@ Virtual memory is recorded as device configuration, not treated as equivalent to
 
 The supplied screenshots were reviewed but are not committed. Their status bars contain network/device metadata, and textual evidence is sufficient for this gate.
 
+## Phase 2 CPU model evidence
+
+A later on-device report from the same Redmi Turbo 4 Pro confirmed:
+
+- llama.cpp CPU backend reported ready;
+- Qwen 2.5 1.5B Instruct Q4_K_M installed with expected 1,065 MiB display size and digest prefix `6a1a2eb6d156…`;
+- scheduler selected CPU using evidence and deterministic fallback order;
+- Android reported 3,077 MiB available memory;
+- conservative estimated model peak was 1,833 MiB, so memory preflight allowed loading;
+- battery was 79%, not charging;
+- thermal state was `NOMINAL`;
+- model session was loaded (Unload control active);
+- one local generation completed with 15 tokens;
+- no crash or freeze was reported.
+
+The supported-model status remained `Embedded supported-model list available offline`; signed web refresh/cache is not yet physically validated. The generated response content, Bangla quality, load latency, TTFT, decode speed, cancellation and sustained thermals were not shown, so those claims remain pending.
+
+The supplied screenshots were reviewed but not committed because status bars contain device/network metadata.
+
 ## Next gate
 
-Install the first Phase 2 CPU build, download a small compatible instruct GGUF, load it explicitly, and record:
-
-- model name and SHA-256;
-- load duration and peak memory;
-- first Bangla token correctness;
-- time to first token and decode rate;
-- cancellation behavior;
-- 10-minute thermal behavior;
-- crash/log evidence, if any.
+- refresh and cache the signed catalog, then restart offline;
+- capture the actual Bangla response;
+- measure load time, TTFT and decode speed with v0.7;
+- cancel a long response and immediately generate again;
+- run a 10-minute thermal test;
+- provide crash/log evidence if any.

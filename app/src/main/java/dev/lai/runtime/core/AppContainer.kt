@@ -1,5 +1,6 @@
 package dev.lai.runtime.core
 
+import android.content.ComponentCallbacks2
 import android.content.Context
 import dev.lai.runtime.agent.AgentRuntime
 import dev.lai.runtime.device.AndroidRuntimeEnvironmentProvider
@@ -11,6 +12,12 @@ import dev.lai.runtime.scheduler.InferenceScheduler
 import dev.lai.runtime.scheduler.ModelMemoryEstimator
 import dev.lai.runtime.shell.ElevatedShell
 import dev.lai.runtime.shell.ShizukuController
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+
+sealed interface AppRuntimeEvent {
+    data class ModelUnloadedForMemory(val level: Int) : AppRuntimeEvent
+}
 
 class AppContainer(context: Context) {
     val shizukuController = ShizukuController()
@@ -23,4 +30,22 @@ class AppContainer(context: Context) {
     val runtimeEnvironment = AndroidRuntimeEnvironmentProvider(context)
     val ocrService = BanglaOcrService()
     val agentRuntime = AgentRuntime(elevatedShell, shizukuController, ocrService)
+
+    private val _events = MutableSharedFlow<AppRuntimeEvent>(extraBufferCapacity = 4)
+    val events = _events.asSharedFlow()
+
+    fun onTrimMemory(level: Int) {
+        if (
+            level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+            level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE
+        ) {
+            inferenceEngine.close()
+            _events.tryEmit(AppRuntimeEvent.ModelUnloadedForMemory(level))
+        }
+    }
+
+    fun onLowMemory() {
+        inferenceEngine.close()
+        _events.tryEmit(AppRuntimeEvent.ModelUnloadedForMemory(Int.MAX_VALUE))
+    }
 }

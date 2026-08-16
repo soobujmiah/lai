@@ -58,12 +58,13 @@ Implemented in the candidate:
 - per-token JNI callbacks, UTF-8/UTF-16-safe conversion, and cooperative cancellation;
 - explicit load/unload controls in Developer Mode.
 
-Still required before calling it device-ready:
+Still required before calling it production-ready:
 
-- green remote native build for the pinned revision;
-- a deterministic small-model smoke test;
-- physical GGUF load, Bangla generation, cancellation, memory and thermal evidence;
-- session-level conversation history and context-shift policy.
+- verify actual Bangla response quality, not only token completion;
+- physical Stop/recovery, multi-turn trimming and metrics validation;
+- deterministic golden-prompt smoke artifact suitable for CI;
+- 10-minute memory and thermal evidence;
+- explicit long-conversation summarization policy beyond oldest-turn omission.
 
 ### Adreno Vulkan (Phase 2)
 
@@ -94,12 +95,13 @@ The production adapter should support:
 ```kotlin
 runtimeInfo(): String
 createSession(modelPath, backend, contextSize): Long
-generate(session, prompt, configJson): String
+countTokens(session, roles[], contents[]): Int
+generate(session, roles[], contents[], sampling, callback): LongArray?
 destroySession(session)
 lastError(): String
 ```
 
-Phase 2 will replace whole-response `generate` with a callback/cancellable stream while preserving session ownership. JNI inputs are UTF-8 Java strings; model files stay on native-accessible app storage.
+`generate` streams UTF-safe pieces through the callback and returns local timing counters. Conversation history is supplied on each request so context state is deterministic; JNI converts Java UTF-16 to standard UTF-8 for llama.cpp. Model files stay in native-accessible app-private storage.
 
 ## Memory planning
 

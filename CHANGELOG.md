@@ -33,6 +33,15 @@ All notable changes are documented here. The project follows semantic versioning
 - Superseded the short-lived dual-edition experiment with one local-first app and upgrade path.
 - Added an ECDSA-signed web supported-model catalog, encrypted CI signing key, schema validation, verified cache and embedded offline fallback.
 
+### v0.7 runtime reliability candidate
+
+- Added multi-turn conversation arrays through Kotlin/JNI/model-native chat templates.
+- Added native token counting and oldest-turn trimming against the 4,096-token context.
+- Added explicit runtime operation states, Stop and New chat controls.
+- Added native model-load, prompt-evaluation, TTFT, decode and total-time measurements; values remain local.
+- Added Android memory-pressure model release and download/import storage preflight.
+- Recorded Redmi Turbo 4 Pro evidence for Qwen installation, CPU scheduling, memory preflight, nominal thermal state and a 15-token local generation.
+
 ### Phase 2 candidate
 
 - Added immutable-commit llama.cpp acquisition in GitHub Actions without committing upstream source.

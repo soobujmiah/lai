@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -156,6 +157,29 @@ std::shared_ptr<lai::BackendSession> find_session(long long handle) {
     return iterator == g_sessions.end() ? nullptr : iterator->second;
 }
 
+std::vector<lai::ChatMessage> from_conversation(
+    JNIEnv* env,
+    jobjectArray roles,
+    jobjectArray contents
+) {
+    if (roles == nullptr || contents == nullptr) throw std::invalid_argument("Conversation arrays are required");
+    const jsize role_count = env->GetArrayLength(roles);
+    const jsize content_count = env->GetArrayLength(contents);
+    if (role_count != content_count || role_count < 1 || role_count > 512) {
+        throw std::invalid_argument("Conversation array sizes are invalid");
+    }
+    std::vector<lai::ChatMessage> result;
+    result.reserve(static_cast<size_t>(role_count));
+    for (jsize index = 0; index < role_count; ++index) {
+        auto role = static_cast<jstring>(env->GetObjectArrayElement(roles, index));
+        auto content = static_cast<jstring>(env->GetObjectArrayElement(contents, index));
+        result.push_back({from_jstring(env, role), from_jstring(env, content)});
+        env->DeleteLocalRef(role);
+        env->DeleteLocalRef(content);
+    }
+    return result;
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -220,12 +244,13 @@ Java_dev_lai_runtime_inference_NativeBindings_createSession(
     return 0;
 }
 
-extern "C" JNIEXPORT jint JNICALL
+extern "C" JNIEXPORT jlongArray JNICALL
 Java_dev_lai_runtime_inference_NativeBindings_generate(
     JNIEnv* env,
     jclass,
     jlong session_handle,
-    jstring prompt_value,
+    jobjectArray roles,
+    jobjectArray contents,
     jint max_new_tokens,
     jfloat temperature,
     jfloat top_p,
@@ -235,45 +260,45 @@ Java_dev_lai_runtime_inference_NativeBindings_generate(
     const auto session = find_session(static_cast<long long>(session_handle));
     if (session == nullptr) {
         set_error("Invalid or closed inference session");
-        return -1;
+        return nullptr;
     }
     if (callback == nullptr) {
         set_error("Token callback is required");
-        return -1;
+        return nullptr;
     }
     const jclass callback_class = env->GetObjectClass(callback);
     const jmethodID on_token_method = env->GetMethodID(callback_class, "onToken", "(Ljava/lang/String;)V");
     const jmethodID is_cancelled_method = env->GetMethodID(callback_class, "isCancelled", "()Z");
     if (on_token_method == nullptr || is_cancelled_method == nullptr) {
         set_error("Token callback contract is incompatible");
-        return -1;
+        return nullptr;
     }
 
-    const std::string prompt = from_jstring(env, prompt_value);
-    lai::GenerationOptions options{
-        static_cast<int>(max_new_tokens),
-        static_cast<float>(temperature),
-        static_cast<float>(top_p),
-        static_cast<long long>(seed),
-    };
-    std::string pending_utf8;
-    auto cancelled = [&]() {
-        const jboolean result = env->CallBooleanMethod(callback, is_cancelled_method);
-        return env->ExceptionCheck() || result == JNI_TRUE;
-    };
-    auto emit = [&](std::string_view bytes) {
-        pending_utf8.append(bytes);
-        const size_t complete = complete_utf8_prefix(pending_utf8);
-        if (complete == 0) return !cancelled();
-        const jstring text = to_jstring(env, std::string_view(pending_utf8).substr(0, complete));
-        env->CallVoidMethod(callback, on_token_method, text);
-        env->DeleteLocalRef(text);
-        pending_utf8.erase(0, complete);
-        return !env->ExceptionCheck() && !cancelled();
-    };
-
     try {
-        const int generated = session->generate(prompt, options, emit, cancelled);
+        const auto conversation = from_conversation(env, roles, contents);
+        lai::GenerationOptions options{
+            static_cast<int>(max_new_tokens),
+            static_cast<float>(temperature),
+            static_cast<float>(top_p),
+            static_cast<long long>(seed),
+        };
+        std::string pending_utf8;
+        auto cancelled = [&]() {
+            const jboolean result = env->CallBooleanMethod(callback, is_cancelled_method);
+            return env->ExceptionCheck() || result == JNI_TRUE;
+        };
+        auto emit = [&](std::string_view bytes) {
+            pending_utf8.append(bytes);
+            const size_t complete = complete_utf8_prefix(pending_utf8);
+            if (complete == 0) return !cancelled();
+            const jstring text = to_jstring(env, std::string_view(pending_utf8).substr(0, complete));
+            env->CallVoidMethod(callback, on_token_method, text);
+            env->DeleteLocalRef(text);
+            pending_utf8.erase(0, complete);
+            return !env->ExceptionCheck() && !cancelled();
+        };
+
+        const lai::GenerationResult generated = session->generate(conversation, options, emit, cancelled);
         if (!pending_utf8.empty() && !cancelled()) {
             const jstring text = to_jstring(env, pending_utf8);
             env->CallVoidMethod(callback, on_token_method, text);
@@ -282,10 +307,43 @@ Java_dev_lai_runtime_inference_NativeBindings_generate(
         if (env->ExceptionCheck()) {
             env->ExceptionClear();
             set_error("Kotlin token callback failed");
-            return -1;
+            return nullptr;
         }
+        const jlong values[] = {
+            generated.prompt_tokens,
+            generated.generated_tokens,
+            generated.prompt_eval_us,
+            generated.time_to_first_token_us,
+            generated.decode_us,
+            generated.total_us,
+        };
+        jlongArray result = env->NewLongArray(6);
+        env->SetLongArrayRegion(result, 0, 6, values);
         set_error("");
-        return static_cast<jint>(generated);
+        return result;
+    } catch (const std::exception& exception) {
+        set_error(exception.what());
+        return nullptr;
+    }
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_dev_lai_runtime_inference_NativeBindings_countTokens(
+    JNIEnv* env,
+    jclass,
+    jlong session_handle,
+    jobjectArray roles,
+    jobjectArray contents
+) {
+    const auto session = find_session(static_cast<long long>(session_handle));
+    if (session == nullptr) {
+        set_error("Invalid or closed inference session");
+        return -1;
+    }
+    try {
+        const int count = session->count_tokens(from_conversation(env, roles, contents));
+        set_error("");
+        return static_cast<jint>(count);
     } catch (const std::exception& exception) {
         set_error(exception.what());
         return -1;

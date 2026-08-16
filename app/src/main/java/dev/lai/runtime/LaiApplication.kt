@@ -11,4 +11,15 @@ class LaiApplication : Application() {
         super.onCreate()
         container = AppContainer(this)
     }
+
+    override fun onTrimMemory(level: Int) {
+        container.onTrimMemory(level)
+        super.onTrimMemory(level)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onLowMemory() {
+        container.onLowMemory()
+        super.onLowMemory()
+    }
 }

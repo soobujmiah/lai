@@ -3,13 +3,19 @@ package dev.lai.runtime.ui
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.lai.runtime.LaiApplication
 import dev.lai.runtime.agent.ToolCall
+import dev.lai.runtime.core.AppRuntimeEvent
 import dev.lai.runtime.automation.AccessibilityGateway
+import dev.lai.runtime.inference.ConversationMessage
+import dev.lai.runtime.inference.ConversationRole
 import dev.lai.runtime.inference.DownloadProgress
+import dev.lai.runtime.inference.GenerationConfig
+import dev.lai.runtime.inference.GenerationMetrics
 import dev.lai.runtime.inference.InferenceBackend
 import dev.lai.runtime.inference.InferenceEvent
 import dev.lai.runtime.inference.InstalledModel
@@ -22,6 +28,8 @@ import dev.lai.runtime.scheduler.CapabilityEvidence
 import dev.lai.runtime.scheduler.InferenceWorkload
 import dev.lai.runtime.scheduler.RuntimeEnvironment
 import dev.lai.runtime.shell.ShizukuState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,13 +41,37 @@ import java.util.UUID
 
 enum class UiMode { CHAT, SCREEN_READER, AUTOMATOR }
 
-data class ChatMessage(val fromUser: Boolean, val text: String)
+enum class RuntimeOperation {
+    NO_MODEL,
+    IDLE,
+    DOWNLOADING,
+    IMPORTING,
+    LOADING,
+    READY,
+    GENERATING,
+    CANCELLING,
+    READING_SCREEN,
+    AUTOMATING,
+    ERROR,
+}
+
+data class ChatMessage(
+    val fromUser: Boolean,
+    val text: String,
+    val contextEligible: Boolean = true,
+)
 
 private data class ScheduledLoad(
     val backend: InferenceBackend,
     val reason: String,
     val estimatedPeakBytes: Long,
     val environment: RuntimeEnvironment,
+    val loadMs: Long,
+)
+
+private data class PreparedConversation(
+    val messages: List<ConversationMessage>,
+    val trimmedTurns: Int,
 )
 
 private fun environmentSummary(environment: RuntimeEnvironment): String {
@@ -53,9 +85,13 @@ data class MainUiState(
     val mode: UiMode = UiMode.CHAT,
     val input: String = "",
     val messages: List<ChatMessage> = listOf(
-        ChatMessage(false, "আসসালামু আলাইকুম — আমি LAI। একটি লোকাল মডেল যুক্ত হলে বাংলা বা English-এ সাহায্য করতে পারব।"),
+        ChatMessage(
+            fromUser = false,
+            text = "আসসালামু আলাইকুম — আমি LAI। একটি লোকাল মডেল যুক্ত হলে বাংলা বা English-এ সাহায্য করতে পারব।",
+            contextEligible = false,
+        ),
     ),
-    val busy: Boolean = false,
+    val operation: RuntimeOperation = RuntimeOperation.NO_MODEL,
     val accessibilityConnected: Boolean = false,
     val shizukuState: ShizukuState = ShizukuState.Unavailable,
     val developerMode: Boolean = false,
@@ -75,10 +111,25 @@ data class MainUiState(
     val schedulerDetail: String = "No model has been scheduled",
     val environmentDetail: String = "",
     val estimatedPeakBytes: Long? = null,
-)
+    val lastModelLoadMs: Long? = null,
+    val lastGenerationMetrics: GenerationMetrics? = null,
+    val trimmedConversationTurns: Int = 0,
+) {
+    val busy: Boolean
+        get() = operation in setOf(
+            RuntimeOperation.DOWNLOADING,
+            RuntimeOperation.IMPORTING,
+            RuntimeOperation.LOADING,
+            RuntimeOperation.GENERATING,
+            RuntimeOperation.CANCELLING,
+            RuntimeOperation.READING_SCREEN,
+            RuntimeOperation.AUTOMATING,
+        )
+}
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val container = (application as LaiApplication).container
+    private var generationJob: Job? = null
     private val _state = MutableStateFlow(
         MainUiState(
             runtimeDetail = container.inferenceEngine.capabilities.detail,
@@ -93,6 +144,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 accessibility to shizuku
             }.collect { (accessibility, shizuku) ->
                 _state.update { it.copy(accessibilityConnected = accessibility, shizukuState = shizuku) }
+            }
+        }
+        viewModelScope.launch {
+            container.events.collect { event ->
+                when (event) {
+                    is AppRuntimeEvent.ModelUnloadedForMemory -> {
+                        generationJob?.cancel(CancellationException("Model released for memory pressure"))
+                        _state.update {
+                            it.copy(
+                                operation = RuntimeOperation.IDLE,
+                                activeModelId = null,
+                                lastGenerationMetrics = null,
+                                notice = "Model unloaded to protect the device under memory pressure",
+                            )
+                        }
+                    }
+                }
             }
         }
         refreshModels()
@@ -157,16 +225,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (prompt.isEmpty() || state.value.busy) return
         val immediateMessage = when {
             state.value.installedModels.isEmpty() ->
-                "লোকাল মডেল এখনো ইনস্টল করা নেই। Settings → Developer mode থেকে একটি GGUF মডেল যোগ করুন।"
+                "লোকাল মডেল এখনো ইনস্টল করা নেই। Settings থেকে একটি supported model ডাউনলোড করুন।"
             state.value.activeModelId == null ->
-                "মডেল ইনস্টল করা আছে। Settings → Developer mode থেকে মডেলটি Load করুন।"
+                "মডেল ইনস্টল করা আছে। Settings থেকে মডেলটি Load করুন।"
             else -> null
         }
         if (immediateMessage != null) {
             _state.update {
                 it.copy(
                     input = "",
-                    messages = it.messages + ChatMessage(true, prompt) + ChatMessage(false, immediateMessage),
+                    messages = it.messages +
+                        ChatMessage(true, prompt, contextEligible = false) +
+                        ChatMessage(false, immediateMessage, contextEligible = false),
                 )
             }
             return
@@ -176,25 +246,116 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 input = "",
                 messages = it.messages + ChatMessage(true, prompt) + ChatMessage(false, ""),
-                busy = true,
+                operation = RuntimeOperation.GENERATING,
+                lastGenerationMetrics = null,
+                notice = null,
             )
         }
-        viewModelScope.launch {
-            container.inferenceEngine.generate(prompt).collect { event ->
-                when (event) {
-                    is InferenceEvent.Token -> appendAssistantToken(event.text)
-                    is InferenceEvent.Completed -> _state.update {
-                        it.copy(busy = false, notice = "Generated ${event.tokensGenerated} tokens locally")
-                    }
-                    is InferenceEvent.Failed -> _state.update {
-                        val updated = it.messages.toMutableList()
-                        if (updated.lastOrNull()?.fromUser == false && updated.last().text.isBlank()) {
-                            updated[updated.lastIndex] = ChatMessage(false, "Inference failed: ${event.message}")
+        generationJob = viewModelScope.launch {
+            try {
+                val prepared = prepareConversation(GENERATION_CONFIG)
+                _state.update { it.copy(trimmedConversationTurns = prepared.trimmedTurns) }
+                container.inferenceEngine.generate(prepared.messages, GENERATION_CONFIG).collect { event ->
+                    when (event) {
+                        is InferenceEvent.Token -> appendAssistantToken(event.text)
+                        is InferenceEvent.Completed -> _state.update {
+                            it.copy(
+                                operation = RuntimeOperation.READY,
+                                lastGenerationMetrics = event.metrics,
+                                notice = "Generated ${event.tokensGenerated} tokens locally",
+                            )
                         }
-                        it.copy(messages = updated, busy = false, notice = event.message)
+                        is InferenceEvent.Failed -> markGenerationFailed(event.message)
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                markLastAssistantContextIneligible()
+                _state.update {
+                    it.copy(
+                        operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
+                        notice = if (it.activeModelId != null) "Generation stopped locally" else it.notice,
+                    )
+                }
+            } catch (error: Exception) {
+                markGenerationFailed(error.message ?: "Generation failed")
+            } finally {
+                generationJob = null
             }
+        }
+    }
+
+    fun cancelGeneration() {
+        if (state.value.operation != RuntimeOperation.GENERATING) return
+        _state.update { it.copy(operation = RuntimeOperation.CANCELLING, notice = "Stopping generation…") }
+        generationJob?.cancel(CancellationException("User stopped generation"))
+    }
+
+    fun clearConversation() {
+        if (state.value.busy) return
+        _state.update {
+            it.copy(
+                messages = it.messages.take(1),
+                trimmedConversationTurns = 0,
+                lastGenerationMetrics = null,
+                notice = "Conversation cleared locally",
+            )
+        }
+    }
+
+    private suspend fun prepareConversation(config: GenerationConfig): PreparedConversation {
+        val all = state.value.messages
+            .filter { it.contextEligible && it.text.isNotBlank() }
+            .map {
+                ConversationMessage(
+                    role = if (it.fromUser) ConversationRole.USER else ConversationRole.ASSISTANT,
+                    content = it.text,
+                )
+            }
+            .toMutableList()
+        require(all.isNotEmpty()) { "Conversation is empty" }
+        var trimmed = 0
+        while (true) {
+            val tokenCount = container.inferenceEngine.countTokens(all).getOrThrow()
+            if (tokenCount + config.maxNewTokens <= container.inferenceEngine.contextSize) {
+                return PreparedConversation(all.toList(), trimmed)
+            }
+            if (all.size <= 1) error("Current message is too large for the model context")
+            all.removeAt(0)
+            if (all.firstOrNull()?.role == ConversationRole.ASSISTANT) all.removeAt(0)
+            trimmed += 1
+        }
+    }
+
+    private fun markGenerationFailed(message: String) {
+        _state.update {
+            val updated = it.messages.toMutableList()
+            val last = updated.lastOrNull()
+            if (last != null && !last.fromUser) {
+                updated[updated.lastIndex] = last.copy(
+                    text = last.text.ifBlank { "Inference failed: $message" },
+                    contextEligible = false,
+                )
+                val userIndex = updated.lastIndex - 1
+                if (userIndex >= 0 && updated[userIndex].fromUser) {
+                    updated[userIndex] = updated[userIndex].copy(contextEligible = false)
+                }
+            }
+            it.copy(messages = updated, operation = RuntimeOperation.ERROR, notice = message)
+        }
+    }
+
+    private fun markLastAssistantContextIneligible() {
+        _state.update {
+            val updated = it.messages.toMutableList()
+            val last = updated.lastOrNull()
+            if (last != null && !last.fromUser) {
+                updated[updated.lastIndex] = last.copy(contextEligible = false)
+                val userIndex = updated.lastIndex - 1
+                if (userIndex >= 0 && updated[userIndex].fromUser) {
+                    updated[userIndex] = updated[userIndex].copy(contextEligible = false)
+                }
+            }
+            it.copy(messages = updated)
         }
     }
 
@@ -219,7 +380,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun inspectScreen() {
         if (state.value.busy) return
-        _state.update { it.copy(busy = true, notice = null) }
+        _state.update { it.copy(operation = RuntimeOperation.AUTOMATING, notice = null) }
         viewModelScope.launch {
             val result = container.agentRuntime.execute(
                 ToolCall(UUID.randomUUID().toString(), "screen.snapshot", buildJsonObject { }),
@@ -230,20 +391,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 result.error?.message ?: "Screen inspection failed"
             }
-            _state.update { it.copy(busy = false, notice = notice) }
+            _state.update {
+                it.copy(
+                    operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
+                    notice = notice,
+                )
+            }
         }
     }
 
     fun readCurrentScreen() {
         if (state.value.busy) return
-        _state.update { it.copy(busy = true, notice = null) }
+        _state.update { it.copy(operation = RuntimeOperation.READING_SCREEN, notice = null) }
         viewModelScope.launch {
             val result = container.agentRuntime.execute(
                 ToolCall(UUID.randomUUID().toString(), "ocr.current_screen", buildJsonObject { }),
             )
             _state.update {
                 it.copy(
-                    busy = false,
+                    operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
                     notice = if (result.success) result.output.toString()
                     else result.error?.message ?: "OCR failed",
                 )
@@ -254,7 +420,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loadModel(modelId: String) {
         if (state.value.busy) return
         val model = state.value.installedModels.firstOrNull { it.id == modelId } ?: return
-        _state.update { it.copy(busy = true, notice = "Checking device resources for ${model.displayName}…") }
+        _state.update {
+            it.copy(operation = RuntimeOperation.LOADING, notice = "Checking device resources for ${model.displayName}…")
+        }
         viewModelScope.launch {
             val result = runCatching {
                 val estimate = container.memoryEstimator.estimate(model.bytes, MODEL_CONTEXT_TOKENS)
@@ -280,29 +448,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     capabilities = capabilities,
                 )
                 val file = container.modelRepository.resolve(model)
+                val loadStarted = SystemClock.elapsedRealtime()
                 container.inferenceEngine.load(file.absolutePath, decision.selected).getOrThrow()
                 ScheduledLoad(
                     backend = decision.selected,
                     reason = decision.reason,
                     estimatedPeakBytes = estimate.estimatedPeakBytes,
                     environment = environment,
+                    loadMs = SystemClock.elapsedRealtime() - loadStarted,
                 )
             }
             result.onSuccess { load ->
                 _state.update {
                     it.copy(
-                        busy = false,
+                        operation = RuntimeOperation.READY,
                         activeModelId = model.id,
                         schedulerDetail = "${load.backend.name}: ${load.reason}",
                         environmentDetail = environmentSummary(load.environment),
                         estimatedPeakBytes = load.estimatedPeakBytes,
-                        notice = "${model.displayName} is ready for local chat on ${load.backend.name}",
+                        lastModelLoadMs = load.loadMs,
+                        notice = "${model.displayName} loaded locally in ${load.loadMs} ms on ${load.backend.name}",
                     )
                 }
             }.onFailure { error ->
                 _state.update {
                     it.copy(
-                        busy = false,
+                        operation = RuntimeOperation.ERROR,
                         activeModelId = null,
                         schedulerDetail = "Load rejected: ${error.message ?: "unknown reason"}",
                         notice = error.message ?: "Model loading failed",
@@ -314,7 +485,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun unloadModel() {
         container.inferenceEngine.close()
-        _state.update { it.copy(activeModelId = null, notice = "Model unloaded") }
+        _state.update {
+            it.copy(
+                operation = RuntimeOperation.IDLE,
+                activeModelId = null,
+                lastModelLoadMs = null,
+                lastGenerationMetrics = null,
+                notice = "Model unloaded",
+            )
+        }
     }
 
     fun installRecommendedModel() = installSupportedModel(state.value.recommendedModel.id)
@@ -337,7 +516,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val reviewed = state.value.recommendedModel
         _state.update {
             it.copy(
-                busy = true,
+                operation = RuntimeOperation.IMPORTING,
                 notice = "Verifying selected model locally…",
                 downloadProgress = DownloadProgress(0, reviewed.bytes),
             )
@@ -351,7 +530,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             result.onSuccess { model ->
                 _state.update {
                     it.copy(
-                        busy = false,
+                        operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
                         notice = "Imported and verified ${model.displayName}",
                         downloadProgress = null,
                     )
@@ -359,7 +538,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 refreshModels()
             }.onFailure { error ->
                 _state.update {
-                    it.copy(busy = false, notice = error.message ?: "Import failed", downloadProgress = null)
+                    it.copy(
+                        operation = RuntimeOperation.ERROR,
+                        notice = error.message ?: "Import failed",
+                        downloadProgress = null,
+                    )
                 }
             }
         }
@@ -382,7 +565,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startModelDownload(spec: ModelSpec) {
         if (state.value.busy) return
-        _state.update { it.copy(busy = true, notice = null, downloadProgress = DownloadProgress(0, spec.expectedBytes)) }
+        _state.update {
+            it.copy(
+                operation = RuntimeOperation.DOWNLOADING,
+                notice = null,
+                downloadProgress = DownloadProgress(0, spec.expectedBytes),
+            )
+        }
         viewModelScope.launch {
             val result = container.modelRepository.download(spec) { progress ->
                 _state.update { it.copy(downloadProgress = progress) }
@@ -390,7 +579,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             result.onSuccess { model ->
                 _state.update {
                     it.copy(
-                        busy = false,
+                        operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
                         notice = "Installed ${model.displayName}",
                         modelName = "",
                         modelUrl = "",
@@ -401,7 +590,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 refreshModels()
             }.onFailure { error ->
                 _state.update {
-                    it.copy(busy = false, notice = error.message ?: "Download failed", downloadProgress = null)
+                    it.copy(
+                        operation = RuntimeOperation.ERROR,
+                        notice = error.message ?: "Download failed",
+                        downloadProgress = null,
+                    )
                 }
             }
         }
@@ -409,7 +602,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun refreshModels() {
         viewModelScope.launch {
-            _state.update { it.copy(installedModels = container.modelRepository.list()) }
+            val models = container.modelRepository.list()
+            _state.update {
+                it.copy(
+                    installedModels = models,
+                    operation = when {
+                        it.activeModelId != null -> RuntimeOperation.READY
+                        models.isEmpty() -> RuntimeOperation.NO_MODEL
+                        it.operation == RuntimeOperation.ERROR -> RuntimeOperation.ERROR
+                        else -> RuntimeOperation.IDLE
+                    },
+                )
+            }
         }
     }
 
@@ -420,5 +624,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val MODEL_CONTEXT_TOKENS = 4096
+        private val GENERATION_CONFIG = GenerationConfig(maxNewTokens = 256)
     }
 }

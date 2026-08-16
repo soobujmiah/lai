@@ -5,6 +5,7 @@
 #include <android/log.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <mutex>
@@ -18,12 +19,17 @@
 namespace lai {
 namespace {
 
+using Clock = std::chrono::steady_clock;
 constexpr const char* kLogTag = "LAI-llama";
 constexpr const char* kSystemPrompt =
     "You are LAI, a private on-device assistant. Respond in natural Bangla when the user writes in "
     "Bangla, otherwise use the user's language. Be concise, accurate, and never claim that an Android "
     "action happened unless a tool result confirms it. আপনি একটি ব্যক্তিগত অফলাইন সহকারী। ব্যবহারকারী বাংলায় "
     "লিখলে স্বাভাবিক বাংলায় উত্তর দিন।";
+
+long long elapsed_us(Clock::time_point start, Clock::time_point end) {
+    return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+}
 
 void initialize_llama_once() {
     static std::once_flag once;
@@ -36,22 +42,49 @@ void initialize_llama_once() {
     });
 }
 
-std::string apply_chat_template(const llama_model* model, std::string_view user_prompt) {
-    const std::string user(user_prompt);
-    const llama_chat_message messages[] = {
-        {"system", kSystemPrompt},
-        {"user", user.c_str()},
-    };
+std::string normalized_role(const std::string& role) {
+    if (role == "user" || role == "assistant" || role == "system") return role;
+    throw std::invalid_argument("Conversation contains an unsupported role");
+}
+
+std::string apply_chat_template(const llama_model* model, const std::vector<ChatMessage>& conversation) {
+    if (conversation.empty()) throw std::invalid_argument("Conversation cannot be empty");
+    std::vector<std::string> roles;
+    std::vector<std::string> contents;
+    roles.reserve(conversation.size() + 1U);
+    contents.reserve(conversation.size() + 1U);
+    roles.emplace_back("system");
+    contents.emplace_back(kSystemPrompt);
+    for (const auto& message : conversation) {
+        if (message.content.empty()) continue;
+        roles.emplace_back(normalized_role(message.role));
+        contents.emplace_back(message.content);
+    }
+    if (roles.size() == 1U) throw std::invalid_argument("Conversation has no non-empty messages");
+
+    std::vector<llama_chat_message> messages;
+    messages.reserve(roles.size());
+    for (size_t index = 0; index < roles.size(); ++index) {
+        messages.push_back({roles[index].c_str(), contents[index].c_str()});
+    }
+
     const char* chat_template = llama_model_chat_template(model, nullptr);
-    int32_t required = llama_chat_apply_template(chat_template, messages, 2, true, nullptr, 0);
+    int32_t required = llama_chat_apply_template(
+        chat_template, messages.data(), messages.size(), true, nullptr, 0
+    );
     if (required <= 0) {
-        return std::string(kSystemPrompt) + "\nUser: " + user + "\nAssistant:";
+        std::string fallback = std::string(kSystemPrompt) + "\n";
+        for (size_t index = 1; index < roles.size(); ++index) {
+            fallback += roles[index] + ": " + contents[index] + "\n";
+        }
+        fallback += "assistant:";
+        return fallback;
     }
     std::vector<char> formatted(static_cast<size_t>(required) + 1U);
     const int32_t written = llama_chat_apply_template(
         chat_template,
-        messages,
-        2,
+        messages.data(),
+        messages.size(),
         true,
         formatted.data(),
         static_cast<int32_t>(formatted.size())
@@ -62,13 +95,7 @@ std::string apply_chat_template(const llama_model* model, std::string_view user_
 
 std::vector<llama_token> tokenize(const llama_vocab* vocab, const std::string& text) {
     const int32_t required = -llama_tokenize(
-        vocab,
-        text.data(),
-        static_cast<int32_t>(text.size()),
-        nullptr,
-        0,
-        true,
-        true
+        vocab, text.data(), static_cast<int32_t>(text.size()), nullptr, 0, true, true
     );
     if (required <= 0) throw std::runtime_error("Prompt tokenization failed");
     std::vector<llama_token> tokens(static_cast<size_t>(required));
@@ -107,26 +134,31 @@ public:
         if (model_ != nullptr) llama_model_free(model_);
     }
 
-    int generate(
-        std::string_view prompt,
+    int count_tokens(const std::vector<ChatMessage>& conversation) override {
+        std::lock_guard<std::mutex> lock(generation_mutex_);
+        return static_cast<int>(tokenize(vocab_, apply_chat_template(model_, conversation)).size());
+    }
+
+    GenerationResult generate(
+        const std::vector<ChatMessage>& conversation,
         const GenerationOptions& options,
         const TokenCallback& on_token,
         const CancelCallback& is_cancelled
     ) override {
         std::lock_guard<std::mutex> lock(generation_mutex_);
-        if (prompt.empty()) throw std::invalid_argument("Prompt cannot be empty");
         if (options.max_new_tokens < 1 || options.max_new_tokens > 4096) {
             throw std::invalid_argument("maxNewTokens is outside the supported range");
         }
 
+        const auto total_start = Clock::now();
         llama_memory_clear(llama_get_memory(context_), true);
-        const std::string formatted = apply_chat_template(model_, prompt);
-        std::vector<llama_token> prompt_tokens = tokenize(vocab_, formatted);
+        std::vector<llama_token> prompt_tokens = tokenize(vocab_, apply_chat_template(model_, conversation));
         const int32_t context_size = static_cast<int32_t>(llama_n_ctx(context_));
         if (static_cast<int64_t>(prompt_tokens.size()) + options.max_new_tokens > context_size) {
-            throw std::runtime_error("Prompt and requested response exceed the loaded context size");
+            throw std::runtime_error("Conversation and requested response exceed the loaded context size");
         }
 
+        const auto prompt_start = Clock::now();
         const int32_t batch_size = std::max(1, std::min(512, context_size));
         size_t offset = 0;
         while (offset < prompt_tokens.size()) {
@@ -138,6 +170,7 @@ public:
             if (llama_decode(context_, batch) != 0) throw std::runtime_error("Prompt evaluation failed");
             offset += static_cast<size_t>(count);
         }
+        const auto prompt_end = Clock::now();
 
         llama_sampler* sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
         if (sampler == nullptr) throw std::runtime_error("Sampler allocation failed");
@@ -157,18 +190,29 @@ public:
             llama_sampler_chain_add(sampler, llama_sampler_init_dist(seed));
         }
 
+        const auto decode_start = Clock::now();
+        Clock::time_point first_token_time{};
         int generated = 0;
         while (generated < options.max_new_tokens) {
             if (is_cancelled()) break;
             llama_token token = llama_sampler_sample(sampler, context_, -1);
             if (llama_vocab_is_eog(vocab_, token)) break;
             const std::string piece = token_piece(vocab_, token);
+            if (generated == 0) first_token_time = Clock::now();
             if (!piece.empty() && !on_token(piece)) break;
             ++generated;
             llama_batch batch = llama_batch_get_one(&token, 1);
             if (llama_decode(context_, batch) != 0) throw std::runtime_error("Generated-token evaluation failed");
         }
-        return generated;
+        const auto end = Clock::now();
+        return GenerationResult{
+            static_cast<int>(prompt_tokens.size()),
+            generated,
+            elapsed_us(prompt_start, prompt_end),
+            generated > 0 ? elapsed_us(total_start, first_token_time) : elapsed_us(total_start, end),
+            elapsed_us(decode_start, end),
+            elapsed_us(total_start, end),
+        };
     }
 
 private:

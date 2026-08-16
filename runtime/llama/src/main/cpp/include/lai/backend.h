@@ -8,11 +8,25 @@
 
 namespace lai {
 
+struct ChatMessage {
+    std::string role;
+    std::string content;
+};
+
 struct GenerationOptions {
     int max_new_tokens = 512;
     float temperature = 0.7F;
     float top_p = 0.9F;
     long long seed = -1;
+};
+
+struct GenerationResult {
+    int prompt_tokens = 0;
+    int generated_tokens = 0;
+    long long prompt_eval_us = 0;
+    long long time_to_first_token_us = 0;
+    long long decode_us = 0;
+    long long total_us = 0;
 };
 
 using TokenCallback = std::function<bool(std::string_view)>;
@@ -21,8 +35,9 @@ using CancelCallback = std::function<bool()>;
 class BackendSession {
 public:
     virtual ~BackendSession() = default;
-    virtual int generate(
-        std::string_view prompt,
+    virtual int count_tokens(const std::vector<ChatMessage>& conversation) = 0;
+    virtual GenerationResult generate(
+        const std::vector<ChatMessage>& conversation,
         const GenerationOptions& options,
         const TokenCallback& on_token,
         const CancelCallback& is_cancelled

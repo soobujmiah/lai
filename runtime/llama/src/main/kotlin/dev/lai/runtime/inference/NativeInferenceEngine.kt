@@ -24,13 +24,15 @@ internal class NativeBindings private constructor() {
         @JvmStatic external fun createSession(modelPath: String, backend: String, contextSize: Int): Long
         @JvmStatic external fun generate(
             session: Long,
-            prompt: String,
+            roles: Array<String>,
+            contents: Array<String>,
             maxNewTokens: Int,
             temperature: Float,
             topP: Float,
             seed: Long,
             callback: NativeTokenCallback,
-        ): Int
+        ): LongArray?
+        @JvmStatic external fun countTokens(session: Long, roles: Array<String>, contents: Array<String>): Int
         @JvmStatic external fun destroySession(session: Long)
         @JvmStatic external fun lastError(): String
     }
@@ -41,6 +43,8 @@ private data class NativeRuntimeInfo(val backends: List<String> = emptyList(), v
 
 class NativeInferenceEngine : InferenceEngine {
     @Volatile private var session: Long = 0
+
+    override val contextSize: Int = DEFAULT_CONTEXT_SIZE
 
     override val capabilities: RuntimeCapabilities by lazy {
         if (!NativeBindings.loaded) {
@@ -62,7 +66,7 @@ class NativeInferenceEngine : InferenceEngine {
     override suspend fun load(modelPath: String, backend: InferenceBackend): Result<Unit> = withContext(Dispatchers.IO) {
         if (!NativeBindings.loaded) return@withContext Result.failure(IllegalStateException(capabilities.detail))
         close()
-        val handle = NativeBindings.createSession(modelPath, backend.name.lowercase(), DEFAULT_CONTEXT_SIZE)
+        val handle = NativeBindings.createSession(modelPath, backend.name.lowercase(), contextSize)
         if (handle == 0L) {
             Result.failure(IllegalStateException(NativeBindings.lastError()))
         } else {
@@ -71,18 +75,29 @@ class NativeInferenceEngine : InferenceEngine {
         }
     }
 
-    override fun generate(prompt: String, config: GenerationConfig): Flow<InferenceEvent> = callbackFlow {
+    override fun generate(
+        conversation: List<ConversationMessage>,
+        config: GenerationConfig,
+    ): Flow<InferenceEvent> = callbackFlow {
         val handle = session
         if (handle == 0L) {
             trySend(InferenceEvent.Failed("No model is loaded"))
             close()
             return@callbackFlow
         }
+        if (conversation.none { it.content.isNotBlank() }) {
+            trySend(InferenceEvent.Failed("Conversation is empty"))
+            close()
+            return@callbackFlow
+        }
+        val roles = conversation.map { it.role.name.lowercase() }.toTypedArray()
+        val contents = conversation.map { it.content }.toTypedArray()
         val cancelled = AtomicBoolean(false)
         val worker = launch(Dispatchers.Default) {
-            val count = NativeBindings.generate(
+            val values = NativeBindings.generate(
                 session = handle,
-                prompt = prompt,
+                roles = roles,
+                contents = contents,
                 maxNewTokens = config.maxNewTokens.coerceIn(1, 4096),
                 temperature = config.temperature.coerceIn(0f, 2f),
                 topP = config.topP.coerceIn(0.05f, 1f),
@@ -96,14 +111,39 @@ class NativeInferenceEngine : InferenceEngine {
                 },
             )
             if (!cancelled.get()) {
-                if (count >= 0) trySend(InferenceEvent.Completed(count))
-                else trySend(InferenceEvent.Failed(NativeBindings.lastError().ifBlank { "Native inference failed" }))
+                if (values != null && values.size >= METRIC_COUNT) {
+                    val metrics = GenerationMetrics(
+                        promptTokens = values[0].toInt(),
+                        generatedTokens = values[1].toInt(),
+                        promptEvaluationMs = values[2] / 1000,
+                        timeToFirstTokenMs = values[3] / 1000,
+                        decodeMs = values[4] / 1000,
+                        totalMs = values[5] / 1000,
+                    )
+                    trySend(InferenceEvent.Completed(metrics.generatedTokens, metrics))
+                } else {
+                    trySend(InferenceEvent.Failed(NativeBindings.lastError().ifBlank { "Native inference failed" }))
+                }
             }
             close()
         }
         awaitClose {
             cancelled.set(true)
             worker.cancel()
+        }
+    }
+
+    override suspend fun countTokens(conversation: List<ConversationMessage>): Result<Int> = withContext(Dispatchers.Default) {
+        val handle = session
+        if (handle == 0L) return@withContext Result.failure(IllegalStateException("No model is loaded"))
+        runCatching {
+            val count = NativeBindings.countTokens(
+                handle,
+                conversation.map { it.role.name.lowercase() }.toTypedArray(),
+                conversation.map { it.content }.toTypedArray(),
+            )
+            check(count >= 0) { NativeBindings.lastError().ifBlank { "Token counting failed" } }
+            count
         }
     }
 
@@ -115,5 +155,6 @@ class NativeInferenceEngine : InferenceEngine {
 
     companion object {
         private const val DEFAULT_CONTEXT_SIZE = 4096
+        private const val METRIC_COUNT = 6
     }
 }

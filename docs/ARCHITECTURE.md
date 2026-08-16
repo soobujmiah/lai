@@ -87,7 +87,7 @@ Selectors are deterministic in this order:
 
 ### Native inference
 
-Kotlin owns one `InferenceEngine`; JNI maps opaque integer handles to shared C++ `BackendSession` instances. C++ validates file existence, GGUF magic, context range, and backend availability. The Phase 2 CPU candidate uses pinned llama.cpp, clears context memory per request, applies the model chat template, evaluates bounded prompt batches, samples tokens, and streams only complete UTF-8 code-point sequences through a cancellable JNI callback. Vulkan and QNN remain unavailable adapters, so capability reporting stays truthful.
+Kotlin owns one `InferenceEngine`; JNI maps opaque integer handles to shared C++ `BackendSession` instances. C++ validates file existence, GGUF magic, context range, backend availability and conversation roles. The CPU runtime clears context memory per request, applies the model-native template to full user/assistant history, counts formatted tokens, evaluates bounded prompt batches, samples, and streams only complete UTF-8 code points through a cancellable callback. Oldest completed turns are omitted when prompt plus response reserve would exceed 4,096 tokens. Native monotonic clocks return prompt evaluation, TTFT, decode and total duration; metrics remain in memory and Developer Mode only. Vulkan and QNN remain unavailable adapters, so capability reporting stays truthful.
 
 A production adapter must provide:
 

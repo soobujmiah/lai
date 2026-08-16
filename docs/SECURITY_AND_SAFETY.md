@@ -52,7 +52,9 @@ Shizuku may run as UID 2000 (ADB shell) or UID 0 (root/Sui). The app surfaces UI
 - screenshots in memory and recycled after OCR;
 - no analytics or remote inference dependency;
 - no broad storage permission;
-- no logs of prompts, screen content, typed text, or command stdout by default.
+- no logs of prompts, screen content, typed text, or command stdout by default;
+- load/TTFT/token-rate/thermal metrics remain in memory, are hidden in Developer Mode, and have no upload path;
+- Android critical-memory callbacks destroy the native session and notify UI state.
 
 ## Release supply chain
 

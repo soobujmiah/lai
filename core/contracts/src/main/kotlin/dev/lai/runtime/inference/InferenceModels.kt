@@ -13,9 +13,35 @@ data class GenerationConfig(
     val seed: Long = -1,
 )
 
+@Serializable
+enum class ConversationRole { SYSTEM, USER, ASSISTANT }
+
+@Serializable
+data class ConversationMessage(
+    val role: ConversationRole,
+    val content: String,
+)
+
+data class GenerationMetrics(
+    val promptTokens: Int,
+    val generatedTokens: Int,
+    val promptEvaluationMs: Long,
+    val timeToFirstTokenMs: Long,
+    val decodeMs: Long,
+    val totalMs: Long,
+) {
+    val promptTokensPerSecond: Double =
+        if (promptEvaluationMs > 0) promptTokens * 1000.0 / promptEvaluationMs else 0.0
+    val decodeTokensPerSecond: Double =
+        if (decodeMs > 0) generatedTokens * 1000.0 / decodeMs else 0.0
+}
+
 sealed interface InferenceEvent {
     data class Token(val text: String) : InferenceEvent
-    data class Completed(val tokensGenerated: Int) : InferenceEvent
+    data class Completed(
+        val tokensGenerated: Int,
+        val metrics: GenerationMetrics? = null,
+    ) : InferenceEvent
     data class Failed(val message: String) : InferenceEvent
 }
 

@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.lai.runtime.R
 import dev.lai.runtime.shell.ShizukuState
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,7 +91,11 @@ fun LaiApp(viewModel: MainViewModel) {
                 state.mode == UiMode.SCREEN_READER -> ScreenReaderScreen(state, viewModel)
                 else -> AutomatorScreen(state, viewModel)
             }
-            if (state.busy && state.downloadProgress == null) {
+            if (
+                state.busy &&
+                state.downloadProgress == null &&
+                state.operation !in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)
+            ) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
             }
         }
@@ -115,9 +120,22 @@ private fun RowScope.ModeNavigationItem(
 @Composable
 private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Text(stringResource(R.string.home_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.home_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.home_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(stringResource(R.string.home_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            TextButton(
+                onClick = viewModel::clearConversation,
+                enabled = !state.busy && state.messages.any { it.contextEligible },
+            ) { Text("New chat") }
         }
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -140,8 +158,17 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
                 keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() }),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
             )
-            Button(onClick = viewModel::sendMessage, enabled = state.input.isNotBlank() && !state.busy) {
-                Text(stringResource(R.string.send))
+            if (state.operation in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)) {
+                Button(
+                    onClick = viewModel::cancelGeneration,
+                    enabled = state.operation == RuntimeOperation.GENERATING,
+                ) {
+                    Text(if (state.operation == RuntimeOperation.CANCELLING) "Stopping…" else "Stop")
+                }
+            } else {
+                Button(onClick = viewModel::sendMessage, enabled = state.input.isNotBlank() && !state.busy) {
+                    Text(stringResource(R.string.send))
+                }
             }
         }
     }
@@ -282,6 +309,24 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                         " • estimated model peak ${it / 1_048_576} MB"
                     } ?: ""),
                 )
+            }
+            state.lastModelLoadMs?.let { loadMs ->
+                item { StatusCard("Model load", "$loadMs ms • local ${state.activeModelId ?: "session"}") }
+            }
+            state.lastGenerationMetrics?.let { metrics ->
+                item {
+                    StatusCard(
+                        "Last generation",
+                        "${metrics.promptTokens} prompt • ${metrics.generatedTokens} output • " +
+                            "TTFT ${metrics.timeToFirstTokenMs} ms • " +
+                            "prefill ${String.format(Locale.US, "%.2f", metrics.promptTokensPerSecond)} tok/s • " +
+                            "decode ${String.format(Locale.US, "%.2f", metrics.decodeTokensPerSecond)} tok/s • " +
+                            "total ${metrics.totalMs} ms" +
+                            if (state.trimmedConversationTurns > 0) {
+                                " • trimmed ${state.trimmedConversationTurns} old turn(s)"
+                            } else "",
+                    )
+                }
             }
         }
         item { ModelSetup(state, viewModel) }

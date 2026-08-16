@@ -30,7 +30,10 @@
 ## Phase 2 — usable local intelligence
 
 - [x] pin/fetch llama.cpp in CI
-- [x] CPU session, cancellation, token streaming
+- [x] CPU model load and local generation on Snapdragon device
+- [ ] Stop/recovery and UTF-safe token streaming device validation
+- [ ] multi-turn history and context-trimming device validation
+- [ ] native TTFT/prefill/decode metrics device validation
 - [ ] GGML Vulkan build and Adreno capability self-test
 - [x] model selection and explicit load/unload
 - [x] conservative pre-load memory estimator and low-memory refusal
@@ -40,7 +43,7 @@
 - [ ] parse LLM-proposed tool calls with strict schema
 - [ ] trusted confirmation sheet and redacted audit records
 - [ ] select and integrate printed Bangla OCR baseline
-- [ ] benchmark profile hidden in Developer Mode
+- [ ] benchmark profile hidden in Developer Mode (implementation candidate added)
 
 ## Phase 3 — Snapdragon specialization
 

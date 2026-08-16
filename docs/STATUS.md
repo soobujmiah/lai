@@ -9,12 +9,12 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Capability | Status | Evidence / boundary |
 |---|---|---|
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
-| Layered module backbone | Ready | eleven-module Gradle/manifest graph compiled and packaged remotely |
+| Layered module backbone | Ready | thirteen-module Gradle/manifest graph compiled and packaged remotely |
 | Zero-egress architecture policy | Ready | only download module owns transport; outbound user data denied; boundary check passes |
 | Signed web model catalog | Build verified | encrypted ECDSA signer, stable `catalog-v1` assets, in-app verification/cache/fallback and supported-list UI passed; device refresh pending |
-| Evidence-aware scheduler | Build verified | model loads route through evidence, memory, battery and thermal preflight; physical load validation pending |
-| Reviewed model catalog | Build verified | immutable official Qwen metadata, mandatory digest/size and one-tap UX compiled; device download pending |
-| Android environment provider | Build verified | memory, battery, charging and thermal snapshot compiled and scheduler-integrated; device reading pending |
+| Evidence-aware scheduler | Device validated (CPU) | Redmi selected CPU with 3,077 MiB available vs 1,833 MiB estimated peak at nominal thermal state |
+| Reviewed model catalog | Device validated baseline | official Qwen artifact installed with expected size/hash prefix; signed web refresh remains pending |
+| Android environment provider | Device validated | Redmi reported memory, 79% battery, charging=false and thermal=NOMINAL |
 | GitHub Android toolchain | Ready | workflow installs API 35, Build Tools, NDK, CMake, Gradle remotely |
 | arm64 native `.so` build | Ready | isolated `runtime:llama` externalNativeBuild compiles C++20 JNI library |
 | Compose three-mode UX | Ready | chat, screen reader, automator; developer controls hidden |
@@ -24,9 +24,10 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Android 11+ accessibility screenshot | Ready | hardware buffer copied to ARGB and closed |
 | Shizuku binder and permission | Ready | state flow, UID, request listener |
 | Elevated operation allowlist | Ready | Shizuku UserService + argv-only policy; no raw shell; tests for injection |
-| Reviewed GGUF download | Build verified | isolated network module, explicit tap, mandatory SHA-256, redirect review, resume/private storage/GGUF validation; device regression pending |
-| LLM JNI/session interface | Build verified | cancellable per-token callback compiled and packaged; device stream test pending |
-| llama.cpp CPU inference | Build verified (Phase 2) | loader/tokenizer/chat template/sampler compiled; physical GGUF and Bangla validation pending |
+| Reviewed GGUF download | Device validated baseline | Qwen 1,117,320,736-byte artifact activated with reviewed digest; interruption/resume still pending |
+| LLM JNI/session interface | Device validated basic | physical model load and 15-token local generation passed; cancellation/metrics pending |
+| llama.cpp CPU inference | Device validated basic | Qwen CPU session loaded and generated locally without reported crash; response/Bangla quality and sustained thermals pending |
+| v0.7 runtime reliability | Candidate | multi-turn templates, token trimming, state machine, Stop, native metrics, storage/memory-pressure handling; CI pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | requires licensed SDK/runtime and physical device |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |

@@ -3,6 +3,7 @@ package dev.lai.runtime.inference
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import android.os.StatFs
 import dev.lai.runtime.core.LaiJson
 import dev.lai.runtime.privacy.DataClass
 import dev.lai.runtime.privacy.DataFlowDirection
@@ -43,6 +44,7 @@ class ModelRepository private constructor(
             modelDir.mkdirs()
             val partialFile = File(modelDir, "${spec.id}.gguf.part")
             val existingBytes = partialFile.takeIf(File::exists)?.length() ?: 0L
+            ensureStorageAvailable(spec.expectedBytes?.minus(existingBytes)?.coerceAtLeast(0))
             val request = Request.Builder()
                 .url(spec.url)
                 .header("User-Agent", "LAI-Android/0.4")
@@ -83,6 +85,7 @@ class ModelRepository private constructor(
             validateIdentity(spec.id, spec.displayName, spec.sha256)
             modelDir.mkdirs()
             val partialFile = File(modelDir, "${spec.id}.gguf.part")
+            ensureStorageAvailable(spec.expectedBytes)
             if (partialFile.exists()) check(partialFile.delete()) { "Could not replace previous import staging file" }
             val providerLength = contentResolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
                 descriptor.length.takeIf { it >= 0 }
@@ -113,6 +116,17 @@ class ModelRepository private constructor(
         File(modelDir, "${target.id}.gguf.part").delete()
         writeRegistry(models.filterNot { it.id == id })
         true
+    }
+
+    private fun ensureStorageAvailable(requiredBytes: Long?) {
+        val available = StatFs(modelDir.absolutePath).availableBytes
+        val required = requiredBytes?.let {
+            if (it > Long.MAX_VALUE - STORAGE_RESERVE_BYTES) Long.MAX_VALUE else it + STORAGE_RESERVE_BYTES
+        } ?: STORAGE_RESERVE_BYTES
+        check(available >= required) {
+            "Not enough storage: ${required / 1_048_576} MB required including safety reserve, " +
+                "${available / 1_048_576} MB available"
+        }
     }
 
     private fun streamToPartial(
@@ -239,6 +253,7 @@ class ModelRepository private constructor(
             .build()
 
         private const val LOCAL_IMPORT_SOURCE = "local-import"
+        private const val STORAGE_RESERVE_BYTES = 256L * 1024L * 1024L
         private val ID = Regex("^[a-z0-9][a-z0-9._-]{1,63}$")
         private val SHA256 = Regex("^[a-fA-F0-9]{64}$")
         private const val PROGRESS_STEP_BYTES = 512L * 1024L
