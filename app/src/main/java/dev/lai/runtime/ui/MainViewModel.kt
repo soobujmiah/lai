@@ -698,7 +698,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     active = model.id == current.activeModelId,
                 )
             },
-            performance = current.performanceHistory.map(GenerationMetrics::toDiagnostics),
+            performance = current.performanceHistory.map { metrics -> metrics.toDiagnostics() },
             privacy = DiagnosticsPrivacy(),
         )
     }
