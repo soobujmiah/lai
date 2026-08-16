@@ -4,6 +4,18 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Phase 2A vertical slice complete: quick settings, workspace UI and one-request overrides
+
+- Added pure `SettingsSession` / `SettingsSessionPolicy` (`core:policy`) that models the two distinct notions of "current settings": persisted defaults and a one-request quick-sheet override. Validation happens before every transition, so an invalid candidate is rejected with typed issues instead of being silently sanitized.
+- Added pure `WorkspaceGrantPort` / `SettingsStorePort` / `ModelDiscoveryPort` (`core:contracts`); `platform:workspace` adapters now implement them, so the composition seam is testable without SAF, Robolectric, or a device. No Android type crosses the port.
+- Added `WorkspaceSettingsCoordinator` (`app`): grant state, settings session, save/reset, and coarse discovery counts, depending only on the ports and pure policy. `MainViewModel` is a thin binder over it.
+- Chat now honours the effective settings: `sendMessage` consumes any armed override exactly once and maps typed `LlmSettings` onto `GenerationConfig`, clamped to the live native context. Clearing the conversation discards an unspent override. The hard-coded 256-token `GENERATION_CONFIG` is gone.
+- Added the Chat ⚙ quick-settings `ModalBottomSheet`: creativity, focus, reply length and conversation memory, in plain bilingual language, with **Apply once** / **Save default** / **Reset**. Slider ranges mirror `SettingsPolicy`, so the sheet cannot compose a document the store would reject. Image/voice/search controls are deliberately not rendered while no real adapter exists.
+- Added the Settings workspace card: `ACTION_OPEN_DOCUMENT_TREE` grant/revoke, a status line, and a manual scan showing **coarse counts only** (reviewed / local unreviewed) — never a file name, path, or digest.
+- Added 29 pure-JVM tests (11 session-policy, 15 coordinator, 3 codec): session-policy transitions, coordinator behaviour against fake ports (absent workspace → defaults, valid file restores typed values, malformed/oversized falls back without crashing, override never mutates saved defaults, rejected document is never written, failed write keeps previous defaults, save/reset round-trips, revoked grant clears counts), plus truncated-write/unsupported-version/free-text-rejection codec cases.
+- No build-flag or NDK change was required; the Qwen 1.5B / llama.cpp APK path is untouched.
+- Not build-verified until the CI run for this commit passes.
+
 ### Documentation-first repository audit
 
 - Added the source-verified current-state audit and class/interface inventory; architecture/system/module/AI/agent/security/plugin documents; complete feature matrix; canonical Phase 0–14 roadmap; implementation/testing plans; ADR index; definition of done; development policy; and documentation map.

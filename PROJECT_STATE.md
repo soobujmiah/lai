@@ -4,9 +4,9 @@ Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` (clone URL `https://github.com/soobujmiah/LAI`)  
 Application ID: `dev.lai.runtime`  
 Target device: Xiaomi/Redmi Turbo 4 Pro, Android API 36, QTI SM8735 / Snapdragon 8s Gen 4  
-Latest verified build: GitHub Actions run [`31968037878`](https://github.com/soobujmiah/LAI/actions/runs/31968037878) (commit `34e1281`) — **green**  
+Latest verified build: GitHub Actions run [`31968037878`](https://github.com/soobujmiah/LAI/actions/runs/31968037878) (commit `34e1281`) — **green** (Phase 2A items 6–8 pushed after it; CI pending)  
 Latest device-test release: [`v0.8.2`](https://github.com/soobujmiah/LAI/releases/tag/v0.8.2) (`cbf6ff9`); temporary/debug-signed APK  
-Current graph: **15 Gradle modules** (added `platform:workspace` this session)
+Current graph: **15 Gradle modules** (unchanged this session; Phase 2A items 6–8 completed the vertical slice)
 
 > This is a handoff snapshot. Current source/tests are authoritative; `docs/implementation/current-state.md` is the latest audited state, `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap, and accepted ADRs govern architectural decisions. The documentation/master-roadmap and bounded model-stream changes in the working tree remain CI-unverified until an updated workflow run passes.
 
@@ -57,7 +57,7 @@ Status vocabulary: **Implemented** = source/contracts exist · **Build verified*
 | Source policy | Ready | 128 MB limit; no binaries/models/SDKs/keystores; token scan | Keep as first CI gate |
 | Architecture policy | Ready | Network, Accessibility, Shizuku, JNI, vendor terms, dependency direction checked | Extend when workspace/task modules land |
 | Android build | Ready | CI installs JDK 17, API 35, Build Tools, NDK 27, CMake, Gradle; fetches pinned llama.cpp; tests/lints/builds APK | Keep Qwen 1.5B job unchanged while adding isolated jobs |
-| Tests / coverage | Ready | Pure-JVM coverage ratchets, app + audit + **workspace** unit tests, lint | Add SAF/quick-sheet tests next phase |
+| Tests / coverage | Ready | Pure-JVM coverage ratchets, app + audit + **workspace** unit tests, lint; **29 new Phase 2A tests** (session policy, coordinator vs fake ports, codec edge cases) | Physical SAF grant/discovery instrumentation |
 | Catalog publish | Ready | Validates/signs/verifies/publishes `catalog-v1` | Physical in-app refresh |
 | Releases | Ready for device testing | Tag-triggered APK publication | Temporary/debug signing is not production |
 | Production supply chain | Pending | — | Permanent key, SBOM, provenance, reproducible comparison |
@@ -70,18 +70,21 @@ Status vocabulary: **Implemented** = source/contracts exist · **Build verified*
 | Settings validation/migration | Build verified | `SettingsPolicy` validate/sanitize/migrate; range/finite/type/context-dependent checks; unknown-field warnings; deterministic v1 seam | — |
 | Workspace decision layer | Build verified | `WorkspacePolicy.classify` (digest dedup, size/format/count, catalog match) + `WorkspaceSettingsCodec` (bounded, exact-schema) | — |
 | `platform:workspace` SAF adapter | Build verified; device pending | `WorkspaceRepository` (grant, persistable permission, child resolution, layout), `WorkspaceSettingsStore` (temp-write-then-replace), `WorkspaceDiscovery` (bounded traversal + SHA-256 + GGUF magic) | Physical SAF grant/discovery test |
-| Composition wiring | Build verified | `AppContainer` holds repository/store/discovery | `MainViewModel` + UI integration |
-| Chat ⚙ quick-settings UI | Pending | Contracts ready | Bottom sheet (item 6) |
+| Workspace ports | Implemented | `WorkspaceGrantPort` / `SettingsStorePort` / `ModelDiscoveryPort` in `core:contracts`; the SAF adapters implement them so no Android type crosses the seam | — |
+| Settings session semantics | Implemented | `SettingsSession` + `SettingsSessionPolicy`: saved defaults vs one-request override, validate-before-transition, context-aware `maxNewTokens` ceiling | — |
+| Composition wiring | Implemented | `WorkspaceSettingsCoordinator` (pure ports only) owns grant state, session, save/reset, coarse counts; `MainViewModel` binds it and Chat consumes the override once per reply | Physical device pass |
+| Chat ⚙ quick-settings UI | Implemented | `ModalBottomSheet` with creativity/focus/reply-length/memory in plain bilingual language; Apply once · Save default · Reset; ranges mirror `SettingsPolicy` | Physical device pass |
+| Workspace status surface | Implemented | Settings card: `ACTION_OPEN_DOCUMENT_TREE` grant/revoke, status line, manual scan showing coarse REVIEWED / LOCAL_UNREVIEWED counts only | Physical SAF grant/discovery test |
 
 ### 1.6 UI & product surfaces
 
 | Area | Status | Current result | Remaining |
 |---|---|---|---|
 | Compose three-mode shell | Build verified | Chat, Screen Reader, Automator; Developer Mode hidden | Extract feature modules later |
-| Chat | Device validated (basic) | Local streaming, Stop, New chat, metrics, load controls | Rolling Context Window; physical trim tests |
+| Chat | Device validated (basic); ⚙ sheet pending device pass | Local streaming, Stop, New chat, metrics, load controls, **contextual ⚙ quick settings honoured per reply** | Rolling Context Window; physical trim tests |
 | Standalone Tools Dashboard | Planned | Spec exists | Implement over shared contracts |
 | Chat + Attach Tools | Planned | Spec exists | Same contracts as dashboard |
-| Contextual ⚙ quick settings | Pending | Typed ranges/precedence specified | Implement bottom sheet (next phase) |
+| Contextual ⚙ quick settings | Implemented (CI/device pending) | LLM-only bottom sheet over shared typed contracts; image/voice/search stay unrendered until a real adapter exists | Physical device pass |
 
 ---
 
@@ -108,8 +111,10 @@ lai/
 │       ├── AndroidManifest.xml
 │       ├── java/dev/lai/runtime/{LaiApplication.kt, MainActivity.kt}
 │       ├── core/AppContainer.kt             # composition root (holds workspace repo/store/discovery)
-│       ├── ui/{LaiApp.kt, MainViewModel.kt, theme/Theme.kt}
+│       ├── ui/{LaiApp.kt, MainViewModel.kt, QuickSettingsSheet.kt,          # (Phase 2A items 6-7)
+│       │        WorkspaceSettingsCoordinator.kt, theme/Theme.kt}
 │       └── res/{drawable, values, values-bn}
+│   └── src/test/java/dev/lai/runtime/ui/WorkspaceSettingsCoordinatorTest.kt   # (Phase 2A item 8)
 ├── core/
 │   ├── contracts/  (pure JVM)
 │   │   └── src/main/kotlin/dev/lai/runtime/
@@ -122,7 +127,8 @@ lai/
 │   │       ├── ocr/OcrModels.kt
 │   │       ├── settings/ToolSettings.kt      # SettingsDocumentV1 + sections   (Phase 2A)
 │   │       ├── shell/ShellModels.kt
-│   │       └── workspace/WorkspaceContracts.kt                              # (Phase 2A)
+│   │       ├── workspace/WorkspaceContracts.kt                              # (Phase 2A)
+│   │       └── workspace/WorkspacePorts.kt      # grant/store/discovery ports (Phase 2A)
 │   │   (tests: agent, automation, diagnostics, inference, model, ocr, settings, shell, workspace)
 │   ├── model/      → ReviewedModelCatalog (immutable fallback catalog)
 │   ├── policy/     (pure JVM)
@@ -130,6 +136,7 @@ lai/
 │   │       ├── agent/{AgentPolicy.kt, BuiltInToolCatalog.kt, ToolAuditLedger.kt, ToolProposalTelemetry.kt}
 │   │       ├── privacy/LocalFirstPolicy.kt
 │   │       ├── settings/SettingsPolicy.kt                                   # (Phase 2A)
+│   │       ├── settings/SettingsSession.kt  # saved vs one-request override (Phase 2A)
 │   │       ├── shell/ShellCommandPolicy.kt
 │   │       └── workspace/WorkspacePolicy.kt                                 # classifier + codec (Phase 2A)
 │   │   (tests: agent, privacy, settings, shell, workspace)
@@ -277,6 +284,37 @@ class WorkspaceSettingsStore(repository, codec = ..., maxBytes = 32KB) { suspend
 class WorkspaceDiscovery(repository, policy = ...) { suspend fun discoverModels(reviewedBySha256, limits = ...): Result<List<DiscoveredModel>> }
 ```
 
+```kotlin
+// core:contracts - pure ports the app depends on (no Android type crosses them)
+interface WorkspaceGrantPort { val state: WorkspaceGrantState }
+interface SettingsStorePort {
+    suspend fun load(): SettingsLoadOutcome                        // never throws; always usable
+    suspend fun save(document: SettingsDocumentV1): Result<Unit>   // exact-v1-schema verified
+}
+interface ModelDiscoveryPort {
+    suspend fun discoverModels(
+        reviewedBySha256: Map<String, String>,
+        limits: DiscoveryLimits = DiscoveryLimits(),
+    ): Result<List<DiscoveredModel>>
+}
+
+// core:policy - session semantics (saved defaults vs one-request override)
+data class SettingsSession(val saved: SettingsDocumentV1, val pendingLlmOverride: LlmSettings?, ...) {
+    val effectiveLlm: LlmSettings          // the override when armed, otherwise saved defaults
+}
+class SettingsSessionPolicy {
+    fun fromLoad(document, fromFile, fellBackToDefaults, warnings): SettingsSession
+    fun applyOnce(session, llm): SettingsSessionResult             // Applied | Rejected(issues)
+    fun prepareSave(session, document): SettingsSessionResult      // validates before any write
+    fun reset(session): SettingsSession
+    fun resolveForRequest(session): ResolvedRequestSettings        // consumes the override
+    fun maxNewTokensCeiling(session, runtimeContextTokens: Int?): Int
+}
+
+// app - composition seam over pure ports only, unit-testable with fakes
+class WorkspaceSettingsCoordinator(grant, store, discovery) { val state: StateFlow<WorkspaceUiState> }
+```
+
 Privacy invariants: the settings schema has **no free-text field** (cannot store prompts/documents/credentials); settings write verification rejects unknown fields; SAF uses `ACTION_OPEN_DOCUMENT_TREE` with persistable permission — no `MANAGE_EXTERNAL_STORAGE`, no raw path translation; discovery registers metadata only and never auto-loads inference.
 
 ### 3.7 UI specification
@@ -291,30 +329,53 @@ Privacy invariants: the settings schema has **no free-text field** (cannot store
 
 ## 4. Next Logical Implementation Phase
 
-### Phase 2A — finish the typed-configuration + SAF vertical slice (items 6–8)
+### Phase 2A is code-complete (items 1–8); what remains is verification
 
-Items 1–5 are build-verified (CI run `31968037878`). The next session codes exactly:
+All eight Phase 2A items now exist in source. Two gates are still open and must be closed before
+anything here is called finished:
 
-1. **`MainViewModel` integration (item 7).** Expose `workspaceGrantState: StateFlow<WorkspaceGrantState>`, `currentSettings: StateFlow<SettingsDocumentV1>`, and a `pendingQuickSettings` one-request override derived from `AppContainer.workspaceRepository` / `workspaceSettingsStore`. Add actions: `grantWorkspace(treeUri)` (calls `WorkspaceRepository.grant` then `ensureLayout`), `revokeWorkspace()`, `applyQuickSettings(LlmSettings)` (one-request override, no silent mutation of saved defaults), `saveDefaultSettings(document)` (calls `WorkspaceSettingsStore.save`, which verifies the exact schema first), `resetSettings()`. On init, `load()` settings and seed `currentSettings`; never crash on absent/malformed (fall back to defaults).
+1. **CI gate.** Confirm the Actions run for this commit is green — specifically the "Unit tests and
+   lint" step, which is the only real Kotlin compile gate (`scripts/validate_repo.sh` does not
+   compile). Until it passes, everything added this session is *Implemented*, not *Build verified*.
+2. **Device gate (Redmi Turbo 4 Pro, SM8735).** Physically confirm the Phase 2A acceptance list in
+   §4.2 below, then record the result in `docs/device-results/`.
 
-2. **Chat ⚙ quick-settings bottom sheet (item 6).** Compose `ModalBottomSheet` opened from a top-right ⚙ button in Chat. LLM-only controls first: temperature (0.0–2.0), top-P (0.0–1.0), max new tokens (1–4096, bounded by context), keep-last-turns. Buttons: **Apply once** (sets `pendingQuickSettings`, does not persist), **Save default** (persists via store), **Reset** (defaults). Do **not** render Image/Voice/Search controls until a real adapter capability exists (they remain inert typed ranges).
+### 4.1 Phase 2A device acceptance checklist
 
-3. **Workspace status surface in Settings.** Grant/Revoke button bound to `ACTION_OPEN_DOCUMENT_TREE` (ActivityResult), and a status line from `workspaceGrantState`. Show coarse discovery counts only (REVIEWED / LOCAL_UNREVIEWED) — never raw digests, filenames, or contents in diagnostics.
+- App starts with **no** workspace grant and uses safe defaults; nothing crashes and no permission
+  dialog appears at launch.
+- Chat ⚙ opens the sheet; **Apply once** changes only the next reply, and the reply after it is back
+  on saved defaults (watch the status line, which states which is in force).
+- **Save default** persists: kill the app, reopen, and the sheet shows the saved values.
+- **Reset** returns to 0.7 / 0.9 / 256 and, when a workspace is connected, rewrites the file.
+- Settings → Workspace folder: grant via the system folder picker, confirm the status flips to
+  Connected, and confirm `models/ tools/ config/ cache/` appear in the chosen folder.
+- Hand-edit `config/settings.json` into malformed JSON, reopen the app: it must fall back to
+  defaults with an explanatory status line, never crash.
+- Put a GGUF in `models/`, press **Scan for models**: counts appear, and **no** model is loaded
+  (the active model must not change and no memory spike should occur).
+- Revoke the folder permission from Android Settings, reopen LAI: state shows revoked, counts reset,
+  defaults in use.
+- Existing Qwen 1.5B download/import/load/chat + retained-copy paths still pass unchanged.
 
-4. **Tests (item 8).** Pure-JVM: extend `SettingsPolicy`/`WorkspaceSettingsCodec` coverage; add `MainViewModel` fake-repository tests for (a) absent workspace → defaults, (b) valid `settings.json` restores typed values, (c) malformed/oversized → fallback without crash, (d) quick-sheet override does not mutate saved defaults, (e) save/reset round-trips. Add `:platform:workspace` fake-SAF tests for revoked grant, partial write, oversized file. Add these to the existing CI `coverageCheck` / `testDebugUnitTest` commands.
-
-5. **Acceptance gate (PROJECT_STATE §4.2).** Existing Qwen 1.5B download/import/load/chat + retained-copy still pass; app starts without a grant and uses safe defaults; user can grant/revoke without broad storage; valid settings restore typed values, malformed/oversized fall back without crash; quick-sheet override does not silently mutate saved defaults; discovery registers metadata but never auto-loads; whole thing compiles in CI under 128 MB.
-
-### Sequencing after Phase 2A
+### 4.2 Then, in order
 
 1. Categorized Model Center + WorkManager foreground downloader (pause/resume/cancel).
-2. Dual Dashboard / Chat **+ Attach Tools** shell over shared contracts.
-3. Rolling Context Window with explicit summary checkpoints.
-4. Real printed Bangla OCR CPU baseline (behind the existing `OcrEngine` contract).
+2. Dual Dashboard / Chat **+ Attach Tools** shell over the same shared contracts.
+3. Rolling Context Window with explicit summary checkpoints (`keepLastTurns` is already a typed,
+   validated, user-editable setting — the window implementation is what's missing).
+4. Real printed Bangla OCR CPU baseline behind the existing `OcrEngine` contract.
 5. Vulkan qualification + closed-loop thermal/battery control.
 6. Native C++ micro-model TaskGraph → streaming STT/TTS + Barge-In.
 7. SQLCipher vector DB + RAG.
 8. QNN/HTP adapter only after licensed tooling + converted artifacts exist.
 
 ### Process note for next session
-The in-workspace source gate (`scripts/validate_repo.sh`) does **not** compile Kotlin — it only checks architecture/size/catalog. Treat GitHub Actions as the real compile/test gate: push, then confirm the "Unit tests and lint" step is green (CI run `31968037878` is the current green baseline). Do not declare a module "build verified" until that step passes.
+
+The in-workspace source gate (`scripts/validate_repo.sh`) does **not** compile Kotlin — it only
+checks architecture/size/catalog/documentation. Treat GitHub Actions as the real compile/test gate:
+push, then confirm "Unit tests and lint" is green. Do not mark a module "build verified" until it is.
+
+A concrete lesson from the previous session: three intermediate commits failed
+`:core:policy:compileKotlin` on errors (a missing argument, missing test imports) that no local gate
+could catch. When touching Kotlin, re-read the diff for signature/import correctness before pushing.
