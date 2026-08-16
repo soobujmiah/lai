@@ -19,9 +19,9 @@ class WorkspaceSettingsStore(
     private val repository: WorkspaceRepository,
     private val codec: WorkspaceSettingsCodec = WorkspaceSettingsCodec(),
     private val maxBytes: Int = MAX_BYTES,
-) {
+) : SettingsStorePort {
     /** Effective document plus provenance for UI/diagnostics. Never throws. */
-    suspend fun load(): SettingsLoadOutcome = withContext(Dispatchers.IO) {
+    override suspend fun load(): SettingsLoadOutcome = withContext(Dispatchers.IO) {
         val saf = repository.saf() ?: return@withContext defaults("workspace not granted")
         val configDocId = saf.childDocumentId(saf.rootDocumentId, WorkspaceLayout.CONFIG_DIRECTORY)
             ?: return@withContext defaults("config directory absent")
@@ -46,7 +46,7 @@ class WorkspaceSettingsStore(
     }
 
     /** Verifies and persists [document] via temp-write-then-replace. Fails when not granted. */
-    suspend fun save(document: SettingsDocumentV1): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun save(document: SettingsDocumentV1): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val saf = repository.saf() ?: error("Workspace not granted")
             repository.ensureLayout().getOrThrow()
@@ -102,11 +102,3 @@ class WorkspaceSettingsStore(
         private const val MIME_JSON = "application/json"
     }
 }
-
-/** Effective loaded settings and provenance. [document] is always safe to use. */
-data class SettingsLoadOutcome(
-    val document: SettingsDocumentV1,
-    val fromFile: Boolean,
-    val fellBackToDefaults: Boolean,
-    val warnings: List<String>,
-)

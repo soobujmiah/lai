@@ -1,7 +1,9 @@
 package dev.lai.runtime.workspace
 
 import dev.lai.runtime.core.LaiJson
+import dev.lai.runtime.settings.SettingsDocumentV1
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,6 +45,23 @@ class WorkspaceContractsTest {
         )
         assertEquals(candidate, LaiJson.decodeFromString(ModelCandidate.serializer(), LaiJson.encodeToString(ModelCandidate.serializer(), candidate)))
         assertEquals(discovered, LaiJson.decodeFromString(DiscoveredModel.serializer(), LaiJson.encodeToString(DiscoveredModel.serializer(), discovered)))
+    }
+
+    @Test
+    fun `a settings load outcome carries provenance alongside a usable document`() {
+        val fallback = SettingsLoadOutcome(
+            document = SettingsDocumentV1(),
+            fromFile = false,
+            fellBackToDefaults = true,
+            warnings = listOf("workspace not granted"),
+        )
+        // The document is always usable, even when the read failed.
+        assertEquals(SettingsDocumentV1(), fallback.document)
+        assertEquals(listOf("workspace not granted"), fallback.warnings)
+        assertEquals(fallback, fallback.copy())
+
+        val loaded = fallback.copy(fromFile = true, fellBackToDefaults = false, warnings = emptyList())
+        assertNotEquals(fallback, loaded)
     }
 
     @Test

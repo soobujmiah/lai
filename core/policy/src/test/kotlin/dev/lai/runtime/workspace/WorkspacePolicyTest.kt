@@ -191,6 +191,29 @@ class WorkspacePolicyTest {
     }
 
     @Test
+    fun `a truncated write is malformed rather than fatal`() {
+        // Simulates a partially written file (power loss / interrupted SAF write).
+        val truncated = codec.encode(SettingsDocumentV1()).copyOfRange(0, 12)
+        assertTrue(codec.decode(truncated, maxBytes = 16 * 1024) is WorkspaceSettingsCodec.DecodeOutcome.Malformed)
+    }
+
+    @Test
+    fun `an unsupported schema version falls back to defaults on read`() {
+        val outcome = codec.decode("""{"schemaVersion":9,"llm":{"temperature":0.5}}""".toByteArray(), maxBytes = 1024)
+        val loaded = outcome as WorkspaceSettingsCodec.DecodeOutcome.Loaded
+        assertTrue(loaded.fellBackToDefaults)
+        assertEquals(SettingsDocumentV1(), loaded.document)
+    }
+
+    @Test
+    fun `storage rejection names the offending field`() {
+        val smuggled = """{"schemaVersion":1,"note":"a private message the user never meant to store"}"""
+        val verification = codec.verifyForStorage(smuggled.toByteArray(), 16 * 1024)
+        assertFalse(verification.accepted)
+        assertTrue(verification.reasons.toString(), verification.reasons.any { it.contains("note") })
+    }
+
+    @Test
     fun `maxBytes boundary is inclusive`() {
         val bytes = codec.encode(SettingsDocumentV1())
         assertTrue(codec.decode(bytes, maxBytes = bytes.size) is WorkspaceSettingsCodec.DecodeOutcome.Loaded)

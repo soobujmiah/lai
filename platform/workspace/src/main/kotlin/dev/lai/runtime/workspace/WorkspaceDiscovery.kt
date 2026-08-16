@@ -20,10 +20,10 @@ import java.security.MessageDigest
 class WorkspaceDiscovery(
     private val repository: WorkspaceRepository,
     private val policy: WorkspacePolicy = WorkspacePolicy(),
-) {
-    suspend fun discoverModels(
+) : ModelDiscoveryPort {
+    override suspend fun discoverModels(
         reviewedBySha256: Map<String, String>,
-        limits: DiscoveryLimits = DiscoveryLimits(),
+        limits: DiscoveryLimits,
     ): Result<List<DiscoveredModel>> = withContext(Dispatchers.IO) {
         runCatching {
             val saf = repository.saf() ?: error("Workspace not granted")

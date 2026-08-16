@@ -11,7 +11,7 @@ import android.net.Uri
  * persistable read/write permission and remembers the tree URI in app-private preferences. It never
  * translates a `content://` URI into a raw path and never requests `MANAGE_EXTERNAL_STORAGE`.
  */
-class WorkspaceRepository(private val context: Context) {
+class WorkspaceRepository(private val context: Context) : WorkspaceGrantPort {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -20,7 +20,7 @@ class WorkspaceRepository(private val context: Context) {
         get() = prefs.getString(KEY_TREE_URI, null)?.let { runCatching { Uri.parse(it) }.getOrNull() }
 
     /** Current grant state derived from remembered URI + held persistable permissions. */
-    val state: WorkspaceGrantState
+    override val state: WorkspaceGrantState
         get() {
             val uri = grantedTreeUri ?: return WorkspaceGrantState.NOT_GRANTED
             val held = context.contentResolver.persistedUriPermissions.any { it.uri == uri }
