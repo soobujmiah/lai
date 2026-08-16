@@ -22,7 +22,8 @@ LAI has one application ID and upgrade path. Internet is used only when the user
 
 | Area | Included now | Intentional boundary |
 |---|---|---|
-| Compose UX | Chat, Screen Reader, Automator, hidden Developer Mode, Bangla resources | Chat reports backend absence rather than fabricating output |
+| Compose UX | Chat, Screen Reader, Automator, Settings, hidden Developer Mode, Bangla resources | Chat reports backend absence rather than fabricating output |
+| Local tool proposals | Opt-in exact JSON parsing, per-tool schemas, trusted one-time review, redacted in-memory audit | One validated action maximum; no autonomous chain or model-authored confirmation |
 | Accessibility | Snapshot, selector, click, set text, scroll, global actions, app launch, Android 11+ screenshot | No autonomous consequential action without confirmation |
 | Shizuku | Binder state, permission, UID, structured operation policy, timeout/output limits | No raw shell command API |
 | Models | Signed artifact/backend/ABI metadata, explicit HTTPS download, mandatory SHA-256, resume, GGUF validation, app-private registry and Keep copy | No model is bundled; only reviewed artifact hosts are accepted |

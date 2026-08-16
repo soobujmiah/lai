@@ -57,7 +57,12 @@ std::string apply_chat_template(const llama_model* model, const std::vector<Chat
     contents.emplace_back(kSystemPrompt);
     for (const auto& message : conversation) {
         if (message.content.empty()) continue;
-        roles.emplace_back(normalized_role(message.role));
+        const std::string role = normalized_role(message.role);
+        if (role == "system") {
+            contents.front().append("\n").append(message.content);
+            continue;
+        }
+        roles.emplace_back(role);
         contents.emplace_back(message.content);
     }
     if (roles.size() == 1U) throw std::invalid_argument("Conversation has no non-empty messages");

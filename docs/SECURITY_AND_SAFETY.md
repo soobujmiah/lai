@@ -13,7 +13,7 @@
 
 | Threat | Control now | Follow-up |
 |---|---|---|
-| Model emits malicious tool call | fixed registry, typed parsing, confirmation | JSON Schema validation + policy fuzzing |
+| Model emits malicious tool call | exact 16 KiB JSON envelope, per-tool schemas, fixed registry, second dispatch validation, one-time trusted review | expand parser/property fuzzing and persistent audit before autonomy |
 | Screen prompt injection | screen data has no authority | provenance labels in model context |
 | Shell injection | no raw shell; validated argv | fuzz every argument compiler |
 | Password leakage in tree | password text/description omitted | screenshot redaction UX |
@@ -27,6 +27,8 @@
 
 - Missing accessibility service → tool failure, no fallback gesture.
 - Missing Shizuku permission → elevated tool failure.
+- Model proposal mode is off by default; every accepted model proposal still requires one-time trusted UI review.
+- Mixed prose/JSON, unknown fields (including model-authored confirmation), wrong types, unsafe selectors and unsupported tools → rejection.
 - Consequential call without trusted confirmation → failure.
 - Unknown shell operation/setting/key code → failure.
 - Missing OCR model → typed unavailable error, no network OCR.
@@ -68,9 +70,9 @@ Shizuku may run as UID 2000 (ADB shell) or UID 0 (root/Sui). The app surfaces UI
 
 ## Known Phase 1 gaps
 
-- model downloads accept optional rather than mandatory SHA-256;
-- UI confirmation is wired at agent boundary but no full proposed-action dialog exists yet;
-- there is no persistent audit log;
+- manual Developer Mode URLs still rely on user-supplied digest metadata rather than signed catalog provenance;
+- the confirmation dialog supports one model-proposed action only; there is no autonomous result-feedback loop;
+- the redacted audit is memory-only; there is no replay-resistant persistent audit log;
 - OCR screenshot redaction is not implemented;
 - dependency verification metadata and SBOM are not present;
 - native adapters have not undergone memory-safety fuzzing.

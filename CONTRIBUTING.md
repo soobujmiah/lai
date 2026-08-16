@@ -35,9 +35,10 @@ Compilation and lint run in GitHub Actions.
 8. New consequential tools require trusted confirmation and threat review.
 9. Bound depth, count, time, output, allocation, and network size where applicable.
 10. Keep telemetry and model internals behind Developer Mode.
-11. Add tests for protocol changes, Bangla UTF-8, rejection paths, and injection attempts.
-12. Include physical-device evidence for hardware/performance claims.
-13. Never log prompts, entered text, screen trees, captures, tokens, or secrets by default.
+11. Add tests for protocol changes, Bangla UTF-8, rejection paths, injection attempts, wrong JSON types, unknown fields and authority bypasses.
+12. Model-proposed tools must use the canonical parser and trusted one-time review; never add a model-authored confirmation or raw tool escape hatch.
+13. Include physical-device evidence for hardware/performance claims.
+14. Never log prompts, entered text, screen trees, captures, tokens, or secrets by default.
 
 ## Supported-model catalog changes
 

@@ -35,7 +35,8 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | QAIRT/QNN HTP offload | Planned (Phase 3) | Snapdragon priority; requires a dedicated isolated adapter, converted artifact, licensed SDK/runtime and physical-device evidence |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
 | Bangla handwriting OCR | Planned | dataset/model/license selection required |
-| LLM-driven tool loop | Planned (Phase 2) | manual safe tools exist; model proposal parser to follow |
+| One-shot LLM tool proposals | Source candidate | opt-in trusted system schema, exact bounded JSON parser, per-tool validation, second dispatch validation, one-time Compose approval and 50-record content-free in-memory audit; CI/device validation pending |
+| Autonomous multi-step tool loop | Planned | requires replay-resistant persistent audit, foreground binding, result feedback, loop limits and adversarial device evidence |
 | RAG / STT / TTS plugins | Planned | interfaces to be designed after runtime stabilization |
 
 ## Definition of "full featured"

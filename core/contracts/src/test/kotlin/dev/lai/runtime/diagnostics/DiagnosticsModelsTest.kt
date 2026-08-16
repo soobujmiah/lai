@@ -17,6 +17,10 @@ class DiagnosticsModelsTest {
             models = listOf(ModelDiagnostics("model", "Model", 100, "a".repeat(64), true)),
             performance = listOf(GenerationPerformanceDiagnostics(10, 2, 5, 6, 20, 26, 2000.0, 100.0)),
             privacy = DiagnosticsPrivacy(),
+            automation = AutomationDiagnostics(
+                toolProposalsEnabled = true,
+                records = listOf(ToolAuditDiagnostics("screen.click", "INTERACTION", true, true, 2)),
+            ),
         )
         val json = LaiJson.encodeToString(DiagnosticsReportV1.serializer(), report)
         val decoded = LaiJson.decodeFromString(DiagnosticsReportV1.serializer(), json)
@@ -24,6 +28,9 @@ class DiagnosticsModelsTest {
         assertTrue(json.contains("\"schemaVersion\":1"))
         assertFalse(json.contains("promptText"))
         assertFalse(json.contains("generatedText"))
+        assertFalse(json.contains("toolArguments"))
+        assertEquals("screen.click", decoded.automation.records.single().toolName)
+        assertEquals("IN_MEMORY_ONLY", decoded.automation.auditPersistence)
         assertTrue(decoded.privacy.localOnlyUntilUserExport)
     }
 }

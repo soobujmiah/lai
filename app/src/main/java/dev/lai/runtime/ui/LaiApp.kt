@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.lai.runtime.R
+import dev.lai.runtime.agent.ToolRisk
 import dev.lai.runtime.shell.ShizukuState
 import java.util.Locale
 
@@ -102,7 +104,49 @@ fun LaiApp(viewModel: MainViewModel) {
             }
         }
     }
+    state.pendingToolProposal?.let { proposal ->
+        ToolConfirmationDialog(
+            proposal = proposal,
+            onApprove = viewModel::approvePendingTool,
+            onDeny = viewModel::denyPendingTool,
+        )
+    }
 }
+
+@Composable
+private fun ToolConfirmationDialog(
+    proposal: PendingToolProposal,
+    onApprove: () -> Unit,
+    onDeny: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDeny,
+        title = { Text(stringResource(R.string.review_local_action)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(proposal.summary, fontWeight = FontWeight.SemiBold)
+                Text("${stringResource(R.string.risk_label)}: ${toolRiskLabel(proposal.risk)}")
+                Text(
+                    stringResource(R.string.tool_review_explanation),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { Button(onClick = onApprove) { Text(stringResource(R.string.approve_once)) } },
+        dismissButton = { TextButton(onClick = onDeny) { Text(stringResource(R.string.do_not_run)) } },
+    )
+}
+
+@Composable
+private fun toolRiskLabel(risk: ToolRisk): String = stringResource(
+    when (risk) {
+        ToolRisk.READ_ONLY -> R.string.risk_read_only
+        ToolRisk.INTERACTION -> R.string.risk_interaction
+        ToolRisk.SENSITIVE -> R.string.risk_sensitive
+        ToolRisk.ELEVATED -> R.string.risk_elevated
+    },
+)
 
 @Composable
 private fun RowScope.ModeNavigationItem(
@@ -136,7 +180,7 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
             }
             TextButton(
                 onClick = viewModel::clearConversation,
-                enabled = !state.busy && state.messages.any { it.contextEligible },
+                enabled = !state.busy && state.pendingToolProposal == null && state.messages.any { it.contextEligible },
             ) { Text("New chat") }
         }
         LazyColumn(
@@ -168,7 +212,10 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
                     Text(if (state.operation == RuntimeOperation.CANCELLING) "Stopping…" else "Stop")
                 }
             } else {
-                Button(onClick = viewModel::sendMessage, enabled = state.input.isNotBlank() && !state.busy) {
+                Button(
+                    onClick = viewModel::sendMessage,
+                    enabled = state.input.isNotBlank() && !state.busy && state.pendingToolProposal == null,
+                ) {
                     Text(stringResource(R.string.send))
                 }
             }
@@ -295,6 +342,29 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.local_action_proposals), fontWeight = FontWeight.SemiBold)
+                        Text(
+                            stringResource(R.string.local_action_proposals_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = state.toolProposalsEnabled,
+                        onCheckedChange = viewModel::setToolProposalsEnabled,
+                        enabled = !state.busy && state.pendingToolProposal == null,
+                    )
+                }
+            }
+        }
+        item {
+            Card {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
                         Text(stringResource(R.string.developer_mode), fontWeight = FontWeight.SemiBold)
                         Text(
                             stringResource(R.string.developer_mode_summary),
@@ -309,6 +379,19 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
         if (state.developerMode) {
             item { StatusCard("Native runtime", state.runtimeDetail) }
             item { StatusCard("Scheduler", state.schedulerDetail) }
+            item {
+                val latest = state.toolAuditHistory.lastOrNull()
+                StatusCard(
+                    "Local tool audit",
+                    if (latest == null) {
+                        "No model-proposed tool has been reviewed in this app session"
+                    } else {
+                        "${state.toolAuditHistory.size} redacted record(s) • latest ${latest.toolName} • " +
+                            if (!latest.userApproved) "denied"
+                            else if (latest.success == true) "approved/succeeded" else "approved/failed"
+                    },
+                )
+            }
             item {
                 StatusCard(
                     "Device environment",

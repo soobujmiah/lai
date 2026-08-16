@@ -10,15 +10,19 @@ import androidx.lifecycle.viewModelScope
 import dev.lai.runtime.BuildConfig
 import dev.lai.runtime.LaiApplication
 import dev.lai.runtime.agent.ToolCall
+import dev.lai.runtime.agent.ToolCallParseResult
+import dev.lai.runtime.agent.ToolRisk
 import dev.lai.runtime.core.AppRuntimeEvent
 import dev.lai.runtime.core.LaiJson
 import dev.lai.runtime.diagnostics.AppDiagnostics
+import dev.lai.runtime.diagnostics.AutomationDiagnostics
 import dev.lai.runtime.diagnostics.DeviceDiagnostics
 import dev.lai.runtime.diagnostics.DiagnosticsPrivacy
 import dev.lai.runtime.diagnostics.DiagnosticsReportV1
 import dev.lai.runtime.diagnostics.GenerationPerformanceDiagnostics
 import dev.lai.runtime.diagnostics.ModelDiagnostics
 import dev.lai.runtime.diagnostics.RuntimeDiagnostics
+import dev.lai.runtime.diagnostics.ToolAuditDiagnostics
 import dev.lai.runtime.automation.AccessibilityGateway
 import dev.lai.runtime.inference.ConversationMessage
 import dev.lai.runtime.inference.ConversationRole
@@ -72,6 +76,21 @@ data class ChatMessage(
     val fromUser: Boolean,
     val text: String,
     val contextEligible: Boolean = true,
+)
+
+data class PendingToolProposal(
+    val call: ToolCall,
+    val summary: String,
+    val risk: ToolRisk,
+)
+
+data class ToolAuditRecord(
+    val callId: String,
+    val toolName: String,
+    val risk: ToolRisk,
+    val userApproved: Boolean,
+    val success: Boolean?,
+    val timestampEpochMs: Long,
 )
 
 private data class ScheduledLoad(
@@ -129,6 +148,9 @@ data class MainUiState(
     val performanceHistory: List<GenerationMetrics> = emptyList(),
     val trimmedConversationTurns: Int = 0,
     val diagnosticsStatus: String = "No diagnostics exported",
+    val toolProposalsEnabled: Boolean = false,
+    val pendingToolProposal: PendingToolProposal? = null,
+    val toolAuditHistory: List<ToolAuditRecord> = emptyList(),
 ) {
     val busy: Boolean
         get() = operation in setOf(
@@ -187,6 +209,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setInput(value: String) = _state.update { it.copy(input = value) }
     fun toggleSettings() = _state.update { it.copy(settingsVisible = !it.settingsVisible) }
     fun setDeveloperMode(enabled: Boolean) = _state.update { it.copy(developerMode = enabled) }
+    fun setToolProposalsEnabled(enabled: Boolean) = _state.update {
+        it.copy(
+            toolProposalsEnabled = enabled,
+            pendingToolProposal = if (enabled) it.pendingToolProposal else null,
+            notice = if (enabled) {
+                "Local action proposals enabled; every proposed tool still requires one-time review"
+            } else {
+                "Local action proposals disabled"
+            },
+        )
+    }
     fun setModelName(value: String) = _state.update { it.copy(modelName = value) }
     fun setModelUrl(value: String) = _state.update { it.copy(modelUrl = value) }
     fun setModelSha(value: String) = _state.update { it.copy(modelSha = value) }
@@ -238,7 +271,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun sendMessage() {
         val prompt = state.value.input.trim()
-        if (prompt.isEmpty() || state.value.busy) return
+        if (prompt.isEmpty() || state.value.busy || state.value.pendingToolProposal != null) return
         val immediateMessage = when {
             state.value.installedModels.isEmpty() ->
                 "লোকাল মডেল এখনো ইনস্টল করা নেই। Settings থেকে একটি supported model ডাউনলোড করুন।"
@@ -274,16 +307,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 container.inferenceEngine.generate(prepared.messages, GENERATION_CONFIG).collect { event ->
                     when (event) {
                         is InferenceEvent.Token -> appendAssistantToken(event.text)
-                        is InferenceEvent.Completed -> _state.update {
-                            it.copy(
-                                operation = RuntimeOperation.READY,
-                                lastGenerationMetrics = event.metrics,
-                                performanceHistory = event.metrics?.let { metrics ->
-                                    (it.performanceHistory + metrics).takeLast(MAX_PERFORMANCE_SAMPLES)
-                                } ?: it.performanceHistory,
-                                notice = "Generated ${event.tokensGenerated} tokens locally",
-                            )
-                        }
+                        is InferenceEvent.Completed -> completeGeneration(event)
                         is InferenceEvent.Failed -> markGenerationFailed(event.message)
                     }
                 }
@@ -309,8 +333,121 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         generationJob?.cancel(CancellationException("User stopped generation"))
     }
 
-    fun clearConversation() {
+    private fun completeGeneration(event: InferenceEvent.Completed) {
+        val current = state.value
+        val modelOutput = current.messages.lastOrNull()?.takeIf { !it.fromUser }?.text.orEmpty()
+        val proposal = if (current.toolProposalsEnabled) {
+            container.agentRuntime.parseToolProposal(modelOutput)
+        } else {
+            ToolCallParseResult.NotToolCall
+        }
+        _state.update { latest ->
+            val performance = event.metrics?.let { metrics ->
+                (latest.performanceHistory + metrics).takeLast(MAX_PERFORMANCE_SAMPLES)
+            } ?: latest.performanceHistory
+            when (proposal) {
+                ToolCallParseResult.NotToolCall -> latest.copy(
+                    operation = RuntimeOperation.READY,
+                    lastGenerationMetrics = event.metrics,
+                    performanceHistory = performance,
+                    notice = "Generated ${event.tokensGenerated} tokens locally",
+                )
+                is ToolCallParseResult.Accepted -> latest.copy(
+                    messages = replaceLastToolTurn(
+                        latest.messages,
+                        "Proposed local action: ${proposal.confirmationSummary}",
+                    ),
+                    operation = RuntimeOperation.READY,
+                    lastGenerationMetrics = event.metrics,
+                    performanceHistory = performance,
+                    pendingToolProposal = PendingToolProposal(
+                        call = proposal.call,
+                        summary = proposal.confirmationSummary,
+                        risk = proposal.definition.risk,
+                    ),
+                    notice = "Nothing has run; review the model-proposed action",
+                )
+                is ToolCallParseResult.Rejected -> latest.copy(
+                    messages = replaceLastToolTurn(
+                        latest.messages,
+                        "LAI rejected an invalid model-proposed action.",
+                    ),
+                    operation = RuntimeOperation.READY,
+                    lastGenerationMetrics = event.metrics,
+                    performanceHistory = performance,
+                    notice = proposal.message,
+                )
+            }
+        }
+    }
+
+    fun approvePendingTool() {
+        val proposal = state.value.pendingToolProposal ?: return
         if (state.value.busy) return
+        _state.update {
+            it.copy(
+                pendingToolProposal = null,
+                operation = RuntimeOperation.AUTOMATING,
+                notice = "Running the one approved local action…",
+            )
+        }
+        viewModelScope.launch {
+            val result = container.agentRuntime.execute(proposal.call, userConfirmed = true)
+            val resultText = if (result.success) {
+                "Approved action completed locally: ${proposal.summary}"
+            } else {
+                "Approved action was not completed: ${result.error?.message ?: "tool failed"}"
+            }
+            _state.update {
+                it.copy(
+                    messages = it.messages + ChatMessage(false, resultText, contextEligible = false),
+                    operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
+                    notice = resultText,
+                    toolAuditHistory = appendAudit(
+                        it.toolAuditHistory,
+                        ToolAuditRecord(
+                            callId = proposal.call.id,
+                            toolName = proposal.call.name,
+                            risk = proposal.risk,
+                            userApproved = true,
+                            success = result.success,
+                            timestampEpochMs = System.currentTimeMillis(),
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun denyPendingTool() {
+        val proposal = state.value.pendingToolProposal ?: return
+        if (state.value.busy) return
+        _state.update {
+            it.copy(
+                pendingToolProposal = null,
+                messages = it.messages + ChatMessage(
+                    fromUser = false,
+                    text = "Proposed action was not run.",
+                    contextEligible = false,
+                ),
+                notice = "Action denied; no Android authority was invoked",
+                toolAuditHistory = appendAudit(
+                    it.toolAuditHistory,
+                    ToolAuditRecord(
+                        callId = proposal.call.id,
+                        toolName = proposal.call.name,
+                        risk = proposal.risk,
+                        userApproved = false,
+                        success = null,
+                        timestampEpochMs = System.currentTimeMillis(),
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun clearConversation() {
+        if (state.value.busy || state.value.pendingToolProposal != null) return
         _state.update {
             it.copy(
                 messages = it.messages.take(1),
@@ -322,28 +459,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun prepareConversation(config: GenerationConfig): PreparedConversation {
-        val all = state.value.messages
-            .filter { it.contextEligible && it.text.isNotBlank() }
-            .map {
-                ConversationMessage(
-                    role = if (it.fromUser) ConversationRole.USER else ConversationRole.ASSISTANT,
-                    content = it.text,
-                )
+        val current = state.value
+        val all = buildList {
+            if (current.toolProposalsEnabled) {
+                add(ConversationMessage(ConversationRole.SYSTEM, container.agentRuntime.modelToolInstruction))
             }
-            .toMutableList()
-        require(all.isNotEmpty()) { "Conversation is empty" }
+            current.messages
+                .filter { it.contextEligible && it.text.isNotBlank() }
+                .mapTo(this) {
+                    ConversationMessage(
+                        role = if (it.fromUser) ConversationRole.USER else ConversationRole.ASSISTANT,
+                        content = it.text,
+                    )
+                }
+        }.toMutableList()
+        val protectedPrefix = if (current.toolProposalsEnabled) 1 else 0
+        require(all.size > protectedPrefix) { "Conversation is empty" }
         var trimmed = 0
         while (true) {
             val tokenCount = container.inferenceEngine.countTokens(all).getOrThrow()
             if (tokenCount + config.maxNewTokens <= container.inferenceEngine.contextSize) {
                 return PreparedConversation(all.toList(), trimmed)
             }
-            if (all.size <= 1) error("Current message is too large for the model context")
-            all.removeAt(0)
-            if (all.firstOrNull()?.role == ConversationRole.ASSISTANT) all.removeAt(0)
+            if (all.size <= protectedPrefix + 1) error("Current message is too large for the model context")
+            all.removeAt(protectedPrefix)
+            if (all.getOrNull(protectedPrefix)?.role == ConversationRole.ASSISTANT) {
+                all.removeAt(protectedPrefix)
+            }
             trimmed += 1
         }
     }
+
+    private fun replaceLastToolTurn(messages: List<ChatMessage>, replacement: String): List<ChatMessage> {
+        val updated = messages.toMutableList()
+        val assistantIndex = updated.indexOfLast { !it.fromUser }
+        if (assistantIndex >= 0) {
+            updated[assistantIndex] = updated[assistantIndex].copy(text = replacement, contextEligible = false)
+            val userIndex = assistantIndex - 1
+            if (userIndex >= 0 && updated[userIndex].fromUser) {
+                updated[userIndex] = updated[userIndex].copy(contextEligible = false)
+            }
+        }
+        return updated
+    }
+
+    private fun appendAudit(history: List<ToolAuditRecord>, record: ToolAuditRecord): List<ToolAuditRecord> =
+        (history + record).takeLast(MAX_TOOL_AUDIT_RECORDS)
 
     private fun markGenerationFailed(message: String) {
         _state.update {
@@ -761,6 +922,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             },
             performance = current.performanceHistory.map { metrics -> metrics.toDiagnostics() },
             privacy = DiagnosticsPrivacy(),
+            automation = AutomationDiagnostics(
+                toolProposalsEnabled = current.toolProposalsEnabled,
+                records = current.toolAuditHistory.map { record ->
+                    ToolAuditDiagnostics(
+                        toolName = record.toolName,
+                        risk = record.risk.name,
+                        userApproved = record.userApproved,
+                        success = record.success,
+                        timestampEpochMs = record.timestampEpochMs,
+                    )
+                },
+            ),
         )
     }
 
@@ -800,6 +973,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val MODEL_CONTEXT_TOKENS = 4096
         private const val MAX_PERFORMANCE_SAMPLES = 20
+        private const val MAX_TOOL_AUDIT_RECORDS = 50
         private val GENERATION_CONFIG = GenerationConfig(maxNewTokens = 256)
         private val DIAGNOSTICS_JSON = Json(LaiJson) { prettyPrint = true }
     }

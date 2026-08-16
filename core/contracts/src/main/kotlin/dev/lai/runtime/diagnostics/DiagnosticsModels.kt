@@ -12,6 +12,7 @@ data class DiagnosticsReportV1(
     val models: List<ModelDiagnostics>,
     val performance: List<GenerationPerformanceDiagnostics>,
     val privacy: DiagnosticsPrivacy,
+    val automation: AutomationDiagnostics = AutomationDiagnostics(),
 )
 
 @Serializable
@@ -74,6 +75,22 @@ data class GenerationPerformanceDiagnostics(
 )
 
 @Serializable
+data class AutomationDiagnostics(
+    val toolProposalsEnabled: Boolean = false,
+    val auditPersistence: String = "IN_MEMORY_ONLY",
+    val records: List<ToolAuditDiagnostics> = emptyList(),
+)
+
+@Serializable
+data class ToolAuditDiagnostics(
+    val toolName: String,
+    val risk: String,
+    val userApproved: Boolean,
+    val success: Boolean?,
+    val timestampEpochMs: Long,
+)
+
+@Serializable
 data class DiagnosticsPrivacy(
     val localOnlyUntilUserExport: Boolean = true,
     val excludedData: List<String> = listOf(
@@ -84,6 +101,9 @@ data class DiagnosticsPrivacy(
         "accessibility_trees",
         "foreground_packages",
         "documents",
+        "tool_arguments",
+        "tool_outputs",
+        "typed_automation_text",
         "credentials",
         "network_identifiers",
     ),

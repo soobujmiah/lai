@@ -45,8 +45,9 @@
 - [x] one-tap immutable reviewed baseline catalog
 - [x] scheduler wiring for memory/battery/thermal-aware model load
 - [ ] Bangla system prompt/templates and evaluation pack
-- [ ] parse LLM-proposed tool calls with strict schema
-- [ ] trusted confirmation sheet and redacted audit records
+- [x] parse complete LLM-proposed JSON tool calls with strict per-tool schemas and dispatch revalidation
+- [x] opt-in one-shot trusted confirmation dialog and bounded in-memory redacted audit records
+- [ ] replay-resistant app-private audit and tool-result feedback before any autonomous multi-step loop
 - [ ] select and integrate printed Bangla OCR baseline
 - [ ] benchmark profile hidden in Developer Mode (implementation candidate added)
 

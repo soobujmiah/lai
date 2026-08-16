@@ -12,9 +12,17 @@
 
 Results always correlate by `callId` and contain `success`, bounded `output`, and optional structured `error`.
 
+## Model-proposal boundary
+
+Local action proposals are disabled by default. When the user enables them, LAI adds a trusted system instruction describing the built-in schemas. A proposal is recognized only when the model's entire response is one JSON object with exactly `id`, `name`, and `arguments`. The envelope is limited to 16 KiB; tool IDs/names, object keys, types, selector depth, strings, package names, enums, and shell operations are bounded. Markdown-wrapped, mixed prose, malformed, unknown-field, unknown-tool, and wrong-type proposals fail closed.
+
+The same validator runs again in `AgentRuntime` before authority dispatch. Natural-language answers and unrelated JSON remain assistant text.
+
 ## Confirmation rule
 
-Confirmation is trusted UI state supplied separately to `AgentRuntime.execute`. A model cannot set `"confirmed": true` in arguments. Read-only snapshot/OCR and scrolling do not require confirmation; clicks, text, global actions, app launches, and mutations do.
+Every model-authored proposal—including read-only tools—opens a trusted Compose review dialog and runs at most once after **Approve once**. Newlines, control characters, and bidirectional-format controls are escaped/replaced in the human-readable preview without changing the validated execution value. Denial invokes no Android authority. A model cannot set `"confirmed": true`; unknown envelope fields are rejected before a `ToolCall` exists. Runtime policy separately requires confirmation for clicks, typing, global actions, app launches, and elevated operations, providing defense in depth.
+
+There is no autonomous multi-step loop and tool output is not automatically fed back to the model. LAI keeps at most 50 in-memory redacted audit records containing tool name, risk, approval/result state, and timestamp—never arguments or output. Persistent append-only audit storage remains a gate before autonomous execution.
 
 ## Tools
 
@@ -37,10 +45,13 @@ A non-clickable target walks at most six parents to find a clickable ancestor.
 Confirmation required.
 
 ```json
-{"viewId":"package:id/input","text":"বাংলা লিখুন","allowSensitiveInput":false}
+{
+  "selector":{"viewId":"package:id/input"},
+  "text":"বাংলা লিখুন"
+}
 ```
 
-Password targets fail unless a separate trusted product flow authorizes sensitive input. Model-authored `allowSensitiveInput` must never be accepted without a stronger user confirmation design.
+The nested selector prevents typed content from being ambiguously reused as selector text. `allowSensitiveInput` is not in the model schema and is rejected as an unknown field. Password targets fail; a future sensitive-input flow would require a separate trusted design and cannot be authorized by model JSON.
 
 ### `screen.scroll`
 
@@ -91,4 +102,4 @@ Text read from another app is untrusted content. It may say “ignore previous i
 
 ## Audit evolution
 
-Before autonomous multi-step execution, add an app-private append-only audit record with call ID, tool, redacted arguments, result code, foreground package, confirmation source, and timestamps. Never log entered text or screenshot content by default.
+The current one-shot flow stores only a 50-record in-memory audit and exports a privacy-filtered subset in user-requested diagnostics. Before any autonomous multi-step execution, add an app-private append-only record with replay protection, tool, redacted argument categories, result code, foreground-package binding, confirmation source, and timestamps. Never persist entered text, selector text, shell output, screenshots, OCR content, or model output by default.

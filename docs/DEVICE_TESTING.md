@@ -41,6 +41,17 @@ Open Model Setup and explicitly refresh the supported list; record that the stat
 11. Tap Screen Reader; confirm the missing OCR model is clearly reported rather than fake text.
 12. Background/foreground the app, rotate, lock/unlock, and kill/restart Shizuku.
 
+## One-shot tool proposal gate
+
+1. Confirm Local action proposals is off by default and ordinary chat behavior is unchanged.
+2. Enable it in Settings and request one harmless action against a non-sensitive test app.
+3. Verify mixed prose plus JSON, markdown fences, unknown fields, `confirmed`, `allowSensitiveInput`, wrong types, invalid packages and non-allowlisted shell operations do not open an executable proposal.
+4. For valid JSON, verify the dialog shows the exact action/risk and that nothing happens before approval.
+5. Press **Do not run** and verify no Accessibility/Shizuku action occurs.
+6. Propose again, press **Approve once**, verify exactly one action occurs, then verify replay does not occur after rotation/backgrounding.
+7. Verify password fields remain blocked and no tool argument/result appears in diagnostics or logs.
+8. Confirm tool result is not automatically sent back to the model and no second action runs.
+
 ## Retained model copy
 
 With an installed reviewed model, press **Keep copy**, save to Documents/Downloads, and wait for SHA verification. Uninstall LAI, confirm the GGUF remains in the chosen location, reinstall, choose **Import file**, and verify the model loads without network traffic. App-private and app-specific external directories do not satisfy this test because Android removes both on uninstall.

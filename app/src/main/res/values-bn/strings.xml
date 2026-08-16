@@ -15,6 +15,17 @@
   <string name="enable_accessibility">অ্যাক্সেসিবিলিটি চালু করুন</string>
   <string name="inspect_screen">নিরাপদে স্ক্রিন দেখুন</string>
   <string name="connect_shizuku">Shizuku সংযুক্ত করুন</string>
+  <string name="local_action_proposals">লোকাল কাজের প্রস্তাব</string>
+  <string name="local_action_proposals_summary">লোকাল মডেলকে কঠোরভাবে যাচাইকৃত একটি অ্যান্ড্রয়েড টুলের প্রস্তাব দিতে দিন। প্রতিটি প্রস্তাব একবারের বিশ্বস্ত পর্যালোচনা খুলবে; স্বয়ংক্রিয় কোনো কাজের ধারা চলবে না।</string>
+  <string name="review_local_action">লোকাল কাজটি পর্যালোচনা করুন</string>
+  <string name="tool_review_explanation">এই কাজটি লোকাল মডেল প্রস্তাব করেছে। এখনো কিছু চালানো হয়নি। অনুমোদন শুধু এই নির্দিষ্ট যাচাইকৃত কলের জন্য একবার প্রযোজ্য; মডেলের লেখা নিজেকে অনুমোদন করতে পারে না।</string>
+  <string name="approve_once">একবার অনুমোদন করুন</string>
+  <string name="do_not_run">চালাবেন না</string>
+  <string name="risk_label">ঝুঁকি</string>
+  <string name="risk_read_only">শুধু পড়া</string>
+  <string name="risk_interaction">ইন্টারঅ্যাকশন</string>
+  <string name="risk_sensitive">সংবেদনশীল</string>
+  <string name="risk_elevated">উচ্চ ক্ষমতা</string>
   <string name="developer_mode">ডেভেলপার মোড</string>
   <string name="developer_mode_summary">রানটাইমের তথ্য ও মডেল ইনস্টল নিয়ন্ত্রণ দেখান।</string>
   <string name="model_setup">মডেল সেটআপ</string>

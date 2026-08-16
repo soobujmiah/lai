@@ -16,6 +16,7 @@ These are release-blocking product invariants, not preferences.
 12. A verified cache and embedded fallback preserve the supported list offline.
 13. Local file imports store no provider URI and activate only exact reviewed digest/size/GGUF bytes.
 14. Retained model export occurs only to a user-selected SAF document; LAI reopens and hashes the destination, stores no URI, and never exports prompts or app data with the public model weights.
+15. Model-proposed tool arguments/results remain local and are excluded from diagnostics; only content-free in-memory audit metadata can be exported after explicit user action.
 
 ## Mechanical enforcement
 

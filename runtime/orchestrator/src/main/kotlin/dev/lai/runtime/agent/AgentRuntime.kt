@@ -26,18 +26,17 @@ class AgentRuntime(
     private val ocr: BanglaOcrService,
     private val policy: AgentPolicy = AgentPolicy(),
 ) {
-    val tools: List<ToolDefinition> = listOf(
-        ToolDefinition("screen.snapshot", "Read the current accessibility tree", ToolRisk.READ_ONLY, false),
-        ToolDefinition("screen.click", "Click a visible UI element", ToolRisk.INTERACTION, true),
-        ToolDefinition("screen.type", "Enter text into an editable UI element", ToolRisk.SENSITIVE, true),
-        ToolDefinition("screen.scroll", "Scroll a visible container", ToolRisk.INTERACTION, false),
-        ToolDefinition("system.global_action", "Back, home, recents, or notifications", ToolRisk.INTERACTION, true),
-        ToolDefinition("app.launch", "Launch an installed application", ToolRisk.INTERACTION, true),
-        ToolDefinition("ocr.current_screen", "Capture and recognize current screen text", ToolRisk.READ_ONLY, false),
-        ToolDefinition("shell.operation", "Run one structured, allowlisted Shizuku operation", ToolRisk.ELEVATED, true),
-    )
+    private val toolCallParser = ToolCallParser()
+    val tools: List<ToolDefinition> = BuiltInToolCatalog.definitions
+    val modelToolInstruction: String = BuiltInToolCatalog.modelInstruction
+
+    fun parseToolProposal(modelOutput: String): ToolCallParseResult = toolCallParser.parse(modelOutput)
 
     suspend fun execute(call: ToolCall, userConfirmed: Boolean = false): ToolResult = runCatching {
+        val validation = toolCallParser.validate(call)
+        if (validation is ToolCallParseResult.Rejected) {
+            return ToolResult.failure(call.id, "invalid_tool_call", validation.message)
+        }
         val definition = tools.firstOrNull { it.name == call.name }
             ?: return ToolResult.failure(call.id, "unknown_tool", "Unknown tool: ${call.name}")
         val decision = policy.review(
@@ -58,9 +57,9 @@ class AgentRuntime(
             "screen.type" -> automation(
                 call,
                 AutomationCommand.SetText(
-                    selector = call.arguments.selector(),
+                    selector = call.arguments.selector("selector"),
                     text = call.arguments.string("text"),
-                    allowSensitiveInput = call.arguments.boolean("allowSensitiveInput") ?: false,
+                    allowSensitiveInput = false,
                 ),
             )
             "screen.scroll" -> automation(

@@ -65,11 +65,11 @@ flowchart TB
 
 ### Presentation
 
-`LaiApp` shows only three primary modes. Runtime details and model URL controls are behind Developer Mode. `MainViewModel` performs lifecycle-bound coroutine work and exposes immutable state.
+`LaiApp` shows only three primary modes. Runtime details and model URL controls are behind Developer Mode. `MainViewModel` performs lifecycle-bound coroutine work and exposes immutable state. Local action proposals are a separate opt-in; pending validated calls live only in ViewModel memory and are cleared before one-time execution.
 
 ### Agent/tool policy
 
-The model-facing format is `ToolCall(id, name, arguments)`. `AgentRuntime` resolves only registered tools, checks confirmation, validates arguments, and returns `ToolResult`. The model never receives Java/Kotlin object references, Binder objects, accessibility nodes, or a shell.
+The model-facing format is `ToolCall(id, name, arguments)`. `ToolCallParser` accepts only a complete bounded JSON envelope and validates exact per-tool shapes; `AgentRuntime` repeats typed validation, resolves only the canonical registry, checks trusted confirmation, and returns `ToolResult`. The model never receives Java/Kotlin object references, Binder objects, accessibility nodes, confirmation authority, or a shell.
 
 ### Accessibility
 
@@ -98,7 +98,7 @@ Each adapter owns a stable opaque `BackendId` and publishes a generic `BackendDe
 
 ### Native inference
 
-The current app composes one llama `InferenceEngine`; JNI maps opaque integer handles to shared C++ `BackendSession` instances. C++ validates file existence, GGUF magic, context range, backend availability and conversation roles. The CPU runtime clears context memory per request, applies the model-native template to full user/assistant history, counts formatted tokens, evaluates bounded prompt batches, samples, and streams only complete UTF-8 code points through a cancellable callback. Oldest completed turns are omitted when prompt plus response reserve would exceed 4,096 tokens. Native monotonic clocks return prompt evaluation, TTFT, decode and total duration; metrics remain in memory and Developer Mode only.
+The current app composes one llama `InferenceEngine`; JNI maps opaque integer handles to shared C++ `BackendSession` instances. C++ validates file existence, GGUF magic, context range, backend availability and conversation roles. Trusted Kotlin system instructions are merged into the single native system message rather than emitted as conflicting duplicate system roles. The CPU runtime clears context memory per request, applies the model-native template to full user/assistant history, counts formatted tokens, evaluates bounded prompt batches, samples, and streams only complete UTF-8 code points through a cancellable callback. Oldest completed turns are omitted when prompt plus response reserve would exceed 4,096 tokens. Native monotonic clocks return prompt evaluation, TTFT, decode and total duration; metrics remain in memory and Developer Mode only.
 
 The llama module owns `llama-cpu` and a future tested `llama-vulkan`; it contains no QNN flag, placeholder, SDK type, or model assumption. A real Qualcomm implementation will be a separately isolated runtime adapter and will be composed only when it exists. A generic backend manager is deliberately deferred until a second concrete runtime is compiled.
 
@@ -138,7 +138,7 @@ sequenceDiagram
   L-->>UI: User-facing response
 ```
 
-The current UI exposes safe manual demonstrations; feeding tool proposals from a concrete LLM is Phase 2. The confirmation bit must originate in trusted UI state, never in model-authored JSON.
+When Local action proposals is enabled, a complete model response may enter the strict built-in `ToolCallParser`. An accepted one-shot proposal is rewritten to a human-readable summary and shown in a trusted Compose dialog; see [ADR 0006](adr/0006-one-shot-model-tool-proposals.md). Approval is passed separately to `AgentRuntime`; denial invokes no authority. Tool output is not fed back to the model and no autonomous chain exists. The confirmation bit originates only in trusted UI state, never in model-authored JSON.
 
 ## 5. Threads and ownership
 

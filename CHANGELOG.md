@@ -33,6 +33,16 @@ All notable changes are documented here. The project follows semantic versioning
 - Superseded the short-lived dual-edition experiment with one local-first app and upgrade path.
 - Added an ECDSA-signed web supported-model catalog, encrypted CI signing key, schema validation, verified cache and embedded offline fallback.
 
+### One-shot local tool proposal candidate
+
+- Added an opt-in trusted system instruction for eight built-in local Android tools.
+- Added a 16 KiB whole-response JSON parser with exact envelope keys, per-tool argument schemas, bounded selectors/text/path depth, package/enumeration checks and allowlisted shell compilation.
+- Revalidates every `ToolCall` at `AgentRuntime` dispatch so plugins/manual paths cannot bypass argument schemas.
+- Rejects model-authored confirmation, sensitive-input flags, mixed prose/JSON, wrong JSON types, unknown fields/tools and shell argument mismatches.
+- Added a trusted Compose review dialog with **Approve once** / **Do not run**; all model proposals, including read-only calls, require review and no autonomous chain runs.
+- Added a 50-record in-memory content-free tool audit and privacy-filtered diagnostics fields; arguments, typed text and tool output are excluded.
+- Merges trusted Kotlin system instructions into the native model system message and preserves that prefix during context trimming.
+
 ### Snapdragon-first vendor-neutral architecture candidate
 
 - Replaced the closed core backend enum with validated, adapter-owned opaque backend IDs and generic descriptors.
