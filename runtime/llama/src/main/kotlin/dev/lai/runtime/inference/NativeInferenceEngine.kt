@@ -54,19 +54,25 @@ class NativeInferenceEngine : InferenceEngine {
                 val info = LaiJson.decodeFromString<NativeRuntimeInfo>(NativeBindings.runtimeInfo())
                 RuntimeCapabilities(
                     nativeLibraryLoaded = true,
-                    compiledBackends = info.backends.mapNotNull {
-                        runCatching { InferenceBackend.valueOf(it.uppercase()) }.getOrNull()
-                    }.toSet(),
+                    compiledBackends = info.backends.mapNotNull(::descriptorForNativeBackend).toSet(),
                     detail = info.detail,
                 )
             }.getOrElse { RuntimeCapabilities(true, emptySet(), it.message ?: "Runtime query failed") }
         }
     }
 
-    override suspend fun load(modelPath: String, backend: InferenceBackend): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun load(modelPath: String, backend: BackendId?): Result<Unit> = withContext(Dispatchers.IO) {
         if (!NativeBindings.loaded) return@withContext Result.failure(IllegalStateException(capabilities.detail))
+        val nativeBackend = when (backend) {
+            null -> "auto"
+            else -> capabilities.compiledBackends.firstOrNull { it.id == backend }
+                ?.let { nativeName(it.id) }
+                ?: return@withContext Result.failure(
+                    IllegalArgumentException("Backend ${backend.value} is not provided by the llama runtime"),
+                )
+        }
         close()
-        val handle = NativeBindings.createSession(modelPath, backend.name.lowercase(), contextSize)
+        val handle = NativeBindings.createSession(modelPath, nativeBackend, contextSize)
         if (handle == 0L) {
             Result.failure(IllegalStateException(NativeBindings.lastError()))
         } else {
@@ -151,6 +157,28 @@ class NativeInferenceEngine : InferenceEngine {
         val handle = session
         session = 0
         if (handle != 0L && NativeBindings.loaded) NativeBindings.destroySession(handle)
+    }
+
+    private fun descriptorForNativeBackend(name: String): BackendDescriptor? = when (name) {
+        "cpu" -> BackendDescriptor(
+            id = BackendId("llama-cpu"),
+            computeClass = ComputeClass.CPU,
+            supportedModelFormats = setOf("gguf"),
+            defaultPriority = 100,
+        )
+        "vulkan" -> BackendDescriptor(
+            id = BackendId("llama-vulkan"),
+            computeClass = ComputeClass.GPU,
+            supportedModelFormats = setOf("gguf"),
+            defaultPriority = 200,
+        )
+        else -> null
+    }
+
+    private fun nativeName(id: BackendId): String = when (id.value) {
+        "llama-cpu" -> "cpu"
+        "llama-vulkan" -> "vulkan"
+        else -> error("Unknown llama backend ${id.value}")
     }
 
     companion object {

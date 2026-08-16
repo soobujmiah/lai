@@ -19,6 +19,8 @@ The app requests neither all-files access nor media storage permission. Android 
 
 The app fetches a detached-signature-verified supported-model catalog on explicit refresh, caches verified bytes for offline browsing, and keeps an embedded fallback. Each model has one-tap explicit download. Android file import accepts only bytes matching reviewed SHA-256, exact size and GGUF signature. Manual URL entry remains Developer Mode only.
 
+Catalog revision 3 describes compatibility per artifact: format, quantization, context size, compatible backend IDs, preferred/fallback order, estimated peak memory, required ABIs, and validation evidence. A logical model may later have separate GGUF and converted accelerator artifacts; LAI will not claim they are interchangeable. Schema changes remain signed and backward compatible, and the app refuses a signed catalog older than its embedded revision.
+
 ## Bangla model requirements
 
 Candidate chat models should be evaluated, not merely advertised as multilingual. Acceptance includes:
@@ -35,20 +37,25 @@ Tokenizer changes require model retraining or compatible vocabulary; LAI must no
 
 ## Backend routing design
 
+Generic core does not enumerate vendors. Concrete adapters publish opaque IDs and compatibility facts. The current ID is `llama-cpu`; planned IDs include `llama-vulkan` and, only after a real adapter exists, an implementation-owned Qualcomm QNN/HTP ID.
+
 ```text
-AUTO
- ├─ QNN/HTP if exact model context is compatible and runtime probe passes
- ├─ Vulkan if device and required operators pass a startup self-test
- └─ CPU as correctness fallback
+Model artifact requirements + DeviceProfile
+  |- require compiled and runtime-probed adapter
+  |- require declared format compatibility
+  |- require memory/battery/thermal policy
+  |- require physical-device validation for acceleration
+  |- prefer real measured performance, then adapter/model preference
+  `- choose a compatible fallback or report all rejection reasons
 ```
 
-A backend is shown as available only after compile-time linkage and runtime probing. Phase 1 returns an empty backend list.
+A backend is shown as available only after compile-time linkage and runtime probing. Manufacturer/SoC strings provide diagnostic context but never establish backend availability. The scheduler contains no Qualcomm-specific branch; see [VENDOR_BACKEND_STRATEGY.md](VENDOR_BACKEND_STRATEGY.md).
 
 ### CPU / llama.cpp (Phase 2)
 
-Current candidate pins upstream commit `ad1de39e0708e3ced9c71bb3c82d93a2c046a73f` (release `b10448`). CI verifies the full SHA before compilation; no upstream source is committed.
+The current adapter pins upstream commit `ad1de39e0708e3ced9c71bb3c82d93a2c046a73f` (release `b10448`). CI verifies the full SHA before compilation; no upstream source is committed.
 
-Implemented in the candidate:
+Implemented:
 
 - arm64 Android NDK static linkage into `liblai_runtime.so`;
 - mmap GGUF loading with CPU-only layer policy;
@@ -61,8 +68,8 @@ Implemented in the candidate:
 
 Still required before calling it production-ready:
 
-- verify actual Bangla response quality, not only token completion;
-- physical Stop/recovery, multi-turn trimming and metrics validation;
+- broaden measured Bangla response-quality evidence beyond the coherent samples already observed;
+- physical Stop/recovery, New chat reset, and forced context-trimming validation;
 - deterministic golden-prompt smoke artifact suitable for CI;
 - 10-minute memory and thermal evidence;
 - explicit long-conversation summarization policy beyond oldest-turn omission.
@@ -77,17 +84,21 @@ Still required before calling it production-ready:
 
 ### QAIRT/QNN Hexagon HTP (Phase 3)
 
-GGUF and QNN context binaries are not interchangeable. QNN deployment normally requires model export/quantization, supported operator partitioning, QAIRT runtime libraries, and device-specific validation. Claims of arbitrary 1B–3B GGUF direct NPU offload are therefore not made by this repository.
+This is the current hardware-acceleration priority and is intentionally Qualcomm-specific. GGUF and QNN context binaries are not interchangeable. QNN deployment normally requires model export/quantization, supported operator partitioning, QAIRT runtime libraries, and device-specific validation. Claims of arbitrary 1B–3B GGUF direct NPU offload are therefore not made by this repository.
+
+The Qualcomm boundary will be a dedicated runtime adapter, not part of `core` or `runtime:llama`. It may own QAIRT/QNN headers and libraries, HTP identifiers, JNI/C++, graph/context formats, conversion recipes, RPC/shared-buffer handling, and Snapdragon probes. It must project only generic descriptors, capabilities, events, and metrics to LAI.
 
 The production adapter should support:
 
-- signed/hashed model manifest;
-- HTP architecture and runtime compatibility probe;
+- signed/hashed converted-artifact manifest;
+- HTP architecture, firmware, and runtime compatibility probe;
 - context-binary cache invalidation;
-- RPC/shared-buffer lifecycle;
+- bounded RPC/shared-buffer lifecycle;
 - graph partition telemetry behind Developer Mode;
-- per-operator fallback and correctness comparison;
+- explicit fallback and correctness comparison with the CPU reference;
 - licensing review for every packaged runtime library.
+
+Another vendor can implement the same generic inference and capability contracts in its own module; none of the QNN types or cache rules become requirements of that implementation.
 
 ## Native ABI
 
@@ -102,7 +113,7 @@ destroySession(session)
 lastError(): String
 ```
 
-`generate` streams UTF-safe pieces through the callback and returns local timing counters. Conversation history is supplied on each request so context state is deterministic; JNI converts Java UTF-16 to standard UTF-8 for llama.cpp. Model files stay in native-accessible app-private storage.
+`generate` streams UTF-safe pieces through the callback and returns local timing counters. Conversation history is supplied on each request so context state is deterministic; JNI converts Java UTF-16 to standard UTF-8 for llama.cpp. The llama adapter maps its public namespaced IDs (`llama-cpu`, later `llama-vulkan`) to private C++ registry names. Model files stay in native-accessible app-private storage.
 
 ## Memory planning
 

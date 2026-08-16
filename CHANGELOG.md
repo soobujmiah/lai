@@ -33,6 +33,17 @@ All notable changes are documented here. The project follows semantic versioning
 - Superseded the short-lived dual-edition experiment with one local-first app and upgrade path.
 - Added an ECDSA-signed web supported-model catalog, encrypted CI signing key, schema validation, verified cache and embedded offline fallback.
 
+### Snapdragon-first vendor-neutral architecture candidate
+
+- Replaced the closed core backend enum with validated, adapter-owned opaque backend IDs and generic descriptors.
+- Added a vendor-neutral `DeviceProfile` with Android/SoC/ABI/CPU/environment facts and adapter-reported capabilities.
+- Made scheduler acceleration policy depend on compute class, evidence, artifact/backend/ABI compatibility, memory, battery, thermal state and real measurements rather than QNN/Vulkan names.
+- Extended signed catalog revision 3 with artifact format, context, compatible/preferred/fallback backend IDs, memory estimate and ABI requirements; older signed revisions cannot replace a newer embedded catalog.
+- Namespaced llama backends as `llama-cpu` / future `llama-vulkan` and removed QNN flags/placeholders from `runtime:llama`.
+- Added a CI source boundary that rejects vendor SDK terminology in generic inference and scheduler code.
+- Documented the dedicated future Qualcomm runtime boundary, model-artifact compatibility, vendor onboarding, test evidence and migration path in ADR 0005.
+- Extended privacy-filtered device diagnostics with optional SoC manufacturer/model and CPU core count.
+
 ### v0.7 runtime reliability candidate
 
 - Added multi-turn conversation arrays through Kotlin/JNI/model-native chat templates.

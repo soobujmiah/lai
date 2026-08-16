@@ -64,7 +64,7 @@ Qualcomm SDK packages and credentials must be GitHub secrets or downloaded from 
 5. publish only redistributable artifacts;
 6. delete temporary SDK/model data at job completion.
 
-`-Plai.enableQnn=ON` currently fails deliberately so CI cannot accidentally label a placeholder build as QNN-enabled.
+QNN is not a build option of `runtime:llama`. When real integration begins, a dedicated Qualcomm runtime module and workflow path will acquire the licensed SDK, compile the actual adapter, and verify packaged libraries. Until then there is no QNN flag or placeholder artifact that could be mislabeled as accelerated.
 
 ## Repository footprint
 

@@ -28,14 +28,16 @@ Compilation and lint run in GitHub Actions.
 1. Preserve the dependency graph in `docs/MODULES.md`; `scripts/check_architecture_boundaries.py` is a release gate.
 2. Network permission/transport belongs only to `platform:download`; outbound user-derived data is forbidden.
 3. Accessibility, Shizuku and JNI APIs remain in their reviewed authority/runtime modules.
-4. Inject implementations through core contracts.
-5. No raw shell API or `sh -c` from model/user strings.
-6. New consequential tools require trusted confirmation and threat review.
-7. Bound depth, count, time, output, allocation, and network size where applicable.
-8. Keep telemetry and model internals behind Developer Mode.
-9. Add tests for protocol changes, Bangla UTF-8, rejection paths, and injection attempts.
-10. Include physical-device evidence for hardware/performance claims.
-11. Never log prompts, entered text, screen trees, captures, tokens, or secrets by default.
+4. Follow **Snapdragon-first, not Snapdragon-locked**: vendor SDKs/types/configuration stay in a dedicated runtime adapter; generic core receives only descriptors, capabilities, events and metrics.
+5. Do not add empty vendor adapters. Add a backend only with real integration, truthful probes, licensing review and a physical-validation plan.
+6. Inject implementations through core contracts.
+7. No raw shell API or `sh -c` from model/user strings.
+8. New consequential tools require trusted confirmation and threat review.
+9. Bound depth, count, time, output, allocation, and network size where applicable.
+10. Keep telemetry and model internals behind Developer Mode.
+11. Add tests for protocol changes, Bangla UTF-8, rejection paths, and injection attempts.
+12. Include physical-device evidence for hardware/performance claims.
+13. Never log prompts, entered text, screen trees, captures, tokens, or secrets by default.
 
 ## Supported-model catalog changes
 

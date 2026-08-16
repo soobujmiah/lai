@@ -13,7 +13,7 @@ LAI commit/tag:
 APK artifact/run:
 Production signed: yes/no
 Device model:
-SoC:
+SoC / reported SoC manufacturer:
 RAM:
 Android/build fingerprint:
 Security patch:
@@ -71,15 +71,18 @@ Redact package names if sensitive and never include accessibility node text from
 
 Use airplane mode, fixed brightness, a stable thermal starting condition, the same prompt/model/hash/context, and at least five runs. Record:
 
-- model load latency;
-- time to first token;
-- prefill tokens/s;
-- decode tokens/s;
-- peak Java/native/PSS;
-- battery power when available;
-- thermal status and throttling time;
-- output hash/quality comparison for CPU, Vulkan, QNN;
-- fallback reason and runtime/driver versions.
+- exact device, SoC, Android/firmware, and starting thermal state;
+- stable backend ID, compute class, capability evidence, and runtime/SDK/driver version;
+- model ID, artifact format, quantization/precision, digest, context, and prompt/input size;
+- model load latency, time to first token, prefill tokens/s, decode tokens/s, and total latency;
+- available memory plus peak Java/native/PSS;
+- CPU/GPU/NPU utilization only when a trustworthy measurement method exists;
+- battery power/energy when available, including the measurement method;
+- sustained duration, thermal transitions, throttling time, cancellation/unload, and failures;
+- output/quality comparison with the CPU reference;
+- backend-failure result, fallback backend, and explicit fallback reason.
+
+For QNN, additionally record QAIRT version, HTP architecture/runtime compatibility, converted-artifact identity, and graph/context-cache state. Never generalize one SoC result to all Snapdragon devices.
 
 A faster backend is not accepted if Bangla output, tool JSON, or numerical correctness regresses beyond an agreed threshold.
 

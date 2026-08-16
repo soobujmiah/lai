@@ -6,7 +6,7 @@ LAI separates product UX, agent decisions, Android control, model storage, recog
 
 ## 2. Compile-time module layers
 
-The enforced graph is documented in [MODULES.md](MODULES.md). Core contracts, policy and scheduling are pure JVM; network, Accessibility and Shizuku each have one platform owner; JNI/C++ lives in runtime adapters; `app` is the composition root. See [the NpuHub comparison](ARCHITECTURE_COMPARISON_NPUHUB.md) and [ADR 0002](adr/0002-modular-local-first-backbone.md).
+The enforced graph is documented in [MODULES.md](MODULES.md). Core contracts, policy and scheduling are pure JVM; network, Accessibility and Shizuku each have one platform owner; JNI/C++ lives in runtime adapters; `app` is the composition root. See [the NpuHub comparison](ARCHITECTURE_COMPARISON_NPUHUB.md), [ADR 0002](adr/0002-modular-local-first-backbone.md), and the [Snapdragon-first decision](adr/0005-snapdragon-first-vendor-neutral-backends.md).
 
 ## 3. Runtime layers
 
@@ -38,21 +38,26 @@ flowchart TB
   subgraph Intelligence[Intelligence plugins]
     MR[ModelRepository]
     OE[OcrEngine]
-    IE[InferenceEngine]
+    DP[DeviceProfile]
+    IS[Vendor-neutral scheduler]
+    IE[llama InferenceEngine]
     JNI[NativeBindings / JNI]
-    BR[C++ Backend registry]
+    BR[C++ llama backend registry]
     CPU[llama.cpp CPU]
     VK[llama.cpp Vulkan]
+    QR[Dedicated Qualcomm runtime]
     QNN[QAIRT/QNN HTP]
+    DP --> IS --> IE
     IE --> JNI --> BR
-    BR -. phase 2 .-> CPU
+    BR --> CPU
     BR -. phase 2 .-> VK
-    BR -. phase 3 .-> QNN
+    IS -. future runtime composition .-> QR
+    QR -. phase 3 .-> QNN
   end
 
   VM --> AR
   VM --> MR
-  VM --> IE
+  VM --> DP
   CG --> AS
   CG --> SH
   SS --> OE
@@ -83,11 +88,19 @@ Selectors are deterministic in this order:
 
 ### Model storage
 
-`ModelRepository` lives in the only network-owning module and streams directly to app-private no-backup storage. It supports HTTP Range resume, mandatory SHA-256, explicit-user-action and reviewed-host policy, redirect revalidation, and GGUF magic validation. Registry replacement is write-then-rename. The repository contains no weights. Installed models are loaded only after an explicit user tap, preventing multi-gigabyte startup allocations.
+`ModelRepository` lives in the only network-owning module and streams directly to app-private no-backup storage. It supports HTTP Range resume, mandatory SHA-256, explicit-user-action and reviewed-host policy, redirect revalidation, and GGUF magic validation. Registry replacement is write-then-rename. **Keep copy** streams to a user-selected SAF document, checks byte count and source digest, reopens the destination, and verifies its digest. The repository contains no weights. Installed models are loaded only after an explicit user tap, preventing multi-gigabyte startup allocations.
+
+### Device profile and backend selection
+
+`platform:device` creates a generic `DeviceProfile` from Android manufacturer/model, public SoC fields where available, API/ABI/CPU facts, memory, battery, charging, and thermal status. Runtime adapters contribute `BackendCapability` entries. Branding is diagnostic only: Snapdragon text never proves that QNN is installed or that a model is compatible.
+
+Each adapter owns a stable opaque `BackendId` and publishes a generic `BackendDescriptor` (compute class, formats, known quantizations, and preference). Signed catalog revision 3 declares each artifact's format, context, compatible/preferred/fallback backend IDs, estimated peak memory, and required ABIs. `InferenceScheduler` knows only evidence, compatibility, resource policy, and measurements. A source boundary check rejects hardware-vendor and SDK terminology in generic inference/scheduler code. See [VENDOR_BACKEND_STRATEGY.md](VENDOR_BACKEND_STRATEGY.md) and [ADR 0005](adr/0005-snapdragon-first-vendor-neutral-backends.md).
 
 ### Native inference
 
-Kotlin owns one `InferenceEngine`; JNI maps opaque integer handles to shared C++ `BackendSession` instances. C++ validates file existence, GGUF magic, context range, backend availability and conversation roles. The CPU runtime clears context memory per request, applies the model-native template to full user/assistant history, counts formatted tokens, evaluates bounded prompt batches, samples, and streams only complete UTF-8 code points through a cancellable callback. Oldest completed turns are omitted when prompt plus response reserve would exceed 4,096 tokens. Native monotonic clocks return prompt evaluation, TTFT, decode and total duration; metrics remain in memory and Developer Mode only. Vulkan and QNN remain unavailable adapters, so capability reporting stays truthful.
+The current app composes one llama `InferenceEngine`; JNI maps opaque integer handles to shared C++ `BackendSession` instances. C++ validates file existence, GGUF magic, context range, backend availability and conversation roles. The CPU runtime clears context memory per request, applies the model-native template to full user/assistant history, counts formatted tokens, evaluates bounded prompt batches, samples, and streams only complete UTF-8 code points through a cancellable callback. Oldest completed turns are omitted when prompt plus response reserve would exceed 4,096 tokens. Native monotonic clocks return prompt evaluation, TTFT, decode and total duration; metrics remain in memory and Developer Mode only.
+
+The llama module owns `llama-cpu` and a future tested `llama-vulkan`; it contains no QNN flag, placeholder, SDK type, or model assumption. A real Qualcomm implementation will be a separately isolated runtime adapter and will be composed only when it exists. A generic backend manager is deliberately deferred until a second concrete runtime is compiled.
 
 A production adapter must provide:
 
@@ -97,7 +110,7 @@ A production adapter must provide:
 - backend capability probe;
 - thermal/memory events;
 - deterministic session destruction;
-- CPU fallback when acceleration cannot load.
+- explicit failure classification so runtime composition can choose a compatible fallback.
 
 ### OCR
 
@@ -153,9 +166,10 @@ No accessibility node survives a command. Bitmaps are recycled after OCR. Native
 
 ## 7. Plugin seams
 
-- `InferenceEngine`: llama.cpp, ExecuTorch, MNN, or QNN adapter.
-- C++ `Backend`: CPU, Vulkan, QNN/HTP.
-- `OcrEngine`: TFLite, ONNX Runtime/QNN, or packaged service plugin.
+- `InferenceEngine`: llama.cpp or a separately isolated ExecuTorch, MNN, QNN, or future runtime adapter.
+- llama C++ `Backend`: CPU and tested Vulkan implementations only.
+- `BackendId`/`BackendDescriptor`: implementation-owned identity and generic compatibility facts; core does not enumerate vendors.
+- `OcrEngine`: TFLite, ONNX Runtime, vendor adapter, or packaged service plugin.
 - future `ToolProvider`: RAG, STT/TTS, calendar, files.
 
 Plugins must publish capability and safety metadata rather than relying on type discovery.
@@ -167,7 +181,7 @@ Plugins must publish capability and safety metadata rather than relying on type 
 - no bitmap crosses JNI in Phase 1.
 - C++ uses hidden visibility and section garbage collection.
 - future Vulkan path should use persistent buffers, mapped staging pools, and device capability probes.
-- future QNN path should cache HTP context binaries by model hash, SoC/firmware ID, QAIRT version, and quantization recipe.
+- the future isolated Qualcomm adapter should cache HTP context binaries by model hash, SoC/firmware ID, QAIRT version, and quantization recipe.
 - UI never waits synchronously for network, OCR, shell, or inference work.
 
 Performance claims require device evidence; see [DEVICE_TESTING.md](DEVICE_TESTING.md).

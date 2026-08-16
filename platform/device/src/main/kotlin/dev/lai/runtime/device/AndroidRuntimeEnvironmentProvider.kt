@@ -7,9 +7,12 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
+import dev.lai.runtime.scheduler.BackendCapability
+import dev.lai.runtime.scheduler.DeviceProfile
 import dev.lai.runtime.scheduler.RuntimeEnvironment
 import dev.lai.runtime.scheduler.ThermalState
 
+/** Android observations only; runtime adapters remain responsible for truthful accelerator probes. */
 class AndroidRuntimeEnvironmentProvider(context: Context) {
     private val appContext = context.applicationContext
 
@@ -31,6 +34,18 @@ class AndroidRuntimeEnvironmentProvider(context: Context) {
             thermalState = thermalState(),
         )
     }
+
+    fun profile(backends: List<BackendCapability>): DeviceProfile = DeviceProfile(
+        manufacturer = Build.MANUFACTURER,
+        model = Build.MODEL,
+        socManufacturer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MANUFACTURER else null,
+        socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else null,
+        androidSdk = Build.VERSION.SDK_INT,
+        supportedAbis = Build.SUPPORTED_ABIS.toList(),
+        cpuCoreCount = Runtime.getRuntime().availableProcessors().takeIf { it > 0 },
+        environment = snapshot(),
+        backends = backends,
+    )
 
     private fun thermalState(): ThermalState {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return ThermalState.UNKNOWN

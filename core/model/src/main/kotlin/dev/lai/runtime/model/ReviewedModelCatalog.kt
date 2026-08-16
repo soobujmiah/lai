@@ -20,6 +20,13 @@ data class ReviewedModel(
     val license: String,
     val architecture: String,
     val quantization: String,
+    val modelFormat: String,
+    val contextSize: Int,
+    val compatibleBackendIds: List<String>,
+    val preferredBackendId: String,
+    val fallbackBackendIds: List<String>,
+    val estimatedPeakBytes: Long,
+    val requiredAbis: List<String>,
     val reviewState: Set<ArtifactReviewState>,
     val banglaQualityValidated: Boolean,
 ) {
@@ -62,6 +69,13 @@ object ReviewedModelCatalog {
         license = "Apache-2.0",
         architecture = "qwen2",
         quantization = "Q4_K_M",
+        modelFormat = "gguf",
+        contextSize = 4_096,
+        compatibleBackendIds = listOf("llama-cpu"),
+        preferredBackendId = "llama-cpu",
+        fallbackBackendIds = emptyList(),
+        estimatedPeakBytes = 1_933_521_832,
+        requiredAbis = listOf("arm64-v8a"),
         reviewState = setOf(
             ArtifactReviewState.METADATA_VERIFIED,
             ArtifactReviewState.BUILD_COMPATIBLE,
@@ -73,8 +87,8 @@ object ReviewedModelCatalog {
     val all: List<ReviewedModel> = listOf(recommendedCpuBaseline)
     val embeddedDocument = ReviewedModelCatalogDocument(
         schemaVersion = 1,
-        revision = 2,
-        generatedAt = "2026-08-16T16:39:00+06:00",
+        revision = 3,
+        generatedAt = "2026-08-16T18:30:00+06:00",
         models = all,
     )
 
@@ -82,5 +96,14 @@ object ReviewedModelCatalog {
         require(all.map { it.id }.distinct().size == all.size) { "Reviewed model IDs must be unique" }
         require(all.all { it.sha256.matches(Regex("^[a-f0-9]{64}$")) }) { "Every model requires SHA-256" }
         require(all.all { it.url.startsWith("https://") && it.bytes > 0 }) { "Invalid reviewed artifact" }
+        require(all.all { it.modelFormat.isNotBlank() && it.contextSize >= 256 && it.estimatedPeakBytes > 0 }) {
+            "Invalid model compatibility metadata"
+        }
+        require(all.all { model ->
+            model.compatibleBackendIds.isNotEmpty() &&
+                model.preferredBackendId in model.compatibleBackendIds &&
+                model.fallbackBackendIds.all { it in model.compatibleBackendIds } &&
+                model.requiredAbis.isNotEmpty()
+        }) { "Invalid backend or hardware compatibility metadata" }
     }
 }

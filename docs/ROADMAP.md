@@ -21,12 +21,16 @@
 - [x] architecture boundary source gate
 - [x] pure-JVM coverage ratchets
 - [x] evidence/thermal/battery/memory scheduler contract
+- [x] opaque adapter-owned backend IDs and vendor-neutral compatibility policy
+- [x] Android/SoC `DeviceProfile` with adapter-reported capabilities
+- [x] CI boundary preventing vendor terminology in generic inference/scheduler source
 - [x] versioned local-only plugin API
 - [x] NpuHub comparison and ADR
 - [x] one local-first application and upgrade path
 - [x] reviewed local GGUF import through Android file picker
 - [x] uninstall-safe user-owned GGUF export with destination hash verification
 - [x] signed web supported-model catalog with verified offline fallback
+- [x] artifact/backend/ABI compatibility metadata and signed-catalog downgrade prevention
 
 ## Phase 2 — usable local intelligence
 
@@ -51,7 +55,7 @@
 - [ ] license-compliant QAIRT SDK CI acquisition
 - [ ] QNN model conversion/calibration workflow
 - [ ] HTP context manifest/cache
-- [ ] QNN runtime adapter and operator fallback
+- [ ] dedicated QNN runtime adapter and explicit fallback (outside `runtime:llama`)
 - [ ] Adreno/HTP/CPU routing under thermal/memory policy
 - [ ] printed and handwritten Bangla OCR QNN acceleration
 - [ ] Snapdragon 8s Gen 4 performance/accuracy report
@@ -65,4 +69,11 @@
 - [ ] scoped user-created automation recipes
 - [ ] import/export with permission review
 
-No phase advances based solely on successful compilation. Device correctness, privacy, safety, and documentation are release gates.
+## Later — progressive vendor expansion
+
+- [ ] introduce a backend manager only when a second real runtime provider exists
+- [ ] evaluate the next vendor against measured product demand and available SDK/licensing
+- [ ] add one isolated, physically validated adapter at a time
+- [ ] compare correctness/performance with the Snapdragon and CPU baselines
+
+No phase advances based solely on successful compilation. Device correctness, privacy, safety, and documentation are release gates. Empty vendor adapters are not roadmap progress.

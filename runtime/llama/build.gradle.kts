@@ -19,7 +19,6 @@ android {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
                     "-DLAI_ENABLE_LLAMA_CPP=${providers.gradleProperty("lai.enableLlamaCpp").orNull ?: "OFF"}",
-                    "-DLAI_ENABLE_QNN=${providers.gradleProperty("lai.enableQnn").orNull ?: "OFF"}",
                 )
                 providers.gradleProperty("lai.llamaCppDir").orNull?.let {
                     arguments += "-DLAI_LLAMA_CPP_DIR=$it"

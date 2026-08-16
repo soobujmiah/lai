@@ -2,8 +2,37 @@ package dev.lai.runtime.inference
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Stable, implementation-owned identifier used by generic LAI code.
+ *
+ * IDs are namespaced by an adapter (for example `llama-cpu` or `vendor-a-npu`)
+ * so adding an implementation does not require adding it to a core enum.
+ */
 @Serializable
-enum class InferenceBackend { AUTO, CPU, VULKAN, QNN }
+@JvmInline
+value class BackendId(val value: String) {
+    init {
+        require(value.matches(VALID_ID)) { "Invalid backend id: $value" }
+    }
+
+    override fun toString(): String = value
+
+    private companion object {
+        val VALID_ID = Regex("^[a-z0-9][a-z0-9._-]{1,63}$")
+    }
+}
+
+@Serializable
+enum class ComputeClass { CPU, GPU, NPU, DSP, OTHER }
+
+/** Static facts published by the adapter that owns this backend. */
+data class BackendDescriptor(
+    val id: BackendId,
+    val computeClass: ComputeClass,
+    val supportedModelFormats: Set<String>,
+    val supportedQuantizations: Set<String> = emptySet(),
+    val defaultPriority: Int = 0,
+)
 
 @Serializable
 data class GenerationConfig(
@@ -47,6 +76,6 @@ sealed interface InferenceEvent {
 
 data class RuntimeCapabilities(
     val nativeLibraryLoaded: Boolean,
-    val compiledBackends: Set<InferenceBackend>,
+    val compiledBackends: Set<BackendDescriptor>,
     val detail: String,
 )

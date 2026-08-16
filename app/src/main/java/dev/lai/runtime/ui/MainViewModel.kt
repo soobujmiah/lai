@@ -3,7 +3,6 @@ package dev.lai.runtime.ui
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
@@ -25,8 +24,8 @@ import dev.lai.runtime.inference.ConversationMessage
 import dev.lai.runtime.inference.ConversationRole
 import dev.lai.runtime.inference.DownloadProgress
 import dev.lai.runtime.inference.GenerationConfig
+import dev.lai.runtime.inference.BackendId
 import dev.lai.runtime.inference.GenerationMetrics
-import dev.lai.runtime.inference.InferenceBackend
 import dev.lai.runtime.inference.InferenceEvent
 import dev.lai.runtime.inference.InstalledModel
 import dev.lai.runtime.inference.ModelSpec
@@ -76,7 +75,7 @@ data class ChatMessage(
 )
 
 private data class ScheduledLoad(
-    val backend: InferenceBackend,
+    val backend: BackendId,
     val reason: String,
     val estimatedPeakBytes: Long,
     val environment: RuntimeEnvironment,
@@ -446,26 +445,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = runCatching {
                 val estimate = container.memoryEstimator.estimate(model.bytes, MODEL_CONTEXT_TOKENS)
-                val environment = container.runtimeEnvironment.snapshot()
                 val runtime = container.inferenceEngine.capabilities
                 val evidence = buildSet {
                     if (runtime.nativeLibraryLoaded) add(CapabilityEvidence.COMPILED)
                     if (runtime.nativeLibraryLoaded) add(CapabilityEvidence.RUNTIME_PROBED)
                 }
-                val capabilities = runtime.compiledBackends
-                    .filter { it != InferenceBackend.AUTO }
-                    .map { backend ->
-                        BackendCapability(
-                            backend = backend,
-                            supported = true,
-                            evidence = evidence,
-                            estimatedPeakBytes = estimate.estimatedPeakBytes,
-                        )
-                    }
+                val capabilities = runtime.compiledBackends.map { descriptor ->
+                    BackendCapability(
+                        backend = descriptor.id,
+                        computeClass = descriptor.computeClass,
+                        supported = true,
+                        evidence = evidence,
+                        estimatedPeakBytes = estimate.estimatedPeakBytes,
+                        supportedModelFormats = descriptor.supportedModelFormats,
+                        supportedQuantizations = descriptor.supportedQuantizations,
+                        preference = descriptor.defaultPriority,
+                    )
+                }
+                val profile = container.runtimeEnvironment.profile(capabilities)
+                val reviewedModel = state.value.supportedModels.firstOrNull { it.id == model.id }
+                val requiredBytes = maxOf(estimate.estimatedPeakBytes, reviewedModel?.estimatedPeakBytes ?: 0L)
                 val decision = container.inferenceScheduler.select(
-                    workload = InferenceWorkload(estimate.estimatedPeakBytes),
-                    environment = environment,
-                    capabilities = capabilities,
+                    workload = InferenceWorkload(
+                        estimatedRequiredBytes = requiredBytes,
+                        modelFormat = reviewedModel?.modelFormat ?: "gguf",
+                        quantization = reviewedModel?.quantization,
+                        compatibleBackends = reviewedModel?.compatibleBackendIds
+                            ?.map(::BackendId)
+                            ?.toSet()
+                            .orEmpty(),
+                        backendPreference = reviewedModel?.let {
+                            listOf(it.preferredBackendId) + it.fallbackBackendIds
+                        }?.map(::BackendId).orEmpty(),
+                        requiredAbis = reviewedModel?.requiredAbis?.toSet().orEmpty(),
+                    ),
+                    profile = profile,
                 )
                 val file = container.modelRepository.resolve(model)
                 val loadStarted = SystemClock.elapsedRealtime()
@@ -473,8 +487,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 ScheduledLoad(
                     backend = decision.selected,
                     reason = decision.reason,
-                    estimatedPeakBytes = estimate.estimatedPeakBytes,
-                    environment = environment,
+                    estimatedPeakBytes = requiredBytes,
+                    environment = profile.environment,
                     loadMs = SystemClock.elapsedRealtime() - loadStarted,
                 )
             }
@@ -483,11 +497,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     it.copy(
                         operation = RuntimeOperation.READY,
                         activeModelId = model.id,
-                        schedulerDetail = "${load.backend.name}: ${load.reason}",
+                        schedulerDetail = "${load.backend.value.uppercase()}: ${load.reason}",
                         environmentDetail = environmentSummary(load.environment),
                         estimatedPeakBytes = load.estimatedPeakBytes,
                         lastModelLoadMs = load.loadMs,
-                        notice = "${model.displayName} loaded locally in ${load.loadMs} ms on ${load.backend.name}",
+                        notice = "${model.displayName} loaded locally in ${load.loadMs} ms on ${load.backend.value.uppercase()}",
                     )
                 }
             }.onFailure { error ->
@@ -693,7 +707,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun buildDiagnosticsReport(): DiagnosticsReportV1 {
         val current = state.value
-        val environment = container.runtimeEnvironment.snapshot()
+        val profile = container.runtimeEnvironment.profile(emptyList())
+        val environment = profile.environment
         val capabilities = container.inferenceEngine.capabilities
         val shizuku = when (val value = current.shizukuState) {
             ShizukuState.Unavailable -> "UNAVAILABLE"
@@ -711,18 +726,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 catalogStatus = current.catalogStatus,
             ),
             device = DeviceDiagnostics(
-                manufacturer = Build.MANUFACTURER,
-                model = Build.MODEL,
-                androidSdk = Build.VERSION.SDK_INT,
-                supportedAbis = Build.SUPPORTED_ABIS.toList(),
+                manufacturer = profile.manufacturer,
+                model = profile.model,
+                androidSdk = profile.androidSdk,
+                supportedAbis = profile.supportedAbis,
                 availableMemoryBytes = environment.availableMemoryBytes,
                 batteryPercent = environment.batteryPercent,
                 charging = environment.charging,
                 thermalState = environment.thermalState.name,
+                socManufacturer = profile.socManufacturer,
+                socModel = profile.socModel,
+                cpuCoreCount = profile.cpuCoreCount,
             ),
             runtime = RuntimeDiagnostics(
                 nativeLibraryLoaded = capabilities.nativeLibraryLoaded,
-                compiledBackends = capabilities.compiledBackends.map { it.name }.sorted(),
+                compiledBackends = capabilities.compiledBackends.map { it.id.value }.sorted(),
                 activeBackendDecision = current.schedulerDetail,
                 contextSize = container.inferenceEngine.contextSize,
                 activeModelId = current.activeModelId,

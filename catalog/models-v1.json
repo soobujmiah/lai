@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": 2,
-  "generatedAt": "2026-08-16T16:39:00+06:00",
+  "revision": 3,
+  "generatedAt": "2026-08-16T18:30:00+06:00",
   "models": [
     {
       "id": "qwen2.5-1.5b-instruct-q4-k-m",
@@ -15,6 +15,13 @@
       "license": "Apache-2.0",
       "architecture": "qwen2",
       "quantization": "Q4_K_M",
+      "modelFormat": "gguf",
+      "contextSize": 4096,
+      "compatibleBackendIds": ["llama-cpu"],
+      "preferredBackendId": "llama-cpu",
+      "fallbackBackendIds": [],
+      "estimatedPeakBytes": 1933521832,
+      "requiredAbis": ["arm64-v8a"],
       "reviewState": ["METADATA_VERIFIED", "BUILD_COMPATIBLE", "DEVICE_VALIDATED"],
       "banglaQualityValidated": false
     }

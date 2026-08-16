@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.22.1)
 project(lai_runtime LANGUAGES C CXX)
 
 option(LAI_ENABLE_LLAMA_CPP "Compile the pinned llama.cpp CPU adapter" OFF)
-option(LAI_ENABLE_QNN "Compile the licensed QAIRT/QNN adapter" OFF)
 set(LAI_LLAMA_CPP_DIR "" CACHE PATH "Path to a CI-fetched llama.cpp checkout")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -44,8 +43,4 @@ if(LAI_ENABLE_LLAMA_CPP)
     target_sources(lai_runtime PRIVATE llama_cpu_backend.cpp)
     target_compile_definitions(lai_runtime PRIVATE LAI_HAS_LLAMA_CPP=1)
     target_link_libraries(lai_runtime PRIVATE llama)
-endif()
-
-if(LAI_ENABLE_QNN)
-    message(FATAL_ERROR "QAIRT/QNN remains a licensed Phase 3 adapter; see docs/MODELS_AND_BACKENDS.md")
 endif()

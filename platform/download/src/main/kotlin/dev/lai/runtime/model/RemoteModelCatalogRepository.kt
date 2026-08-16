@@ -40,13 +40,13 @@ class RemoteModelCatalogRepository private constructor(
     private val cachedSignature = File(cacheDir, "models-v1.sig")
 
     suspend fun cachedOrEmbedded(): ModelCatalogSnapshot = withContext(Dispatchers.IO) {
-        runCatching {
+        val embedded = ModelCatalogSnapshot(ReviewedModelCatalog.embeddedDocument, CatalogSource.EMBEDDED)
+        val cached = runCatching {
             val json = cachedJson.readBytes()
             val signature = cachedSignature.readBytes()
             parseVerified(json, signature, CatalogSource.VERIFIED_CACHE)
-        }.getOrElse {
-            ModelCatalogSnapshot(ReviewedModelCatalog.embeddedDocument, CatalogSource.EMBEDDED)
-        }
+        }.getOrNull()
+        cached?.takeIf { it.document.revision >= embedded.document.revision } ?: embedded
     }
 
     suspend fun refresh(): Result<ModelCatalogSnapshot> = withContext(Dispatchers.IO) {
@@ -56,6 +56,9 @@ class RemoteModelCatalogRepository private constructor(
             val json = fetchBounded(CATALOG_URL, MAX_CATALOG_BYTES)
             val signature = fetchBounded(SIGNATURE_URL, MAX_SIGNATURE_BYTES)
             val snapshot = parseVerified(json, signature, CatalogSource.SIGNED_WEB)
+            check(snapshot.document.revision >= ReviewedModelCatalog.embeddedDocument.revision) {
+                "Signed catalog revision is older than the embedded catalog"
+            }
             writeCache(json, signature)
             snapshot
         }
@@ -117,6 +120,22 @@ class RemoteModelCatalogRepository private constructor(
             require(model.id.matches(MODEL_ID)) { "Invalid model id" }
             require(model.displayName.isNotBlank() && model.description.isNotBlank()) { "Incomplete model metadata" }
             require(model.sha256.matches(SHA256) && model.bytes > 0) { "Invalid artifact trust metadata" }
+            require(model.modelFormat.isNotBlank() && model.contextSize in 256..131_072) {
+                "Invalid model execution metadata"
+            }
+            require(model.estimatedPeakBytes >= model.bytes && model.requiredAbis.isNotEmpty()) {
+                "Invalid model hardware metadata"
+            }
+            require(
+                model.compatibleBackendIds.isNotEmpty() &&
+                    model.compatibleBackendIds.distinct().size == model.compatibleBackendIds.size &&
+                    model.compatibleBackendIds.all { it.matches(BACKEND_ID) } &&
+                    model.preferredBackendId in model.compatibleBackendIds &&
+                    model.fallbackBackendIds.distinct().size == model.fallbackBackendIds.size &&
+                    model.fallbackBackendIds.all {
+                        it in model.compatibleBackendIds && it != model.preferredBackendId
+                    },
+            ) { "Invalid model backend compatibility metadata" }
             val decision = networkPolicy.review(
                 NetworkRequest(
                     direction = DataFlowDirection.INBOUND,
@@ -168,6 +187,7 @@ class RemoteModelCatalogRepository private constructor(
         private const val MAX_SIGNATURE_BYTES = 16 * 1024
         private const val MAX_MODELS = 100
         private val MODEL_ID = Regex("^[a-z0-9][a-z0-9._-]{1,63}$")
+        private val BACKEND_ID = Regex("^[a-z0-9][a-z0-9._-]{1,63}$")
         private val SHA256 = Regex("^[a-f0-9]{64}$")
 
         private fun defaultHttpClient(): OkHttpClient = OkHttpClient.Builder()

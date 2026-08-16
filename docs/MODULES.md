@@ -2,13 +2,13 @@
 
 | Module | Owns | May depend on |
 |---|---|---|
-| `core:contracts` | serializable tool, automation, inference, model, OCR and shell contracts | Kotlin/coroutines/serialization only |
+| `core:contracts` | serializable tool, automation, inference, model, OCR and shell contracts; opaque backend IDs/descriptors | Kotlin/coroutines/serialization only |
 | `core:policy` | agent consent, local-first data-flow policy, shell argv allowlist | contracts |
-| `core:scheduler` | backend evidence and thermal/battery/memory routing | contracts |
+| `core:scheduler` | vendor-neutral device profile, compatibility evidence, thermal/battery/memory routing | contracts |
 | `core:model` | immutable reviewed artifact catalog and trust metadata | contracts |
 | `plugins:api` | versioned local-only plugin manifest and constrained context | contracts, policy |
 | `platform:download` | the only network transport, artifact streaming/hash/activation | core |
-| `platform:device` | Android memory, battery, charging and thermal observations | scheduler |
+| `platform:device` | Android manufacturer/SoC/API/ABI/CPU facts plus memory, battery, charging and thermal observations | scheduler |
 | `platform:accessibility` | Accessibility service, node capture, screenshots and UI actions | contracts |
 | `platform:shizuku` | Shizuku binder/UserService and privileged process boundary | contracts, policy |
 | `runtime:llama` | JNI/C++ llama.cpp adapter | contracts |
@@ -21,6 +21,8 @@
 - Core never imports Android or implementation modules.
 - Platform modules never depend on app or inference runtime modules.
 - Runtime adapters expose core contracts and do not own product UI.
+- Generic inference/scheduler core contains no hardware-vendor or vendor-SDK identifiers; adapters own stable namespaced backend IDs.
+- `runtime:llama` owns llama CPU/Vulkan only. A future real QNN implementation gets its own adapter; no placeholder vendor modules are created.
 - Only app composes concrete implementations.
 - Only the download platform owns network transport.
 - Every new module declares its privacy, authority and test boundary in documentation.

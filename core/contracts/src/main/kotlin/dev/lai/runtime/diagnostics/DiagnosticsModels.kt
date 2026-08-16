@@ -33,6 +33,9 @@ data class DeviceDiagnostics(
     val batteryPercent: Int?,
     val charging: Boolean?,
     val thermalState: String,
+    val socManufacturer: String? = null,
+    val socModel: String? = null,
+    val cpuCoreCount: Int? = null,
 )
 
 @Serializable

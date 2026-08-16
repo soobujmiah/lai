@@ -2,12 +2,13 @@
 
 LAI is a source-only Android foundation for private, Bangla-first on-device AI and consent-driven Android automation. It targets modern arm64 Snapdragon devices, beginning with Snapdragon 8s Gen 4 (Hexagon NPU + Adreno GPU).
 
-> **Current status:** Snapdragon 8s Gen 4 has physically passed Qwen installation, CPU scheduling, memory preflight, model load and a 15-token local generation. v0.7 adds build-verified multi-turn history, Stop/recovery, native performance metrics and memory lifecycle; those behaviors await device validation. Bangla response quality and OCR remain explicit gates. See [status](docs/STATUS.md).
+> **Current status:** Snapdragon 8s Gen 4 has physically passed reviewed Qwen installation, CPU scheduling, memory preflight, multi-turn local inference, coherent Bangla output, and native metrics at about 20 decode tok/s. Retained-model export/reinstall, Stop/recovery, forced context trimming, and sustained thermal behavior remain physical gates. Bangla quality breadth and OCR remain explicit gates. See [status](docs/STATUS.md).
 
 ## Product principles
 
 - **Local first:** prompts, screen structures, captures, and models stay on the phone.
 - **Bangla first:** UTF-8 end to end, Bangla UI resources, bilingual prompts, and a versioned Bangla OCR schema.
+- **Snapdragon first, not locked:** optimize and physically validate Qualcomm hardware first while keeping vendor SDKs behind replaceable runtime adapters.
 - **User controlled:** consequential UI and Shizuku operations require confirmation.
 - **No arbitrary shell:** elevated actions compile from typed, validated operations into argument arrays.
 - **Source-only Git:** no SDKs, models, APKs, native libraries, caches, or keystores in the repository.
@@ -24,8 +25,8 @@ LAI has one application ID and upgrade path. Internet is used only when the user
 | Compose UX | Chat, Screen Reader, Automator, hidden Developer Mode, Bangla resources | Chat reports backend absence rather than fabricating output |
 | Accessibility | Snapshot, selector, click, set text, scroll, global actions, app launch, Android 11+ screenshot | No autonomous consequential action without confirmation |
 | Shizuku | Binder state, permission, UID, structured operation policy, timeout/output limits | No raw shell command API |
-| Models | Explicit HTTPS download, mandatory SHA-256, resume, GGUF validation, app-private registry | No model is bundled; only reviewed artifact hosts are accepted |
-| Native runtime | Build-verified arm64 llama.cpp CPU runtime with cancellable token streaming | Physical GGUF/Bangla gate pending; Vulkan and QNN remain Phase 2/3 |
+| Models | Signed artifact/backend/ABI metadata, explicit HTTPS download, mandatory SHA-256, resume, GGUF validation, app-private registry and Keep copy | No model is bundled; only reviewed artifact hosts are accepted |
+| Native runtime | Device-validated arm64 llama.cpp CPU runtime with cancellable multi-turn streaming and metrics | Vulkan and a separately isolated QNN runtime remain Phase 2/3; no acceleration is claimed yet |
 | Bangla OCR | Screenshot path, plugin interface, versioned structured JSON | Recognition model/runtime is a clearly reported placeholder |
 | Delivery | GitHub-only SDK/NDK/CMake/Gradle setup, tests, lint, APK artifacts, tag releases | Release signing requires repository secrets |
 
@@ -42,14 +43,13 @@ flowchart LR
     AS --> OCR
     AG --> SH[ElevatedShell]
     SH --> SZ[Shizuku / ADB UID]
-    VM --> INF[InferenceEngine]
-    INF --> JNI[JNI C++ runtime]
+    VM --> DP[DeviceProfile + generic scheduler]
+    DP --> INF[llama runtime adapter]
+    INF --> JNI[JNI C++ backend boundary]
     JNI --> CPU[llama.cpp CPU]
-    JNI --> VK[Adreno Vulkan]
-    JNI --> QNN[QAIRT/QNN Hexagon]
-    CPU --> JNI
-    VK -. Phase 2 .-> JNI
-    QNN -. Phase 3 .-> JNI
+    JNI -. Phase 2 .-> VK[llama Vulkan]
+    DP -. future composition .-> QRT[dedicated Qualcomm runtime]
+    QRT -. Phase 3 .-> QNN[QAIRT/QNN Hexagon]
 ```
 
 Detailed component, trust-boundary, thread, and data-flow diagrams are in [ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -129,6 +129,7 @@ Use a credential manager or short-lived token. Never place a token in a remote U
 ## Documentation index
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Snapdragon-first vendor backend strategy](docs/VENDOR_BACKEND_STRATEGY.md)
 - [Module ownership](docs/MODULES.md)
 - [NpuHub comparison](docs/ARCHITECTURE_COMPARISON_NPUHUB.md)
 - [Local-first privacy invariants](docs/PRIVACY_INVARIANTS.md)

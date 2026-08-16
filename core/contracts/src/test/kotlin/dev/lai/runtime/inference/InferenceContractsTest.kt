@@ -11,13 +11,29 @@ class InferenceContractsTest {
         val config = GenerationConfig()
         assertEquals(512, config.maxNewTokens)
         assertTrue(config.temperature in 0f..2f)
+        val cpu = BackendDescriptor(
+            id = BackendId("llama-cpu"),
+            computeClass = ComputeClass.CPU,
+            supportedModelFormats = setOf("gguf"),
+        )
         val capability = RuntimeCapabilities(
             nativeLibraryLoaded = true,
-            compiledBackends = setOf(InferenceBackend.CPU),
+            compiledBackends = setOf(cpu),
             detail = "cpu ready",
         )
-        assertTrue(InferenceBackend.CPU in capability.compiledBackends)
-        assertFalse(InferenceBackend.QNN in capability.compiledBackends)
+        assertTrue(cpu in capability.compiledBackends)
+        assertFalse(capability.compiledBackends.any { it.computeClass == ComputeClass.NPU })
+    }
+
+    @Test
+    fun `backend ids are adapter owned rather than a vendor enum`() {
+        assertEquals("vendor-a-npu", BackendId("vendor-a-npu").value)
+        assertEquals("future-vendor-npu", BackendId("future-vendor-npu").value)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `invalid backend ids are rejected`() {
+        BackendId("Vendor Backend With Spaces")
     }
 
     @Test

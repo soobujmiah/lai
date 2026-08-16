@@ -6,7 +6,8 @@ interface InferenceEngine : AutoCloseable {
     val capabilities: RuntimeCapabilities
     val contextSize: Int
 
-    suspend fun load(modelPath: String, backend: InferenceBackend = InferenceBackend.AUTO): Result<Unit>
+    /** A null backend lets this concrete engine choose among only the adapters it owns. */
+    suspend fun load(modelPath: String, backend: BackendId? = null): Result<Unit>
 
     fun generate(
         conversation: List<ConversationMessage>,

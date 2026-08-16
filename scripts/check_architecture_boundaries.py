@@ -30,6 +30,14 @@ ANALYTICS_MARKERS = (
     "com.mixpanel",
     "appcenter-analytics",
 )
+GENERIC_INFERENCE_PREFIXES = (
+    "core/contracts/src/main/kotlin/dev/lai/runtime/inference/",
+    "core/scheduler/src/main/",
+)
+VENDOR_BACKEND_MARKER = re.compile(
+    r"\b(qualcomm|snapdragon|hexagon|qnn|qairt|mediatek|dimensity|exynos)\b",
+    re.IGNORECASE,
+)
 
 
 def source_files() -> list[Path]:
@@ -79,6 +87,8 @@ def main() -> None:
             violations.append(f"{rel}: INTERNET permission belongs only to platform/download")
         if rel.startswith("core/") and re.search(r"^\s*import\s+android\.", text, re.MULTILINE):
             violations.append(f"{rel}: pure core modules cannot import Android APIs")
+        if allowed(rel, GENERIC_INFERENCE_PREFIXES) and VENDOR_BACKEND_MARKER.search(text):
+            violations.append(f"{rel}: vendor-specific backend terminology must stay outside generic inference/scheduler core")
 
     for build_file in ROOT.rglob("build.gradle.kts"):
         if any(part in SKIP for part in build_file.parts):
@@ -99,7 +109,7 @@ def main() -> None:
         for item in sorted(set(violations)):
             print(f"  - {item}", file=sys.stderr)
         raise SystemExit(1)
-    print("Architecture boundaries OK: network, Android authority, JNI, analytics, and module direction are isolated.")
+    print("Architecture boundaries OK: network, Android authority, JNI, analytics, vendor backends, and module direction are isolated.")
 
 
 if __name__ == "__main__":

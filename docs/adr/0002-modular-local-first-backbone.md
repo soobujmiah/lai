@@ -1,6 +1,6 @@
 # ADR 0002: Modular local-first backbone
 
-- Status: Accepted
+- Status: Accepted; backend identity/boundary refined by [ADR 0005](0005-snapdragon-first-vendor-neutral-backends.md)
 - Date: 2026-08-16
 
 ## Context
@@ -23,7 +23,7 @@ Require SHA-pinned artifact installation and prohibit all outbound user-data flo
 Positive:
 
 - future features cannot casually import privileged/network/native APIs;
-- CPU/Vulkan/QNN routing is evidence-driven;
+- backend routing is evidence-driven;
 - core tests run without Android;
 - plugin API can evolve independently;
 - native and platform adapters are replaceable.

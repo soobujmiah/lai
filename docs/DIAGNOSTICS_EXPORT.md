@@ -10,9 +10,9 @@ Included:
 
 - app version/code and production-signing flag;
 - operation and signed-catalog status;
-- manufacturer/model, Android SDK and supported ABIs;
+- manufacturer/model, optional public SoC manufacturer/model, Android SDK, supported ABIs and reported CPU core count;
 - available memory, battery, charging and thermal state;
-- compiled backends, scheduler decision and context size;
+- compiled namespaced backend IDs, scheduler decision and context size;
 - active model ID, installed model IDs/sizes/SHA-256 and load time;
 - Accessibility connection boolean and coarse Shizuku state/UID;
 - conversation-turn trim count, never conversation text;
@@ -34,8 +34,8 @@ Always excluded:
   "schemaVersion": 1,
   "generatedAtEpochMs": 0,
   "app": {"versionName": "0.8.0", "operation": "READY"},
-  "device": {"androidSdk": 36, "thermalState": "NOMINAL"},
-  "runtime": {"compiledBackends": ["CPU"], "contextSize": 4096},
+  "device": {"androidSdk": 36, "socModel": "example", "thermalState": "NOMINAL"},
+  "runtime": {"compiledBackends": ["llama-cpu"], "contextSize": 4096},
   "models": [{"id": "model-id", "bytes": 1, "sha256": "...", "active": true}],
   "performance": [{"promptTokens": 20, "generatedTokens": 15, "timeToFirstTokenMs": 100}],
   "privacy": {"localOnlyUntilUserExport": true, "excludedData": ["prompts", "generated_text"]}
