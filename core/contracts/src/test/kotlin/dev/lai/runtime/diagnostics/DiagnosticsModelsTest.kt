@@ -30,7 +30,10 @@ class DiagnosticsModelsTest {
         assertFalse(json.contains("generatedText"))
         assertFalse(json.contains("toolArguments"))
         assertEquals("screen.click", decoded.automation.records.single().toolName)
-        assertEquals("IN_MEMORY_ONLY", decoded.automation.auditPersistence)
+        assertEquals("APP_PRIVATE_HASH_CHAIN_V1", decoded.automation.auditPersistence)
+        assertTrue(decoded.automation.auditIntegrityValid)
+        assertTrue("tool_call_fingerprints" in decoded.privacy.excludedData)
+        assertTrue("tool_audit_hashes" in decoded.privacy.excludedData)
         assertTrue(decoded.privacy.localOnlyUntilUserExport)
     }
 }

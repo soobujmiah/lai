@@ -16,9 +16,9 @@
   <string name="inspect_screen">Inspect screen safely</string>
   <string name="connect_shizuku">Connect Shizuku</string>
   <string name="local_action_proposals">Local action proposals</string>
-  <string name="local_action_proposals_summary">Allow the local model to propose one strictly validated Android tool. Every proposal opens a trusted one-time review; no autonomous chain runs.</string>
+  <string name="local_action_proposals_summary">Allow one strictly validated Android tool proposal. Approval is privately recorded before execution, exact replay is blocked, and no autonomous chain runs.</string>
   <string name="review_local_action">Review local action</string>
-  <string name="tool_review_explanation">This action was proposed by the local model. Nothing has run yet. Approval applies once to this exact validated call; model text cannot approve itself.</string>
+  <string name="tool_review_explanation">This action was proposed by the local model. Nothing has run yet. Approval is privately recorded and applies once to this exact validated call; model text cannot approve itself.</string>
   <string name="approve_once">Approve once</string>
   <string name="do_not_run">Do not run</string>
   <string name="risk_label">Risk</string>

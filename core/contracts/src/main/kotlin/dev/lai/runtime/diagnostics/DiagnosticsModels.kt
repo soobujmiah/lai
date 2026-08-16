@@ -77,7 +77,8 @@ data class GenerationPerformanceDiagnostics(
 @Serializable
 data class AutomationDiagnostics(
     val toolProposalsEnabled: Boolean = false,
-    val auditPersistence: String = "IN_MEMORY_ONLY",
+    val auditPersistence: String = "APP_PRIVATE_HASH_CHAIN_V1",
+    val auditIntegrityValid: Boolean = true,
     val records: List<ToolAuditDiagnostics> = emptyList(),
 )
 
@@ -103,6 +104,8 @@ data class DiagnosticsPrivacy(
         "documents",
         "tool_arguments",
         "tool_outputs",
+        "tool_call_fingerprints",
+        "tool_audit_hashes",
         "typed_automation_text",
         "credentials",
         "network_identifiers",

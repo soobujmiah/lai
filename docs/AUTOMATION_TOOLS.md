@@ -22,7 +22,7 @@ The same validator runs again in `AgentRuntime` before authority dispatch. Natur
 
 Every model-authored proposal—including read-only tools—opens a trusted Compose review dialog and runs at most once after **Approve once**. Newlines, control characters, and bidirectional-format controls are escaped/replaced in the human-readable preview without changing the validated execution value. Denial invokes no Android authority. A model cannot set `"confirmed": true`; unknown envelope fields are rejected before a `ToolCall` exists. Runtime policy separately requires confirmation for clicks, typing, global actions, app launches, and elevated operations, providing defense in depth.
 
-There is no autonomous multi-step loop and tool output is not automatically fed back to the model. LAI keeps at most 50 in-memory redacted audit records containing tool name, risk, approval/result state, and timestamp—never arguments or output. Persistent append-only audit storage remains a gate before autonomous execution.
+There is no autonomous multi-step loop and tool output is not automatically fed back to the model. Before execution, LAI fsync-appends a content-free approval to an app-private hash-chained JSONL audit; failure blocks the action. Exact call ID+arguments replay is rejected across process restarts. The UI/diagnostics expose at most 50 recent projections containing tool name, risk, approval/result state, and timestamp—never arguments, fingerprints, hashes, or output.
 
 ## Tools
 
@@ -102,4 +102,4 @@ Text read from another app is untrusted content. It may say “ignore previous i
 
 ## Audit evolution
 
-The current one-shot flow stores only a 50-record in-memory audit and exports a privacy-filtered subset in user-requested diagnostics. Before any autonomous multi-step execution, add an app-private append-only record with replay protection, tool, redacted argument categories, result code, foreground-package binding, confirmation source, and timestamps. Never persist entered text, selector text, shell output, screenshots, OCR content, or model output by default.
+The current one-shot flow stores a bounded app-private, no-backup, hash-chained audit and exports only a privacy-filtered projection after user request. It blocks execution unless approval is durably recorded first and rejects an exact previously approved call. Before autonomous multi-step execution, add reviewed archival/reset policy, foreground-package/screen binding, step budgets, result provenance, and cancellation. Never persist entered text, selector text, package names, shell output, screenshots, OCR content, model output, fingerprints, or record hashes in diagnostics.

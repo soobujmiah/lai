@@ -352,7 +352,7 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                     Switch(
                         checked = state.toolProposalsEnabled,
                         onCheckedChange = viewModel::setToolProposalsEnabled,
-                        enabled = !state.busy && state.pendingToolProposal == null,
+                        enabled = !state.busy && state.pendingToolProposal == null && state.toolAuditIntegrityValid,
                     )
                 }
             }
@@ -384,11 +384,10 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                 StatusCard(
                     "Local tool audit",
                     if (latest == null) {
-                        "No model-proposed tool has been reviewed in this app session"
+                        state.toolAuditStatus
                     } else {
-                        "${state.toolAuditHistory.size} redacted record(s) • latest ${latest.toolName} • " +
-                            if (!latest.userApproved) "denied"
-                            else if (latest.success == true) "approved/succeeded" else "approved/failed"
+                        "${state.toolAuditHistory.size} recent persistent event(s) • latest ${latest.toolName} • " +
+                            "${latest.outcome.name.lowercase().replace('_', ' ')} • ${state.toolAuditStatus}"
                     },
                 )
             }

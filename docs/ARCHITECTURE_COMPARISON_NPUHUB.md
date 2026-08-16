@@ -39,7 +39,7 @@ The right global product is not either repository unchanged. LAI adopts NpuHub's
 
 ## Patterns deliberately not copied unchanged
 
-- Twenty-five modules immediately would slow iteration and obscure the product. LAI starts with thirteen cohesive modules and splits feature UI when ownership warrants it.
+- Twenty-five modules immediately would slow iteration and obscure the product. LAI uses fourteen cohesive modules after adding concrete private-audit ownership, and splits feature UI only when ownership warrants it.
 - NpuHub's plugin interface validates input but does not provide a full capability-scoped execution lifecycle. LAI's API includes a constrained execution context, while dynamic third-party loading remains disabled.
 - Large single-screen Compose files are not a target architecture. LAI will add feature modules plus state/route separation as each surface grows.
 - A committed Gradle wrapper JAR conflicts with LAI's source-only rule. CI obtains Gradle remotely.

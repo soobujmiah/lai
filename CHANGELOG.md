@@ -33,6 +33,17 @@ All notable changes are documented here. The project follows semantic versioning
 - Superseded the short-lived dual-edition experiment with one local-first app and upgrade path.
 - Added an ECDSA-signed web supported-model catalog, encrypted CI signing key, schema validation, verified cache and embedded offline fallback.
 
+### Persistent tool-audit candidate
+
+- Added concrete `platform:audit` ownership for app-private, no-backup, content-free JSONL security events.
+- Added pure-JVM SHA-256 call fingerprints, full record hash chaining, schema/sequence/tool-risk/transition verification and corruption tests.
+- Fsyncs `USER_APPROVED` before invoking Android authority; an audit write failure blocks execution.
+- Rejects a second approval or completion for the exact same call fingerprint across process restarts.
+- Records bounded success/failure after execution and best-effort denials without storing arguments, selectors, typed text, packages, model/tool output or screen content.
+- Bounds audit parsing to 2 MiB, 4,000 events and 4 KiB per record; unknown fields, partial writes and chain mismatches disable proposals.
+- Exposes only the latest 50 content-free projections and integrity state to UI/user-exported diagnostics; fingerprints and record hashes remain private.
+- Added ADR 0007 with root-attacker, capacity, keying and future archive/reset limitations.
+
 ### One-shot local tool proposal candidate
 
 - Added an opt-in trusted system instruction for eight built-in local Android tools.

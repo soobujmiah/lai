@@ -3,6 +3,7 @@ package dev.lai.runtime.core
 import android.content.ComponentCallbacks2
 import android.content.Context
 import dev.lai.runtime.agent.AgentRuntime
+import dev.lai.runtime.audit.ToolAuditRepository
 import dev.lai.runtime.device.AndroidRuntimeEnvironmentProvider
 import dev.lai.runtime.inference.ModelRepository
 import dev.lai.runtime.inference.NativeInferenceEngine
@@ -24,6 +25,7 @@ class AppContainer(context: Context) {
     val elevatedShell = ElevatedShell(context, shizukuController)
     val modelRepository = ModelRepository(context)
     val modelCatalogRepository = RemoteModelCatalogRepository(context)
+    val toolAuditRepository = ToolAuditRepository(context)
     val inferenceEngine = NativeInferenceEngine()
     val inferenceScheduler = InferenceScheduler()
     val memoryEstimator = ModelMemoryEstimator()

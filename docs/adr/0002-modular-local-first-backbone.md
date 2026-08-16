@@ -9,7 +9,7 @@ LAI's Phase 1 and llama.cpp Phase 2 proved product and native-runtime paths in o
 
 ## Decision
 
-Adopt a cohesive layered architecture, currently thirteen modules:
+Adopt a cohesive layered architecture, initially thirteen modules (a concrete fourteenth `platform:audit` boundary was later added by [ADR 0007](0007-persistent-tool-audit-and-replay-guard.md)):
 
 - pure JVM: `core:contracts`, `core:policy`, `core:scheduler`, `core:model`, `plugins:api`;
 - Android platform: `platform:download`, `platform:device`, `platform:accessibility`, `platform:shizuku`;

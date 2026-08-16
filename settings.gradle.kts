@@ -26,8 +26,9 @@ include(":core:scheduler")
 include(":core:model")
 include(":plugins:api")
 
-// Android authority boundaries.
+// Android authority and private persistence boundaries.
 include(":platform:download")
+include(":platform:audit")
 include(":platform:device")
 include(":platform:accessibility")
 include(":platform:shizuku")

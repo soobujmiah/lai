@@ -13,7 +13,8 @@
 
 | Threat | Control now | Follow-up |
 |---|---|---|
-| Model emits malicious tool call | exact 16 KiB JSON envelope, per-tool schemas, fixed registry, second dispatch validation, one-time trusted review | expand parser/property fuzzing and persistent audit before autonomy |
+| Model emits malicious tool call | exact 16 KiB JSON envelope, per-tool schemas, fixed registry, second dispatch validation, one-time trusted review, durable approval-before-execution | expand property fuzzing and foreground/result provenance before autonomy |
+| Tool-call replay or audit corruption | exact-call fingerprint replay block, bounded app-private hash chain, fsync before authority, fail-closed verification | keyed integrity and reviewed archive/reset policy if threat model requires root resistance |
 | Screen prompt injection | screen data has no authority | provenance labels in model context |
 | Shell injection | no raw shell; validated argv | fuzz every argument compiler |
 | Password leakage in tree | password text/description omitted | screenshot redaction UX |
@@ -57,6 +58,7 @@ Shizuku may run as UID 2000 (ADB shell) or UID 0 (root/Sui). The app surfaces UI
 - no logs of prompts, screen content, typed text, or command stdout by default;
 - load/TTFT/token-rate/thermal samples remain in memory (maximum 20) and have no upload path;
 - diagnostics leave app-private state only after an explicit Storage Access Framework export and exclude user content;
+- model-tool audit storage is app-private/no-backup, content-free, bounded and hash-chained; approval is fsynced before execution;
 - Android critical-memory callbacks destroy the native session and notify UI state.
 
 ## Release supply chain
@@ -72,7 +74,8 @@ Shizuku may run as UID 2000 (ADB shell) or UID 0 (root/Sui). The app surfaces UI
 
 - manual Developer Mode URLs still rely on user-supplied digest metadata rather than signed catalog provenance;
 - the confirmation dialog supports one model-proposed action only; there is no autonomous result-feedback loop;
-- the redacted audit is memory-only; there is no replay-resistant persistent audit log;
+- the persistent audit uses an unkeyed hash chain and is not resistant to a root attacker who can rewrite and rehash app-private files;
+- no reviewed audit archive/reset UX exists when the bounded ledger reaches its limit;
 - OCR screenshot redaction is not implemented;
 - dependency verification metadata and SBOM are not present;
 - native adapters have not undergone memory-safety fuzzing.

@@ -37,8 +37,9 @@ Compilation and lint run in GitHub Actions.
 10. Keep telemetry and model internals behind Developer Mode.
 11. Add tests for protocol changes, Bangla UTF-8, rejection paths, injection attempts, wrong JSON types, unknown fields and authority bypasses.
 12. Model-proposed tools must use the canonical parser and trusted one-time review; never add a model-authored confirmation or raw tool escape hatch.
-13. Include physical-device evidence for hardware/performance claims.
-14. Never log prompts, entered text, screen trees, captures, tokens, or secrets by default.
+13. Approval must be durably audited before authority; persistent tool-audit schemas may not contain arguments, selectors, typed text, package names, model/tool output, or screen content.
+14. Include physical-device evidence for hardware/performance claims.
+15. Never log prompts, entered text, screen trees, captures, tokens, or secrets by default.
 
 ## Supported-model catalog changes
 

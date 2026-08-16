@@ -16,7 +16,7 @@
 
 ## Backbone hardening — completed
 
-- [x] thirteen-module core/platform/runtime/plugin architecture
+- [x] fourteen-module core/platform/runtime/plugin architecture including private audit ownership
 - [x] zero-egress network ownership and mandatory artifact digest
 - [x] architecture boundary source gate
 - [x] pure-JVM coverage ratchets
@@ -46,8 +46,9 @@
 - [x] scheduler wiring for memory/battery/thermal-aware model load
 - [ ] Bangla system prompt/templates and evaluation pack
 - [x] parse complete LLM-proposed JSON tool calls with strict per-tool schemas and dispatch revalidation
-- [x] opt-in one-shot trusted confirmation dialog and bounded in-memory redacted audit records
-- [ ] replay-resistant app-private audit and tool-result feedback before any autonomous multi-step loop
+- [x] opt-in one-shot trusted confirmation dialog
+- [x] bounded app-private hash-chained audit, approval-before-execution and exact-call replay guard
+- [ ] foreground/screen binding, result provenance and tool-result feedback before any autonomous multi-step loop
 - [ ] select and integrate printed Bangla OCR baseline
 - [ ] benchmark profile hidden in Developer Mode (implementation candidate added)
 

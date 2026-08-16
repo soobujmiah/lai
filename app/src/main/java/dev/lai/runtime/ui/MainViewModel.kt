@@ -12,6 +12,8 @@ import dev.lai.runtime.LaiApplication
 import dev.lai.runtime.agent.ToolCall
 import dev.lai.runtime.agent.ToolCallParseResult
 import dev.lai.runtime.agent.ToolRisk
+import dev.lai.runtime.audit.ToolAuditOutcome
+import dev.lai.runtime.audit.ToolAuditRecordV1
 import dev.lai.runtime.core.AppRuntimeEvent
 import dev.lai.runtime.core.LaiJson
 import dev.lai.runtime.diagnostics.AppDiagnostics
@@ -84,15 +86,6 @@ data class PendingToolProposal(
     val risk: ToolRisk,
 )
 
-data class ToolAuditRecord(
-    val callId: String,
-    val toolName: String,
-    val risk: ToolRisk,
-    val userApproved: Boolean,
-    val success: Boolean?,
-    val timestampEpochMs: Long,
-)
-
 private data class ScheduledLoad(
     val backend: BackendId,
     val reason: String,
@@ -150,7 +143,9 @@ data class MainUiState(
     val diagnosticsStatus: String = "No diagnostics exported",
     val toolProposalsEnabled: Boolean = false,
     val pendingToolProposal: PendingToolProposal? = null,
-    val toolAuditHistory: List<ToolAuditRecord> = emptyList(),
+    val toolAuditHistory: List<ToolAuditRecordV1> = emptyList(),
+    val toolAuditStatus: String = "Persistent tool audit not loaded",
+    val toolAuditIntegrityValid: Boolean = false,
 ) {
     val busy: Boolean
         get() = operation in setOf(
@@ -201,6 +196,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        loadToolAudit()
         refreshModels()
         loadCachedCatalog()
     }
@@ -209,16 +205,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setInput(value: String) = _state.update { it.copy(input = value) }
     fun toggleSettings() = _state.update { it.copy(settingsVisible = !it.settingsVisible) }
     fun setDeveloperMode(enabled: Boolean) = _state.update { it.copy(developerMode = enabled) }
-    fun setToolProposalsEnabled(enabled: Boolean) = _state.update {
-        it.copy(
-            toolProposalsEnabled = enabled,
-            pendingToolProposal = if (enabled) it.pendingToolProposal else null,
-            notice = if (enabled) {
-                "Local action proposals enabled; every proposed tool still requires one-time review"
-            } else {
-                "Local action proposals disabled"
-            },
-        )
+    fun setToolProposalsEnabled(enabled: Boolean) {
+        if (enabled && !state.value.toolAuditIntegrityValid) {
+            _state.update { it.copy(notice = "Persistent tool audit is unavailable; action proposals remain disabled") }
+            return
+        }
+        _state.update {
+            it.copy(
+                toolProposalsEnabled = enabled,
+                pendingToolProposal = if (enabled) it.pendingToolProposal else null,
+                notice = if (enabled) {
+                    "Local action proposals enabled; every proposed tool still requires one-time review"
+                } else {
+                    "Local action proposals disabled"
+                },
+            )
+        }
     }
     fun setModelName(value: String) = _state.update { it.copy(modelName = value) }
     fun setModelUrl(value: String) = _state.update { it.copy(modelUrl = value) }
@@ -249,6 +251,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val snapshot = container.modelCatalogRepository.cachedOrEmbedded()
             applyCatalog(snapshot.document.models, snapshot.source)
+        }
+    }
+
+    private fun loadToolAudit() {
+        viewModelScope.launch {
+            val snapshot = container.toolAuditRepository.snapshot()
+            _state.update {
+                it.copy(
+                    toolAuditHistory = snapshot.records.takeLast(MAX_TOOL_AUDIT_RECORDS),
+                    toolAuditStatus = snapshot.detail,
+                    toolAuditIntegrityValid = snapshot.integrityValid,
+                    toolProposalsEnabled = if (snapshot.integrityValid) it.toolProposalsEnabled else false,
+                    notice = if (snapshot.integrityValid) it.notice else {
+                        "Local action proposals disabled because the persistent audit failed verification"
+                    },
+                )
+            }
         }
     }
 
@@ -383,37 +402,73 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun approvePendingTool() {
         val proposal = state.value.pendingToolProposal ?: return
-        if (state.value.busy) return
+        if (state.value.busy || !state.value.toolAuditIntegrityValid) return
         _state.update {
             it.copy(
                 pendingToolProposal = null,
                 operation = RuntimeOperation.AUTOMATING,
-                notice = "Running the one approved local action…",
+                notice = "Recording one-time approval before local execution…",
             )
         }
         viewModelScope.launch {
+            val approval = container.toolAuditRepository.recordDecision(
+                call = proposal.call,
+                risk = proposal.risk,
+                approved = true,
+            )
+            if (approval.isFailure) {
+                val verified = container.toolAuditRepository.snapshot()
+                val message = "Action not run because approval audit failed: " +
+                    (approval.exceptionOrNull()?.message ?: "unknown audit error")
+                _state.update {
+                    it.copy(
+                        messages = it.messages + ChatMessage(false, message, contextEligible = false),
+                        operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
+                        notice = message,
+                        toolProposalsEnabled = false,
+                        toolAuditHistory = verified.records.takeLast(MAX_TOOL_AUDIT_RECORDS),
+                        toolAuditIntegrityValid = verified.integrityValid,
+                        toolAuditStatus = "$message • ${verified.detail}",
+                    )
+                }
+                return@launch
+            }
+            val approvedSnapshot = approval.getOrThrow()
+            _state.update {
+                it.copy(
+                    toolAuditHistory = approvedSnapshot.records.takeLast(MAX_TOOL_AUDIT_RECORDS),
+                    toolAuditStatus = approvedSnapshot.detail,
+                    notice = "Approval recorded; running the exact validated action once…",
+                )
+            }
             val result = container.agentRuntime.execute(proposal.call, userConfirmed = true)
+            val completion = container.toolAuditRepository.recordCompletion(
+                call = proposal.call,
+                risk = proposal.risk,
+                success = result.success,
+            )
+            val completionSnapshot = completion.getOrNull()
             val resultText = if (result.success) {
                 "Approved action completed locally: ${proposal.summary}"
             } else {
                 "Approved action was not completed: ${result.error?.message ?: "tool failed"}"
             }
+            val auditWarning = completion.exceptionOrNull()?.message
+            val verifiedAfterFailure = if (auditWarning != null) container.toolAuditRepository.snapshot() else null
             _state.update {
                 it.copy(
                     messages = it.messages + ChatMessage(false, resultText, contextEligible = false),
                     operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
-                    notice = resultText,
-                    toolAuditHistory = appendAudit(
-                        it.toolAuditHistory,
-                        ToolAuditRecord(
-                            callId = proposal.call.id,
-                            toolName = proposal.call.name,
-                            risk = proposal.risk,
-                            userApproved = true,
-                            success = result.success,
-                            timestampEpochMs = System.currentTimeMillis(),
-                        ),
-                    ),
+                    notice = if (auditWarning == null) resultText else "$resultText • audit completion failed",
+                    toolAuditHistory = (
+                        completionSnapshot?.records ?: verifiedAfterFailure?.records ?: approvedSnapshot.records
+                    ).takeLast(MAX_TOOL_AUDIT_RECORDS),
+                    toolAuditStatus = completionSnapshot?.detail
+                        ?: "Audit completion failed: $auditWarning • ${verifiedAfterFailure?.detail}",
+                    toolProposalsEnabled = if (auditWarning == null) it.toolProposalsEnabled else false,
+                    toolAuditIntegrityValid = completionSnapshot?.integrityValid
+                        ?: verifiedAfterFailure?.integrityValid
+                        ?: false,
                 )
             }
         }
@@ -431,18 +486,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     contextEligible = false,
                 ),
                 notice = "Action denied; no Android authority was invoked",
-                toolAuditHistory = appendAudit(
-                    it.toolAuditHistory,
-                    ToolAuditRecord(
-                        callId = proposal.call.id,
-                        toolName = proposal.call.name,
-                        risk = proposal.risk,
-                        userApproved = false,
-                        success = null,
-                        timestampEpochMs = System.currentTimeMillis(),
-                    ),
-                ),
             )
+        }
+        viewModelScope.launch {
+            val denial = container.toolAuditRepository.recordDecision(
+                call = proposal.call,
+                risk = proposal.risk,
+                approved = false,
+            )
+            val snapshot = denial.getOrNull()
+            if (snapshot != null) {
+                _state.update {
+                    it.copy(
+                        toolAuditHistory = snapshot.records.takeLast(MAX_TOOL_AUDIT_RECORDS),
+                        toolAuditStatus = snapshot.detail,
+                    )
+                }
+            } else {
+                val error = denial.exceptionOrNull()
+                val verified = container.toolAuditRepository.snapshot()
+                _state.update {
+                    it.copy(
+                        toolProposalsEnabled = false,
+                        toolAuditHistory = verified.records.takeLast(MAX_TOOL_AUDIT_RECORDS),
+                        toolAuditIntegrityValid = verified.integrityValid,
+                        toolAuditStatus = "Audit denial record failed: ${error?.message} • ${verified.detail}",
+                        notice = "Action was denied and not run, but its audit record could not be stored",
+                    )
+                }
+            }
         }
     }
 
@@ -502,9 +574,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         return updated
     }
-
-    private fun appendAudit(history: List<ToolAuditRecord>, record: ToolAuditRecord): List<ToolAuditRecord> =
-        (history + record).takeLast(MAX_TOOL_AUDIT_RECORDS)
 
     private fun markGenerationFailed(message: String) {
         _state.update {
@@ -924,12 +993,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             privacy = DiagnosticsPrivacy(),
             automation = AutomationDiagnostics(
                 toolProposalsEnabled = current.toolProposalsEnabled,
+                auditIntegrityValid = current.toolAuditIntegrityValid,
                 records = current.toolAuditHistory.map { record ->
                     ToolAuditDiagnostics(
                         toolName = record.toolName,
                         risk = record.risk.name,
-                        userApproved = record.userApproved,
-                        success = record.success,
+                        userApproved = record.outcome != ToolAuditOutcome.USER_DENIED,
+                        success = when (record.outcome) {
+                            ToolAuditOutcome.EXECUTION_SUCCEEDED -> true
+                            ToolAuditOutcome.EXECUTION_FAILED -> false
+                            ToolAuditOutcome.USER_APPROVED,
+                            ToolAuditOutcome.USER_DENIED -> null
+                        },
                         timestampEpochMs = record.timestampEpochMs,
                     )
                 },

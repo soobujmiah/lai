@@ -8,6 +8,7 @@
 | `core:model` | immutable reviewed artifact catalog and trust metadata | contracts |
 | `plugins:api` | versioned local-only plugin manifest and constrained context | contracts, policy |
 | `platform:download` | the only network transport, artifact streaming/hash/activation | core |
+| `platform:audit` | app-private no-backup JSONL tool audit, fsync append, bounded parsing and hash-chain enforcement | contracts, policy |
 | `platform:device` | Android manufacturer/SoC/API/ABI/CPU facts plus memory, battery, charging and thermal observations | scheduler |
 | `platform:accessibility` | Accessibility service, node capture, screenshots and UI actions | contracts |
 | `platform:shizuku` | Shizuku binder/UserService and privileged process boundary | contracts, policy |
@@ -25,5 +26,6 @@
 - `runtime:llama` owns llama CPU/Vulkan only. A future real QNN implementation gets its own adapter; no placeholder vendor modules are created.
 - Only app composes concrete implementations.
 - Only the download platform owns network transport.
+- Only `platform:audit` owns persistent model-tool audit bytes; arguments and outputs never enter its contract.
 - Every new module declares its privacy, authority and test boundary in documentation.
 - Feature modules will be introduced for Chat, Reader, Automator and Settings when their state/navigation surfaces are separated from `MainViewModel`; they will depend on contracts, never concrete vendor APIs.

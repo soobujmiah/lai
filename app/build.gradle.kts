@@ -94,6 +94,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":plugins:api"))
     implementation(project(":platform:download"))
+    implementation(project(":platform:audit"))
     implementation(project(":platform:device"))
     implementation(project(":platform:accessibility"))
     implementation(project(":platform:shizuku"))

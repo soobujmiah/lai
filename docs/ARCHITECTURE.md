@@ -31,6 +31,7 @@ flowchart TB
     SS[Screen screenshot]
     SH[ElevatedShell]
     SZ[Shizuku binder]
+    PA[Private tool audit]
     AS --> SS
     SH --> SZ
   end
@@ -58,6 +59,7 @@ flowchart TB
   VM --> AR
   VM --> MR
   VM --> DP
+  VM --> PA
   CG --> AS
   CG --> SH
   SS --> OE
@@ -123,22 +125,26 @@ sequenceDiagram
   actor U as User
   participant UI as Compose
   participant L as Local LLM
+  participant P as Private audit
   participant A as AgentRuntime
   participant X as Accessibility/Shizuku
   U->>UI: Request a task
   UI->>L: Prompt + available tool schemas
   L-->>UI: Proposed ToolCall
-  UI->>U: Confirmation for consequential action
+  UI->>U: One-time review
   U-->>UI: Approve / deny
-  UI->>A: ToolCall + confirmation bit
-  A->>A: Validate name, schema, policy
+  UI->>P: Append approval fingerprint + fsync
+  P-->>UI: Verified sequence/hash
+  UI->>A: Exact ToolCall + trusted confirmation
+  A->>A: Revalidate name, schema, policy
   A->>X: Typed operation
   X-->>A: Bounded result
-  A-->>L: ToolResult JSON
-  L-->>UI: User-facing response
+  A-->>UI: Typed ToolResult
+  UI->>P: Append success/failure
+  UI-->>U: Local result summary
 ```
 
-When Local action proposals is enabled, a complete model response may enter the strict built-in `ToolCallParser`. An accepted one-shot proposal is rewritten to a human-readable summary and shown in a trusted Compose dialog; see [ADR 0006](adr/0006-one-shot-model-tool-proposals.md). Approval is passed separately to `AgentRuntime`; denial invokes no authority. Tool output is not fed back to the model and no autonomous chain exists. The confirmation bit originates only in trusted UI state, never in model-authored JSON.
+When Local action proposals is enabled, a complete model response may enter the strict built-in `ToolCallParser`. An accepted one-shot proposal is rewritten to a human-readable summary and shown in a trusted Compose dialog; see [ADR 0006](adr/0006-one-shot-model-tool-proposals.md). Approval is hash-chained and fsynced through `platform:audit` before it is passed separately to `AgentRuntime`; an exact previously approved fingerprint is blocked as replay. See [ADR 0007](adr/0007-persistent-tool-audit-and-replay-guard.md). Denial invokes no authority. Tool output is not fed back to the model and no autonomous chain exists. The confirmation bit originates only in trusted UI state, never in model-authored JSON.
 
 ## 5. Threads and ownership
 
@@ -149,6 +155,7 @@ When Local action proposals is enabled, a complete model response may enter the 
 | Model catalog/policy/scheduling | caller / pure JVM | core model, policy and scheduler |
 | Android memory/battery/thermal snapshot | short synchronous platform call | platform:device |
 | Model network and hashing | IO | platform:download ModelRepository |
+| Tool-audit verify/append/fsync | IO + coroutine mutex | platform:audit ToolAuditRepository |
 | Shizuku process streams | IO coroutines | ElevatedShell |
 | OCR preprocessing/inference | Default or plugin-owned | OcrEngine |
 | Native token generation | dedicated native worker (Phase 2) | BackendSession |
@@ -161,8 +168,9 @@ No accessibility node survives a command. Bitmaps are recycled after OCR. Native
 2. **Untrusted visible UI:** screen text can contain prompt injection; it is data, not authority.
 3. **Accessibility authority:** can affect other apps; disabled by default and user-enabled in system settings.
 4. **Shizuku authority:** shell/root identity varies; UID is surfaced and operations are allowlisted.
-5. **Downloaded model:** size/hash/format are validated; model license and provenance remain user responsibilities.
-6. **CI secrets:** signing and future proprietary SDK credentials exist only in GitHub Actions secret scope.
+5. **Persistent tool audit:** contains no call content, but chain/transition failure blocks model tools; unkeyed hashes do not defend against a root attacker who can rewrite all app-private bytes.
+6. **Downloaded model:** size/hash/format are validated; model license and provenance remain user responsibilities.
+7. **CI secrets:** signing and future proprietary SDK credentials exist only in GitHub Actions secret scope.
 
 ## 7. Plugin seams
 

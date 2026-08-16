@@ -1,6 +1,6 @@
 # ADR 0006: Opt-in one-shot model tool proposals
 
-- Status: Accepted; build verified, device verification pending
+- Status: Accepted; persistent-audit aspects refined by [ADR 0007](0007-persistent-tool-audit-and-replay-guard.md); device verification pending
 - Date: 2026-08-16
 
 ## Context

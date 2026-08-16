@@ -18,7 +18,7 @@ The build performs:
 2. JDK 17 setup;
 3. API 35, Build Tools 35.0.0, NDK 27.0.12077973, and CMake 3.22.1 install on the runner;
 4. immutable-SHA llama.cpp fetch into runner-temporary storage;
-5. Kotlin unit tests and Android lint;
+5. pure-JVM coverage tests, private-audit Android unit tests, app unit tests, and Android lint;
 6. Kotlin/Compose resources and arm64 C++/llama.cpp JNI compilation;
 7. single local-first APK assembly and artifact upload;
 8. version-tag release.

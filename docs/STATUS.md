@@ -9,7 +9,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Capability | Status | Evidence / boundary |
 |---|---|---|
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
-| Layered module backbone | Ready | thirteen-module Gradle/manifest graph compiled and packaged remotely |
+| Layered module backbone | Ready | fourteen-module graph including dedicated persistent-audit ownership; latest audit module changes await remote build |
 | Zero-egress architecture policy | Ready | only download module owns transport; outbound user data denied; boundary check passes |
 | Signed web model catalog | Build verified | encrypted ECDSA signer, stable `catalog-v1` assets, in-app verification/cache/fallback and supported-list UI passed; device refresh pending |
 | Evidence-aware scheduler | Device validated (CPU) | Redmi selected CPU with 3,077 MiB available vs 1,833 MiB estimated peak at nominal thermal state |
@@ -35,7 +35,8 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | QAIRT/QNN HTP offload | Planned (Phase 3) | Snapdragon priority; requires a dedicated isolated adapter, converted artifact, licensed SDK/runtime and physical-device evidence |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
 | Bangla handwriting OCR | Planned | dataset/model/license selection required |
-| One-shot LLM tool proposals | Build verified | opt-in trusted system schema, exact bounded JSON parser, per-tool validation, second dispatch validation, one-time Compose approval and 50-record content-free in-memory audit passed run 31953199936; device validation pending |
+| One-shot LLM tool proposals | Build verified v0.8.0 | strict parser, revalidation and trusted review passed release run 31953763295; device validation pending |
+| Persistent tool audit/replay guard | Source candidate | no-backup JSONL, approval-before-authority fsync, bounded full-chain verification, content-free records and exact-call replay rejection; CI/device validation pending |
 | Autonomous multi-step tool loop | Planned | requires replay-resistant persistent audit, foreground binding, result feedback, loop limits and adversarial device evidence |
 | RAG / STT / TTS plugins | Planned | interfaces to be designed after runtime stabilization |
 

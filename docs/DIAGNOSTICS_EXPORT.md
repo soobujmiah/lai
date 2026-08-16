@@ -16,7 +16,7 @@ Included:
 - active model ID, installed model IDs/sizes/SHA-256 and load time;
 - Accessibility connection boolean and coarse Shizuku state/UID;
 - conversation-turn trim count, never conversation text;
-- local-action-proposal enabled state and up to 50 in-memory audit records containing only tool name, risk, approval/result state and timestamp;
+- local-action-proposal enabled state, persistent-audit integrity boolean, persistence schema label and up to 50 recent event projections containing only tool name, risk, approval/result state and timestamp;
 - up to 20 in-memory generation samples: prompt/output token counts, prefill, TTFT, decode and total duration.
 
 Always excluded:
@@ -25,7 +25,7 @@ Always excluded:
 - screenshots, OCR text and Accessibility trees;
 - foreground package/app names;
 - documents, RAG chunks and embeddings;
-- tool arguments, selectors, typed automation text, tool results and shell output;
+- tool arguments, selectors, typed automation text, tool results, call fingerprints, record hashes and shell output;
 - credentials, IP addresses and network identifiers.
 
 ## Example shape
@@ -37,7 +37,7 @@ Always excluded:
   "app": {"versionName": "0.8.0", "operation": "READY"},
   "device": {"androidSdk": 36, "socModel": "example", "thermalState": "NOMINAL"},
   "runtime": {"compiledBackends": ["llama-cpu"], "contextSize": 4096},
-  "automation": {"toolProposalsEnabled": true, "auditPersistence": "IN_MEMORY_ONLY", "records": []},
+  "automation": {"toolProposalsEnabled": true, "auditPersistence": "APP_PRIVATE_HASH_CHAIN_V1", "auditIntegrityValid": true, "records": []},
   "models": [{"id": "model-id", "bytes": 1, "sha256": "...", "active": true}],
   "performance": [{"promptTokens": 20, "generatedTokens": 15, "timeToFirstTokenMs": 100}],
   "privacy": {"localOnlyUntilUserExport": true, "excludedData": ["prompts", "generated_text"]}
