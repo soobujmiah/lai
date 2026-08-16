@@ -164,7 +164,9 @@ public:
         }
 
         const auto prompt_start = Clock::now();
-        const int32_t batch_size = std::max(1, std::min(512, context_size));
+        // Smaller prompt chunks bound how long a single uninterruptible llama_decode call runs,
+        // so Stop is observed promptly instead of after a whole 512-token batch.
+        const int32_t batch_size = std::max(1, std::min(128, context_size));
         size_t offset = 0;
         while (offset < prompt_tokens.size()) {
             if (is_cancelled()) throw std::runtime_error("Generation cancelled");
@@ -249,12 +251,25 @@ public:
 
         llama_context_params context_params = llama_context_default_params();
         context_params.n_ctx = static_cast<uint32_t>(context_size);
-        context_params.n_batch = static_cast<uint32_t>(std::min(context_size, 512));
+        context_params.n_batch = static_cast<uint32_t>(std::min(context_size, 256));
         context_params.n_ubatch = context_params.n_batch;
+        // Thermal budget, not raw throughput.
+        //
+        // Field report (Redmi Turbo 4 Pro / SM8735, 8 cores): the previous policy used
+        // hardware_concurrency-2 for decode and ALL 8 cores for prompt batches. On a 1+3+4
+        // big.LITTLE layout that saturates the little cores too, and they finish their share
+        // late, so every batch waits on the slowest core while the whole SoC heats. The device
+        // became hot enough to notice within one reply.
+        //
+        // Half the cores keeps work on the performance cluster, cuts sustained package power
+        // roughly in half, and on a 1.5B Q4_K_M model costs little real decode speed because
+        // decode is memory-bandwidth bound long before it is core bound.
         const unsigned int hardware_threads = std::max(2U, std::thread::hardware_concurrency());
-        context_params.n_threads = static_cast<int32_t>(std::clamp(hardware_threads > 2 ? hardware_threads - 2 : 2U, 2U, 8U));
-        context_params.n_threads_batch = static_cast<int32_t>(std::clamp(hardware_threads, 2U, 8U));
+        const int32_t worker_threads = static_cast<int32_t>(std::clamp(hardware_threads / 2U, 2U, 4U));
+        context_params.n_threads = worker_threads;
+        context_params.n_threads_batch = worker_threads;
         context_params.no_perf = false;
+
         llama_context* context = llama_init_from_model(model, context_params);
         if (context == nullptr) {
             llama_model_free(model);

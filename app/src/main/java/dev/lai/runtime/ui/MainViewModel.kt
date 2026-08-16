@@ -43,6 +43,7 @@ import dev.lai.runtime.scheduler.BackendCapability
 import dev.lai.runtime.scheduler.CapabilityEvidence
 import dev.lai.runtime.scheduler.InferenceWorkload
 import dev.lai.runtime.scheduler.RuntimeEnvironment
+import dev.lai.runtime.scheduler.ThermalState
 import dev.lai.runtime.settings.LlmSettings
 import dev.lai.runtime.settings.SettingsDocumentV1
 import dev.lai.runtime.shell.ShizukuState
@@ -50,6 +51,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -168,6 +170,7 @@ data class MainUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val container = (application as LaiApplication).container
     private var generationJob: Job? = null
+    private var cancelWatchdogJob: Job? = null
 
     /**
      * Typed-settings session + SAF workspace status (Phase 2A). All decisions live in the pure
@@ -414,6 +417,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 notice = null,
             )
         }
+        // Thermal admission. The scheduler already gates model LOAD on heat, but a long chat can
+        // heat the device after loading and nothing re-checked it. Field report: sustained
+        // generation made the phone hot with no warning anywhere in the UI.
+        val thermal = container.runtimeEnvironment.snapshot().thermalState
+        if (thermal >= ThermalState.SEVERE) {
+            _state.update {
+                it.copy(
+                    input = "",
+                    messages = it.messages +
+                        ChatMessage(true, prompt, contextEligible = false) +
+                        ChatMessage(
+                            fromUser = false,
+                            text = "ফোন গরম হয়ে গেছে, তাই উত্তর তৈরি বন্ধ রাখা হলো। কিছুক্ষণ ঠান্ডা হতে দিন।\n\n" +
+                                "Paused because the device is too hot. Let it cool for a moment and try again.",
+                            contextEligible = false,
+                        ),
+                    notice = "Generation paused to protect the device (thermal ${thermal.name})",
+                )
+            }
+            return
+        }
+
         // Consume any armed "Apply once" override here, so it spends itself on exactly one reply.
         val requestConfig = generationConfig(workspace.consumeForRequest())
         generationJob = viewModelScope.launch {
@@ -428,13 +453,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             } catch (cancelled: CancellationException) {
-                markLastAssistantContextIneligible()
-                _state.update {
-                    it.copy(
-                        operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
-                        notice = if (it.activeModelId != null) "Generation stopped locally" else it.notice,
-                    )
-                }
+                restoreAfterStoppedGeneration(
+                    if (state.value.activeModelId != null) "Generation stopped locally" else "Generation stopped",
+                )
             } catch (error: Exception) {
                 markGenerationFailed(error.message ?: "Generation failed")
             } finally {
@@ -446,7 +467,72 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelGeneration() {
         if (state.value.operation != RuntimeOperation.GENERATING) return
         _state.update { it.copy(operation = RuntimeOperation.CANCELLING, notice = "Stopping generation…") }
-        generationJob?.cancel(CancellationException("User stopped generation"))
+        val cancelled = generationJob
+        cancelled?.cancel(CancellationException("User stopped generation"))
+
+        // Field report (Redmi Turbo 4 Pro): Stop could stick on "Stopping…" forever.
+        //
+        // Job.cancel() only sets a flag. A coroutine blocked inside a non-suspending JNI call
+        // (llama_decode, or countTokens during prompt preparation) does not observe it until
+        // that call returns, so the catch block that restores the UI may never run. The user is
+        // then stranded with a dead button and no way back.
+        //
+        // The watchdog guarantees the UI recovers: it waits for the job to finish, and if the
+        // native side has not yielded within the grace period it hands the chat back to the user
+        // regardless. The engine is released so a wedged session cannot keep burning CPU.
+        cancelWatchdogJob?.cancel()
+        cancelWatchdogJob = viewModelScope.launch {
+            val exited = cancelled == null ||
+                withTimeoutOrNull(CANCEL_GRACE_MS) { cancelled.join() } != null
+            if (state.value.operation != RuntimeOperation.CANCELLING) return@launch
+            if (exited) {
+                restoreAfterStoppedGeneration("Generation stopped locally")
+            } else {
+                // The native call is still running. Releasing the session stops the CPU burn and
+                // the model must be loaded again, which is stated plainly rather than implied.
+                generationJob = null
+                container.inferenceEngine.close()
+                _state.update {
+                    it.copy(
+                        operation = RuntimeOperation.IDLE,
+                        activeModelId = null,
+                        notice = "Generation did not stop in time, so the model was released. " +
+                            "Load it again from Settings to continue.",
+                    )
+                }
+                markLastAssistantContextIneligible()
+                dropTrailingEmptyAssistantMessage()
+            }
+        }
+    }
+
+    /** Restores a usable chat state after a stopped generation, dropping the empty reply bubble. */
+    private fun restoreAfterStoppedGeneration(message: String) {
+        markLastAssistantContextIneligible()
+        dropTrailingEmptyAssistantMessage()
+        _state.update {
+            it.copy(
+                operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
+                notice = message,
+            )
+        }
+    }
+
+    /**
+     * Removes the placeholder assistant bubble when generation produced nothing.
+     *
+     * Without this a stopped or failed reply leaves an empty grey bubble on screen, which reads as
+     * a broken app rather than as "nothing was generated".
+     */
+    private fun dropTrailingEmptyAssistantMessage() {
+        _state.update {
+            val last = it.messages.lastOrNull()
+            if (last != null && !last.fromUser && last.text.isBlank()) {
+                it.copy(messages = it.messages.dropLast(1))
+            } else {
+                it
+            }
+        }
     }
 
     private fun completeGeneration(event: InferenceEvent.Completed) {
@@ -1171,6 +1257,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val MODEL_CONTEXT_TOKENS = 4096
+
+        /** How long Stop waits for a native call to yield before force-releasing the engine. */
+        private const val CANCEL_GRACE_MS = 4_000L
         private const val MAX_PERFORMANCE_SAMPLES = 20
         private const val MAX_TOOL_AUDIT_RECORDS = 50
         private val DIAGNOSTICS_JSON = Json(LaiJson) { prettyPrint = true }

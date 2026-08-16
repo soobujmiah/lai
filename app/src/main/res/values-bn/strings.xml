@@ -61,4 +61,5 @@
   <string name="workspace_scan">মডেল খুঁজুন</string>
   <string name="workspace_scanning">খোঁজা হচ্ছে…</string>
   <string name="workspace_counts">%1$d পর্যালোচিত · %2$d স্থানীয় অপর্যালোচিত · স্বয়ংক্রিয়ভাবে কিছুই লোড হয় না</string>
+  <string name="back">ফিরে যান</string>
 </resources>

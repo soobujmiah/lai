@@ -9,12 +9,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.text.KeyboardActions
@@ -24,8 +30,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -58,19 +68,46 @@ import java.util.Locale
 @Composable
 fun LaiApp(viewModel: MainViewModel) {
     val state by viewModel.state.collectAsState()
+    // Hardware/gesture back must leave Settings as well; otherwise back exits the whole app from
+    // a screen the user thinks of as "inside" something.
+    BackHandler(enabled = state.settingsVisible) { viewModel.toggleSettings() }
     Scaffold(
+        // The activity is edge-to-edge and resizes for the keyboard. Without an explicit contentWindowInsets
+        // the Scaffold keeps reserving the status-bar inset while the IME is up, which pushed the whole
+        // layout upward and made the top bar collide with the status bar (field report, Redmi Turbo 4 Pro).
+        contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
                 title = { Text("LAI", fontWeight = FontWeight.Bold) },
+                windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                navigationIcon = {
+                    // Settings is a full screen, not a mode. It needs an unambiguous way out:
+                    // reusing the same "Settings" button to leave was a guess the user had to make.
+                    if (state.settingsVisible) {
+                        IconButton(onClick = viewModel::toggleSettings) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    }
+                },
                 actions = {
                     // Contextual quick settings belong to Chat only; other modes have no LLM knobs.
                     if (state.mode == UiMode.CHAT && !state.settingsVisible) {
-                        TextButton(onClick = viewModel::showQuickSettings) {
-                            Text(stringResource(R.string.quick_settings_action))
+                        // Glyph rather than a vector: material-icons-extended would add ~9 MB of
+                        // unused vectors to keep the debug APK honest about its size.
+                        IconButton(onClick = viewModel::showQuickSettings) {
+                            Text(
+                                stringResource(R.string.quick_settings_action),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                         }
                     }
-                    TextButton(onClick = viewModel::toggleSettings) {
-                        Text(stringResource(R.string.settings))
+                    if (!state.settingsVisible) {
+                        TextButton(onClick = viewModel::toggleSettings) {
+                            Text(stringResource(R.string.settings))
+                        }
                     }
                 },
             )
@@ -213,7 +250,9 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
             items(state.messages) { message -> MessageBubble(message) }
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            // imePadding keeps the composer directly above the keyboard instead of letting the
+            // keyboard shove the whole screen up into the status bar.
+            modifier = Modifier.fillMaxWidth().imePadding().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
