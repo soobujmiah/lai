@@ -9,11 +9,9 @@ import kotlin.concurrent.thread
 
 /** Runs in Shizuku's shell/root UserService process, not the application process. */
 @Keep
-class PrivilegedUserService : IPrivilegedService.Stub() {
-    constructor()
-
+class PrivilegedUserService() : IPrivilegedService.Stub() {
     @Keep
-    constructor(@Suppress("UNUSED_PARAMETER") context: Context)
+    constructor(@Suppress("UNUSED_PARAMETER") context: Context) : this()
 
     override fun execute(argv: Array<out String>, timeoutMs: Long, outputLimit: Int): String {
         require(argv.isNotEmpty()) { "Empty command" }

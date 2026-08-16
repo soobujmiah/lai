@@ -114,7 +114,7 @@ class ModelRepository(
     private fun validate(spec: ModelSpec) {
         require(ID.matches(spec.id)) { "Model id must contain lowercase letters, numbers, dot, underscore, or dash" }
         require(spec.displayName.isNotBlank()) { "Display name is required" }
-        val url = okhttp3.HttpUrl.get(spec.url)
+        val url = spec.url.toHttpUrl()
         require(url.isHttps) { "Models must use HTTPS" }
         require(url.host == "huggingface.co" || url.host.endsWith(".huggingface.co")) {
             "Only Hugging Face model URLs are accepted"

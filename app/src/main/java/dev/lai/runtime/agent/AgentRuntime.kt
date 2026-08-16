@@ -99,7 +99,9 @@ class AgentRuntime(
             ToolResult(
                 callId = call.id,
                 success = true,
-                output = buildJsonObject { put("ocr", LaiJson.encodeToJsonElement(result)) },
+                output = buildJsonObject {
+                    put("ocr", LaiJson.encodeToJsonElement(dev.lai.runtime.ocr.OcrResult.serializer(), result))
+                },
             )
         } finally {
             bitmap.recycle()
