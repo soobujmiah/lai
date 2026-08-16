@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import dev.lai.runtime.R
 import dev.lai.runtime.agent.ToolRisk
 import dev.lai.runtime.shell.ShizukuState
+import dev.lai.runtime.workspace.WorkspaceGrantState
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,6 +63,12 @@ fun LaiApp(viewModel: MainViewModel) {
             TopAppBar(
                 title = { Text("LAI", fontWeight = FontWeight.Bold) },
                 actions = {
+                    // Contextual quick settings belong to Chat only; other modes have no LLM knobs.
+                    if (state.mode == UiMode.CHAT && !state.settingsVisible) {
+                        TextButton(onClick = viewModel::showQuickSettings) {
+                            Text(stringResource(R.string.quick_settings_action))
+                        }
+                    }
                     TextButton(onClick = viewModel::toggleSettings) {
                         Text(stringResource(R.string.settings))
                     }
@@ -103,6 +110,21 @@ fun LaiApp(viewModel: MainViewModel) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
             }
         }
+    }
+    if (state.workspace.quickSettingsVisible) {
+        QuickSettingsSheet(
+            current = state.workspace.effectiveLlm,
+            maxNewTokensCeiling = viewModel.maxNewTokensCeiling(),
+            statusLine = state.workspace.settingsStatus,
+            overrideArmed = state.workspace.overrideArmed,
+            saving = state.workspace.savingSettings,
+            onApplyOnce = viewModel::applyQuickSettings,
+            onSaveDefault = { llm ->
+                viewModel.saveDefaultSettings(state.workspace.session.saved.copy(llm = llm))
+            },
+            onReset = viewModel::resetSettings,
+            onDismiss = viewModel::hideQuickSettings,
+        )
     }
     state.pendingToolProposal?.let { proposal ->
         ToolConfirmationDialog(
@@ -427,6 +449,7 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                 }
             }
         }
+        item { WorkspaceCard(state, viewModel) }
         item { ModelSetup(state, viewModel) }
         item {
             Card {
@@ -447,6 +470,75 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
             }
         }
         state.notice?.let { notice -> item { StatusCard("Status", notice) } }
+    }
+}
+
+/**
+ * Workspace folder status and controls (Phase 2A item 7).
+ *
+ * The grant is taken with `ACTION_OPEN_DOCUMENT_TREE`, so the user picks exactly one folder and
+ * LAI never asks for broad storage access. Only coarse counts are shown here - never a file name,
+ * a path, or a digest.
+ */
+@Composable
+private fun WorkspaceCard(state: MainUiState, viewModel: MainViewModel) {
+    val workspacePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri -> uri?.let(viewModel::grantWorkspace) }
+    val workspace = state.workspace
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                stringResource(R.string.workspace_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                stringResource(R.string.workspace_summary),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                when (workspace.grantState) {
+                    WorkspaceGrantState.GRANTED -> stringResource(R.string.workspace_connected)
+                    WorkspaceGrantState.REVOKED -> stringResource(R.string.workspace_revoked)
+                    WorkspaceGrantState.NOT_GRANTED -> stringResource(R.string.workspace_not_connected)
+                },
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(workspace.settingsStatus, style = MaterialTheme.typography.labelSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (workspace.granted) {
+                    OutlinedButton(onClick = viewModel::revokeWorkspace, enabled = !state.busy) {
+                        Text(stringResource(R.string.workspace_disconnect))
+                    }
+                    Button(
+                        onClick = viewModel::scanWorkspaceModels,
+                        enabled = !state.busy && !workspace.discovering,
+                    ) {
+                        Text(
+                            if (workspace.discovering) stringResource(R.string.workspace_scanning)
+                            else stringResource(R.string.workspace_scan),
+                        )
+                    }
+                } else {
+                    Button(onClick = { workspacePicker.launch(null) }, enabled = !state.busy) {
+                        Text(stringResource(R.string.workspace_connect))
+                    }
+                }
+            }
+            if (workspace.granted) {
+                Text(
+                    stringResource(
+                        R.string.workspace_counts,
+                        workspace.reviewedModelCount,
+                        workspace.localUnreviewedModelCount,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                Text(workspace.discoveryStatus, style = MaterialTheme.typography.labelSmall)
+            }
+        }
     }
 }
 

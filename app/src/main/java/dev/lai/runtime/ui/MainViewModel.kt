@@ -43,6 +43,8 @@ import dev.lai.runtime.scheduler.BackendCapability
 import dev.lai.runtime.scheduler.CapabilityEvidence
 import dev.lai.runtime.scheduler.InferenceWorkload
 import dev.lai.runtime.scheduler.RuntimeEnvironment
+import dev.lai.runtime.settings.LlmSettings
+import dev.lai.runtime.settings.SettingsDocumentV1
 import dev.lai.runtime.shell.ShizukuState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -148,6 +150,7 @@ data class MainUiState(
     val toolAuditHistory: List<ToolAuditRecordV1> = emptyList(),
     val toolAuditStatus: String = "Persistent tool audit not loaded",
     val toolAuditIntegrityValid: Boolean = false,
+    val workspace: WorkspaceUiState = WorkspaceUiState(),
 ) {
     val busy: Boolean
         get() = operation in setOf(
@@ -165,6 +168,16 @@ data class MainUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val container = (application as LaiApplication).container
     private var generationJob: Job? = null
+
+    /**
+     * Typed-settings session + SAF workspace status (Phase 2A). All decisions live in the pure
+     * coordinator; the ViewModel only binds them to `MainUiState` and to Android authority calls.
+     */
+    private val workspace = WorkspaceSettingsCoordinator(
+        grant = container.workspaceRepository,
+        store = container.workspaceSettingsStore,
+        discovery = container.workspaceDiscovery,
+    )
     private val _state = MutableStateFlow(
         MainUiState(
             runtimeDetail = container.inferenceEngine.capabilities.detail,
@@ -198,9 +211,89 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        viewModelScope.launch {
+            workspace.state.collect { workspaceState ->
+                _state.update { it.copy(workspace = workspaceState) }
+            }
+        }
         loadToolAudit()
         refreshModels()
         loadCachedCatalog()
+        refreshWorkspace()
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Workspace grant + typed settings (Phase 2A items 6-7)
+    // ---------------------------------------------------------------------------------------
+
+    /** Re-reads the SAF grant state and reloads settings; never throws and never blocks start-up. */
+    fun refreshWorkspace() {
+        viewModelScope.launch { workspace.refresh() }
+    }
+
+    /** Call from the `ACTION_OPEN_DOCUMENT_TREE` result. Takes the persistable permission first. */
+    fun grantWorkspace(treeUri: Uri) {
+        viewModelScope.launch {
+            val granted = container.workspaceRepository.grant(treeUri)
+                .mapCatching { container.workspaceRepository.ensureLayout().getOrThrow() }
+            val status = workspace.refresh()
+            val notice = granted.fold(
+                onSuccess = { "Workspace folder connected • $status" },
+                onFailure = { error ->
+                    "Workspace folder was not connected: " +
+                        (error.message ?: "permission could not be kept")
+                },
+            )
+            _state.update { it.copy(notice = notice) }
+        }
+    }
+
+    /** Releases the persistable permission. Nothing inside the user's folder is deleted. */
+    fun revokeWorkspace() {
+        viewModelScope.launch {
+            container.workspaceRepository.revoke()
+            workspace.refresh()
+            _state.update {
+                it.copy(notice = "Workspace folder disconnected; built-in defaults are in use")
+            }
+        }
+    }
+
+    fun showQuickSettings() = workspace.setQuickSettingsVisible(true)
+    fun hideQuickSettings() = workspace.setQuickSettingsVisible(false)
+
+    /** Upper bound the quick sheet must respect for max new tokens on the loaded runtime. */
+    fun maxNewTokensCeiling(): Int = workspace.maxNewTokensCeiling(container.inferenceEngine.contextSize)
+
+    /** "Apply once": affects the next reply only and never mutates saved defaults. */
+    fun applyQuickSettings(llm: LlmSettings) {
+        val message = workspace.applyOnce(llm)
+        _state.update { it.copy(notice = message) }
+    }
+
+    /** "Save default": validated, then persisted through the exact-schema store. */
+    fun saveDefaultSettings(document: SettingsDocumentV1) {
+        viewModelScope.launch {
+            val message = workspace.saveDefaults(document)
+            _state.update { it.copy(notice = message) }
+        }
+    }
+
+    /** "Reset": returns to embedded defaults, persisting them when a workspace is connected. */
+    fun resetSettings() {
+        viewModelScope.launch {
+            val message = workspace.resetDefaults()
+            _state.update { it.copy(notice = message) }
+        }
+    }
+
+    /** Registers workspace model metadata only; never copies weights and never auto-loads. */
+    fun scanWorkspaceModels() {
+        viewModelScope.launch {
+            val reviewed = state.value.supportedModels.associate { it.sha256.lowercase() to it.id }
+            val message = workspace.discoverModels(reviewed)
+            _state.update { it.copy(notice = message) }
+        }
     }
 
     fun setMode(mode: UiMode) = _state.update { it.copy(mode = mode, settingsVisible = false, notice = null) }
@@ -321,11 +414,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 notice = null,
             )
         }
+        // Consume any armed "Apply once" override here, so it spends itself on exactly one reply.
+        val requestConfig = generationConfig(workspace.consumeForRequest())
         generationJob = viewModelScope.launch {
             try {
-                val prepared = prepareConversation(GENERATION_CONFIG)
+                val prepared = prepareConversation(requestConfig)
                 _state.update { it.copy(trimmedConversationTurns = prepared.trimmedTurns) }
-                container.inferenceEngine.generate(prepared.messages, GENERATION_CONFIG).collect { event ->
+                container.inferenceEngine.generate(prepared.messages, requestConfig).collect { event ->
                     when (event) {
                         is InferenceEvent.Token -> appendAssistantToken(event.text)
                         is InferenceEvent.Completed -> completeGeneration(event)
@@ -530,6 +625,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearConversation() {
         if (state.value.busy || state.value.pendingToolProposal != null) return
+        // An unspent "Apply once" override belongs to the conversation the user just discarded.
+        workspace.discardOverride()
         _state.update {
             it.copy(
                 messages = it.messages.take(1),
@@ -570,6 +667,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             trimmed += 1
         }
+    }
+
+    /** Maps typed [LlmSettings] onto the runtime's [GenerationConfig], clamped to the live context. */
+    private fun generationConfig(llm: LlmSettings): GenerationConfig {
+        val ceiling = workspace.maxNewTokensCeiling(container.inferenceEngine.contextSize)
+        return GenerationConfig(
+            maxNewTokens = llm.maxNewTokens.coerceIn(1, ceiling),
+            temperature = llm.temperature,
+            topP = llm.topP,
+            seed = llm.seed,
+        )
     }
 
     private fun replaceLastToolTurn(messages: List<ChatMessage>, replacement: String): List<ChatMessage> {
@@ -1065,7 +1173,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val MODEL_CONTEXT_TOKENS = 4096
         private const val MAX_PERFORMANCE_SAMPLES = 20
         private const val MAX_TOOL_AUDIT_RECORDS = 50
-        private val GENERATION_CONFIG = GenerationConfig(maxNewTokens = 256)
         private val DIAGNOSTICS_JSON = Json(LaiJson) { prettyPrint = true }
     }
 }
