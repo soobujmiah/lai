@@ -45,7 +45,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import dev.lai.runtime.BuildConfig
 import dev.lai.runtime.R
 import dev.lai.runtime.shell.ShizukuState
 
@@ -250,12 +249,8 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
         }
         item {
             StatusCard(
-                title = if (BuildConfig.AIR_GAPPED) "Air-gapped edition" else "Connected local-first edition",
-                detail = if (BuildConfig.AIR_GAPPED) {
-                    "This APK has no Android network permission. Models can enter only through the system file picker."
-                } else {
-                    "Network permission is isolated to explicit, digest-pinned model downloads. User content is never transmitted."
-                },
+                title = "Local-first privacy",
+                detail = "Internet is used only for the signed model catalog and explicit downloads. Prompts, screens, generations and telemetry stay on this device.",
             )
         }
         item {
@@ -288,8 +283,8 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                     } ?: ""),
                 )
             }
-            item { ModelSetup(state, viewModel) }
         }
+        item { ModelSetup(state, viewModel) }
         state.notice?.let { notice -> item { StatusCard("Status", notice) } }
     }
 }
@@ -303,39 +298,55 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.model_setup), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                if (BuildConfig.AIR_GAPPED) {
-                    "Air-gapped edition: Android grants no network permission. Select the reviewed GGUF file; verification is fully local."
-                } else {
-                    "Connected edition: model downloads are explicit and digest-pinned. No prompts or generated content are transmitted."
-                },
+                "Browse the signed supported-model list, download explicitly, then use everything offline. Local file import is also available.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            val recommended = state.recommendedModel
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Recommended baseline", style = MaterialTheme.typography.labelLarge)
-                    Text(recommended.displayName, fontWeight = FontWeight.Bold)
-                    Text(recommended.description, style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        "${recommended.bytes / 1_048_576} MB • ${recommended.quantization} • ${recommended.license}",
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    val isInstalled = state.installedModels.any { it.id == recommended.id }
-                    if (isInstalled) {
-                        Button(onClick = {}, enabled = false) { Text("Installed") }
-                    } else if (BuildConfig.AIR_GAPPED) {
-                        Button(onClick = { modelPicker.launch(arrayOf("*/*")) }, enabled = !state.busy) {
-                            Text("Import reviewed GGUF")
-                        }
-                    } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = viewModel::installRecommendedModel, enabled = !state.busy) {
-                                Text("Download securely")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Supported models", fontWeight = FontWeight.Bold)
+                    Text(state.catalogStatus, style = MaterialTheme.typography.labelSmall)
+                }
+                OutlinedButton(
+                    onClick = viewModel::refreshSupportedModels,
+                    enabled = !state.catalogRefreshing && !state.busy,
+                ) { Text(if (state.catalogRefreshing) "Checking…" else "Refresh") }
+            }
+            state.supportedModels.forEach { supported ->
+                val isRecommended = supported.id == state.recommendedModel.id
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isRecommended) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (isRecommended) Text("Recommended baseline", style = MaterialTheme.typography.labelLarge)
+                        Text(supported.displayName, fontWeight = FontWeight.Bold)
+                        Text(supported.description, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "${supported.bytes / 1_048_576} MB • ${supported.quantization} • ${supported.license}",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        val isInstalled = state.installedModels.any { it.id == supported.id }
+                        if (isInstalled) {
+                            Button(onClick = {}, enabled = false) { Text("Installed") }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { viewModel.installSupportedModel(supported.id) },
+                                    enabled = !state.busy,
+                                ) { Text("Download") }
+                                if (isRecommended) {
+                                    OutlinedButton(
+                                        onClick = { modelPicker.launch(arrayOf("*/*")) },
+                                        enabled = !state.busy,
+                                    ) { Text("Import file") }
+                                }
                             }
-                            OutlinedButton(
-                                onClick = { modelPicker.launch(arrayOf("*/*")) },
-                                enabled = !state.busy,
-                            ) { Text("Import file") }
                         }
                     }
                 }
@@ -368,41 +379,40 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
                 }
                 HorizontalDivider()
             }
-            if (!BuildConfig.AIR_GAPPED) {
+            if (state.developerMode) {
+                Text("Advanced manual model", fontWeight = FontWeight.SemiBold)
                 OutlinedTextField(
-                value = state.modelName,
-                onValueChange = viewModel::setModelName,
-                label = { Text(stringResource(R.string.model_name)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            OutlinedTextField(
-                value = state.modelUrl,
-                onValueChange = viewModel::setModelUrl,
-                label = { Text(stringResource(R.string.model_url)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-            )
-            OutlinedTextField(
-                value = state.modelSha,
-                onValueChange = viewModel::setModelSha,
-                label = { Text(stringResource(R.string.model_sha)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                    value = state.modelName,
+                    onValueChange = viewModel::setModelName,
+                    label = { Text(stringResource(R.string.model_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
                 )
+                OutlinedTextField(
+                    value = state.modelUrl,
+                    onValueChange = viewModel::setModelUrl,
+                    label = { Text(stringResource(R.string.model_url)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                )
+                OutlinedTextField(
+                    value = state.modelSha,
+                    onValueChange = viewModel::setModelSha,
+                    label = { Text(stringResource(R.string.model_sha)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                Button(
+                    onClick = viewModel::downloadModel,
+                    enabled = !state.busy && state.modelName.isNotBlank() && state.modelUrl.isNotBlank() &&
+                        state.modelSha.matches(Regex("^[a-fA-F0-9]{64}$")),
+                ) { Text(stringResource(R.string.download)) }
             }
             state.downloadProgress?.let { progress ->
                 progress.fraction?.let { fraction ->
                     LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
                 } ?: LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 Text("${progress.downloadedBytes / 1_048_576} MB", style = MaterialTheme.typography.labelSmall)
-            }
-            if (!BuildConfig.AIR_GAPPED) {
-                Button(
-                    onClick = viewModel::downloadModel,
-                    enabled = !state.busy && state.modelName.isNotBlank() && state.modelUrl.isNotBlank() &&
-                        state.modelSha.matches(Regex("^[a-fA-F0-9]{64}$")),
-                ) { Text(stringResource(R.string.download)) }
             }
         }
     }

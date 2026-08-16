@@ -37,6 +37,10 @@ Compilation and lint run in GitHub Actions.
 10. Include physical-device evidence for hardware/performance claims.
 11. Never log prompts, entered text, screen trees, captures, tokens, or secrets by default.
 
+## Supported-model catalog changes
+
+Catalog changes must update the immutable fallback, increment `revision`, preserve exact artifact size/SHA/license/source metadata, and pass `scripts/validate_model_catalog.py`. Never add a model because it merely claims multilingual support; Bangla/device validation remains false until recorded physical evidence exists. GitHub Actions signs and publishes accepted bytes—contributors never commit or receive the private key.
+
 ## Commit style
 
 Use focused conventional commits, for example:

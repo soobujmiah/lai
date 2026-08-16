@@ -1,6 +1,6 @@
 # ADR 0003: Connected and air-gapped editions
 
-- Status: Accepted
+- Status: Superseded by [ADR 0004](0004-single-local-first-app.md)
 - Date: 2026-08-16
 
 ## Context

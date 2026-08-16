@@ -22,9 +22,9 @@ Battery level / plugged:
 Ambient temperature:
 ```
 
-## Connectivity-edition gate
+## Online-acquisition / offline-operation gate
 
-Install both artifacts side by side. Android App Info for `dev.lai.runtime.airgap` must show no network-related permissions. In the air-gapped edition, the reviewed model action must open the system file picker; airplane mode must not change local import/load/generation behavior. In the connected edition, the same reviewed model may be explicitly downloaded. Never infer the permission result from UI text—record App Info or `dumpsys package` evidence.
+Open Model Setup and explicitly refresh the supported list; record that the status changes to a signed web catalog. Disable connectivity, restart LAI and verify the cached list remains. Download or import a reviewed model, then keep airplane mode enabled while loading, generating, cancelling, using OCR and running automation. Capture traffic separately to confirm only catalog/model acquisition endpoints are contacted and no user content is sent.
 
 ## Phase 1 smoke test
 

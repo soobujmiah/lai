@@ -12,8 +12,9 @@ These are release-blocking product invariants, not preferences.
 8. Local telemetry is export-only; no automatic transmission path may exist.
 9. Plugins are `LOCAL_ONLY`; a future plugin loader must reject any manifest requesting network authority.
 10. Accessibility, Shizuku and native runtime authority stay in separate auditable modules.
-11. The air-gapped APK has neither `INTERNET` nor `ACCESS_NETWORK_STATE`; CI inspects the final merged APK.
-12. Local file imports store no provider URI and activate only exact reviewed digest/size/GGUF bytes.
+11. Web catalog bytes are accepted only after ECDSA signature verification with the embedded public key.
+12. A verified cache and embedded fallback preserve the supported list offline.
+13. Local file imports store no provider URI and activate only exact reviewed digest/size/GGUF bytes.
 
 ## Mechanical enforcement
 

@@ -31,20 +31,6 @@ android {
         buildConfigField("boolean", "PRODUCTION_SIGNED", hasReleaseSigning.toString())
     }
 
-    flavorDimensions += "connectivity"
-    productFlavors {
-        create("connected") {
-            dimension = "connectivity"
-            buildConfigField("boolean", "AIR_GAPPED", "false")
-        }
-        create("airgap") {
-            dimension = "connectivity"
-            applicationIdSuffix = ".airgap"
-            versionNameSuffix = "-airgap"
-            buildConfigField("boolean", "AIR_GAPPED", "true")
-        }
-    }
-
     signingConfigs {
         if (hasReleaseSigning) {
             create("release") {

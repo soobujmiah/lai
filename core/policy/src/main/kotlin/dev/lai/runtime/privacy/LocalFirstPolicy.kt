@@ -22,10 +22,11 @@ sealed interface NetworkDecision {
 
 /**
  * Product-wide network policy. LAI never authorizes user-derived outbound data.
- * The only current network path is an explicitly requested, digest-pinned model download.
+ * Network use is limited to a signed public catalog and explicitly requested, digest-pinned model downloads.
  */
 class LocalFirstPolicy(
-    private val reviewedHostSuffixes: Set<String> = setOf("huggingface.co", "hf.co"),
+    private val modelHostSuffixes: Set<String> = setOf("huggingface.co", "hf.co"),
+    private val catalogHostSuffixes: Set<String> = setOf("github.com", "githubusercontent.com"),
 ) {
     fun review(request: NetworkRequest): NetworkDecision {
         if (request.direction == DataFlowDirection.OUTBOUND) {
@@ -44,8 +45,19 @@ class LocalFirstPolicy(
         }
         val host = uri.host?.lowercase()?.trimEnd('.')
             ?: return NetworkDecision.Deny("INVALID_HOST", "URL has no valid host")
-        if (reviewedHostSuffixes.none { host == it || host.endsWith(".$it") }) {
-            return NetworkDecision.Deny("HOST_NOT_REVIEWED", "Host is outside the reviewed artifact allowlist")
+        val requiredDataClass = when (request.purpose) {
+            NetworkPurpose.MODEL_ARTIFACT -> DataClass.PUBLIC_ARTIFACT
+            NetworkPurpose.REVIEWED_CATALOG -> DataClass.PUBLIC_CATALOG
+        }
+        if (request.dataClass != requiredDataClass) {
+            return NetworkDecision.Deny("PURPOSE_DATA_MISMATCH", "Network purpose and public data class do not match")
+        }
+        val reviewedHosts = when (request.purpose) {
+            NetworkPurpose.MODEL_ARTIFACT -> modelHostSuffixes
+            NetworkPurpose.REVIEWED_CATALOG -> catalogHostSuffixes
+        }
+        if (reviewedHosts.none { host == it || host.endsWith(".$it") }) {
+            return NetworkDecision.Deny("HOST_NOT_REVIEWED", "Host is outside the purpose-specific allowlist")
         }
         if (request.purpose == NetworkPurpose.MODEL_ARTIFACT &&
             request.expectedSha256?.matches(SHA256) != true

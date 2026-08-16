@@ -36,6 +36,34 @@ class LocalFirstPolicyTest {
     }
 
     @Test
+    fun `explicit public signed catalog host is allowed by transport policy`() {
+        val decision = policy.review(
+            NetworkRequest(
+                DataFlowDirection.INBOUND,
+                NetworkPurpose.REVIEWED_CATALOG,
+                DataClass.PUBLIC_CATALOG,
+                "https://github.com/soobujmiah/lai/releases/download/catalog-v1/models-v1.json",
+                explicitUserAction = true,
+            ),
+        )
+        assertTrue(decision is NetworkDecision.Allow)
+    }
+
+    @Test
+    fun `catalog cannot be fetched from a model host`() {
+        val decision = policy.review(
+            NetworkRequest(
+                DataFlowDirection.INBOUND,
+                NetworkPurpose.REVIEWED_CATALOG,
+                DataClass.PUBLIC_CATALOG,
+                "https://huggingface.co/catalog.json",
+                explicitUserAction = true,
+            ),
+        )
+        assertTrue(decision is NetworkDecision.Deny)
+    }
+
+    @Test
     fun `model without digest is denied`() {
         val decision = policy.review(
             NetworkRequest(

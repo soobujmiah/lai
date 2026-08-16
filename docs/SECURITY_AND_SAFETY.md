@@ -44,9 +44,10 @@ Shizuku may run as UID 2000 (ADB shell) or UID 0 (root/Sui). The app surfaces UI
 ## Data handling
 
 - outbound user-derived data is denied by `LocalFirstPolicy`;
-- only `platform:download` owns network transport and the connected edition's `INTERNET` permission;
-- the air-gapped edition removes all network permissions from the final merged APK and imports through Android's file picker;
-- downloads require explicit user action, HTTPS, reviewed hosts and mandatory SHA-256;
+- only `platform:download` owns network transport and Android network permission;
+- supported-model catalog updates require an explicit refresh and valid ECDSA signature;
+- downloads require explicit user action, HTTPS, reviewed hosts, mandatory SHA-256 and expected size;
+- after model/component installation, inference and automation require no network;
 - app-private model storage;
 - screenshots in memory and recycled after OCR;
 - no analytics or remote inference dependency;

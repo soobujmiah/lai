@@ -104,17 +104,16 @@ jobs:
 
       - name: Unit tests and lint
         run: >-
-          gradle --no-daemon --stacktrace coverageCheck
-          :app:testConnectedDebugUnitTest :app:lintConnectedDebug :app:lintAirgapDebug
+          gradle --no-daemon --stacktrace coverageCheck :app:testDebugUnitTest :app:lintDebug
           -Plai.enableLlamaCpp=ON
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
 
       - name: Build debug APK and native arm64 library
         if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
         run: >-
-          gradle --no-daemon --stacktrace :app:assembleConnectedDebug :app:assembleAirgapDebug
+          gradle --no-daemon --stacktrace :app:assembleDebug
           -Plai.versionCode=${{ github.run_number }}
-          -Plai.versionName=0.5.${{ github.run_number }}
+          -Plai.versionName=0.6.${{ github.run_number }}
           -Plai.enableLlamaCpp=ON
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
 
@@ -124,19 +123,11 @@ jobs:
         run: |
           VERSION_NAME="${GITHUB_REF_NAME#v}"
           if [[ "$VERSION_NAME" == "$GITHUB_REF_NAME" ]]; then VERSION_NAME="0.1.${GITHUB_RUN_NUMBER}"; fi
-          gradle --no-daemon --stacktrace :app:assembleConnectedRelease :app:assembleAirgapRelease \
+          gradle --no-daemon --stacktrace :app:assembleRelease \
             -Plai.versionCode="${GITHUB_RUN_NUMBER}" \
             -Plai.versionName="$VERSION_NAME" \
             -Plai.enableLlamaCpp=ON \
             -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
-
-      - name: Verify debug APK privacy boundary
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
-        run: bash scripts/ci/verify_apk_privacy.sh debug
-
-      - name: Verify release APK privacy boundary
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
-        run: bash scripts/ci/verify_apk_privacy.sh release
 
       - name: Inventory native and APK artifacts
         if: always()
@@ -149,7 +140,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lai-debug-${{ github.run_number }}
-          path: app/build/outputs/apk/*/debug/*.apk
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -158,7 +149,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lai-release-${{ github.run_number }}
-          path: app/build/outputs/apk/*/release/*.apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -167,7 +158,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lint-${{ github.run_number }}
-          path: app/build/reports/lint-results-*.html
+          path: app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
           retention-days: 7
 
@@ -179,7 +170,7 @@ jobs:
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
             gh release create "$GITHUB_REF_NAME" --title "LAI $GITHUB_REF_NAME" --generate-notes
-          gh release upload "$GITHUB_REF_NAME" app/build/outputs/apk/*/release/*.apk --clobber
+          gh release upload "$GITHUB_REF_NAME" app/build/outputs/apk/release/*.apk --clobber
         # The job receives write permission below only for tags.
     permissions:
       contents: write

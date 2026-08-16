@@ -1,0 +1,58 @@
+name: Publish signed model catalog
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'catalog/models-v1.json'
+      - 'catalog/catalog-public-key.pem'
+      - 'scripts/validate_model_catalog.py'
+      - '.github/workflows/catalog_publish.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sign-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate catalog schema and trust metadata
+        run: python3 scripts/validate_model_catalog.py
+
+      - name: Sign exact catalog bytes
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.MODEL_CATALOG_SIGNING_KEY }}
+        run: |
+          if [[ -z "$SIGNING_KEY" ]]; then
+            echo "MODEL_CATALOG_SIGNING_KEY is not configured" >&2
+            exit 1
+          fi
+          KEY_FILE="$RUNNER_TEMP/catalog-signing-key.pem"
+          printf '%s' "$SIGNING_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          openssl pkey -in "$KEY_FILE" -pubout -out "$RUNNER_TEMP/derived-public.pem"
+          cmp "$RUNNER_TEMP/derived-public.pem" catalog/catalog-public-key.pem
+          openssl dgst -sha256 -sign "$KEY_FILE" -out "$RUNNER_TEMP/models-v1.sig.bin" catalog/models-v1.json
+          base64 -w0 "$RUNNER_TEMP/models-v1.sig.bin" > "$RUNNER_TEMP/models-v1.sig"
+          printf '\n' >> "$RUNNER_TEMP/models-v1.sig"
+          openssl dgst -sha256 -verify catalog/catalog-public-key.pem \
+            -signature "$RUNNER_TEMP/models-v1.sig.bin" catalog/models-v1.json
+          rm -f "$KEY_FILE"
+
+      - name: Publish stable catalog assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release view catalog-v1 >/dev/null 2>&1 || \
+            gh release create catalog-v1 --title "LAI signed model catalog v1" \
+              --notes "Machine-consumed signed catalog assets. Use an application release for APK downloads."
+          gh release upload catalog-v1 \
+            catalog/models-v1.json \
+            "$RUNNER_TEMP/models-v1.sig" \
+            --clobber

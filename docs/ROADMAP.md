@@ -23,9 +23,9 @@
 - [x] evidence/thermal/battery/memory scheduler contract
 - [x] versioned local-only plugin API
 - [x] NpuHub comparison and ADR
-- [x] connected and OS-enforced air-gapped product flavors
+- [x] one local-first application and upgrade path
 - [x] reviewed local GGUF import through Android file picker
-- [x] final APK permission inspection in CI
+- [x] signed web supported-model catalog with verified offline fallback
 
 ## Phase 2 — usable local intelligence
 

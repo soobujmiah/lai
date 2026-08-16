@@ -1,5 +1,6 @@
 package dev.lai.runtime.model
 
+import dev.lai.runtime.core.LaiJson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -18,5 +19,11 @@ class ReviewedModelCatalogTest {
         assertEquals(model.bytes, model.toModelSpec().expectedBytes)
         assertEquals(model.sha256, model.toImportSpec().sha256)
         assertEquals(model.bytes, model.toImportSpec().expectedBytes)
+        val encoded = LaiJson.encodeToString(
+            ReviewedModelCatalogDocument.serializer(),
+            ReviewedModelCatalog.embeddedDocument,
+        )
+        val decoded = LaiJson.decodeFromString(ReviewedModelCatalogDocument.serializer(), encoded)
+        assertEquals(ReviewedModelCatalog.embeddedDocument, decoded)
     }
 }

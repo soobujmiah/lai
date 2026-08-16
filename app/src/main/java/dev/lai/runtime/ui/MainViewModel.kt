@@ -14,6 +14,7 @@ import dev.lai.runtime.inference.InferenceBackend
 import dev.lai.runtime.inference.InferenceEvent
 import dev.lai.runtime.inference.InstalledModel
 import dev.lai.runtime.inference.ModelSpec
+import dev.lai.runtime.model.CatalogSource
 import dev.lai.runtime.model.ReviewedModel
 import dev.lai.runtime.model.ReviewedModelCatalog
 import dev.lai.runtime.scheduler.BackendCapability
@@ -60,7 +61,10 @@ data class MainUiState(
     val developerMode: Boolean = false,
     val settingsVisible: Boolean = false,
     val installedModels: List<InstalledModel> = emptyList(),
+    val supportedModels: List<ReviewedModel> = ReviewedModelCatalog.all,
     val recommendedModel: ReviewedModel = ReviewedModelCatalog.recommendedCpuBaseline,
+    val catalogStatus: String = "Embedded supported-model list available offline",
+    val catalogRefreshing: Boolean = false,
     val activeModelId: String? = null,
     val modelName: String = "",
     val modelUrl: String = "",
@@ -92,6 +96,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         refreshModels()
+        loadCachedCatalog()
     }
 
     fun setMode(mode: UiMode) = _state.update { it.copy(mode = mode, settingsVisible = false, notice = null) }
@@ -102,6 +107,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setModelUrl(value: String) = _state.update { it.copy(modelUrl = value) }
     fun setModelSha(value: String) = _state.update { it.copy(modelSha = value) }
     fun dismissNotice() = _state.update { it.copy(notice = null) }
+
+    fun refreshSupportedModels() {
+        if (state.value.catalogRefreshing) return
+        _state.update { it.copy(catalogRefreshing = true, catalogStatus = "Checking signed catalog…") }
+        viewModelScope.launch {
+            container.modelCatalogRepository.refresh()
+                .onSuccess { snapshot ->
+                    applyCatalog(snapshot.document.models, snapshot.source)
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            catalogRefreshing = false,
+                            catalogStatus = "Web catalog unavailable; verified offline list retained",
+                            notice = error.message ?: "Catalog refresh failed",
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun loadCachedCatalog() {
+        viewModelScope.launch {
+            val snapshot = container.modelCatalogRepository.cachedOrEmbedded()
+            applyCatalog(snapshot.document.models, snapshot.source)
+        }
+    }
+
+    private fun applyCatalog(models: List<ReviewedModel>, source: CatalogSource) {
+        val safeModels = models.ifEmpty { ReviewedModelCatalog.all }
+        val sourceLabel = when (source) {
+            CatalogSource.EMBEDDED -> "Embedded supported-model list available offline"
+            CatalogSource.VERIFIED_CACHE -> "Verified cached model list available offline"
+            CatalogSource.SIGNED_WEB -> "Signed web model list verified and cached"
+        }
+        _state.update {
+            it.copy(
+                supportedModels = safeModels,
+                recommendedModel = safeModels.firstOrNull() ?: ReviewedModelCatalog.recommendedCpuBaseline,
+                catalogStatus = sourceLabel,
+                catalogRefreshing = false,
+            )
+        }
+    }
 
     fun sendMessage() {
         val prompt = state.value.input.trim()
@@ -268,12 +317,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(activeModelId = null, notice = "Model unloaded") }
     }
 
-    fun installRecommendedModel() {
-        if (state.value.installedModels.any { it.id == state.value.recommendedModel.id }) {
-            _state.update { it.copy(notice = "Recommended model is already installed") }
+    fun installRecommendedModel() = installSupportedModel(state.value.recommendedModel.id)
+
+    fun installSupportedModel(modelId: String) {
+        val model = state.value.supportedModels.firstOrNull { it.id == modelId }
+            ?: run {
+                _state.update { it.copy(notice = "Supported model is no longer in the verified catalog") }
+                return
+            }
+        if (state.value.installedModels.any { it.id == model.id }) {
+            _state.update { it.copy(notice = "${model.displayName} is already installed") }
             return
         }
-        startModelDownload(state.value.recommendedModel.toModelSpec())
+        startModelDownload(model.toModelSpec())
     }
 
     fun importRecommendedModel(uri: Uri) {

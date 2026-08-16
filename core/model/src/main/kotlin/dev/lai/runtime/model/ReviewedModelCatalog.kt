@@ -2,9 +2,12 @@ package dev.lai.runtime.model
 
 import dev.lai.runtime.inference.ModelImportSpec
 import dev.lai.runtime.inference.ModelSpec
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class ArtifactReviewState { METADATA_VERIFIED, BUILD_COMPATIBLE, DEVICE_VALIDATED }
 
+@Serializable
 data class ReviewedModel(
     val id: String,
     val displayName: String,
@@ -36,7 +39,15 @@ data class ReviewedModel(
     )
 }
 
-/** Immutable catalog shipped with the APK; there is no remote catalog or silent update path. */
+@Serializable
+data class ReviewedModelCatalogDocument(
+    val schemaVersion: Int,
+    val revision: Int,
+    val generatedAt: String,
+    val models: List<ReviewedModel>,
+)
+
+/** Immutable fallback catalog shipped with the APK and used whenever the signed web catalog is unavailable. */
 object ReviewedModelCatalog {
     val recommendedCpuBaseline = ReviewedModel(
         id = "qwen2.5-1.5b-instruct-q4-k-m",
@@ -56,6 +67,12 @@ object ReviewedModelCatalog {
     )
 
     val all: List<ReviewedModel> = listOf(recommendedCpuBaseline)
+    val embeddedDocument = ReviewedModelCatalogDocument(
+        schemaVersion = 1,
+        revision = 1,
+        generatedAt = "2026-08-16T00:00:00Z",
+        models = all,
+    )
 
     init {
         require(all.map { it.id }.distinct().size == all.size) { "Reviewed model IDs must be unique" }
