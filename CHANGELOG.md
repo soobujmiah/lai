@@ -47,4 +47,5 @@ All notable changes are documented here. The project follows semantic versioning
 - GitHub Actions run 31919286438 passed immutable llama.cpp acquisition, Kotlin tests/lint, full arm64 llama.cpp/ggml/JNI compilation, APK assembly, and artifact upload.
 - GitHub Actions run 31921021303 passed architecture/privacy boundaries, coverage ratchets, all eleven modules, lint, native llama.cpp linkage, APK assembly, and artifact upload.
 - GitHub Actions run 31936642189 passed the thirteen-module catalog/device/scheduler graph, memory and routing tests, lint, native llama.cpp, APK assembly, and artifact upload.
-- GitHub Actions run 31937804443 built both debug editions and proved with final APK inspection that the air-gapped artifact has no network permissions.
+- GitHub Actions run 31937804443 verified the superseded dual-edition experiment before product unification.
+- GitHub Actions runs 31939187858 and 31939187860 published/verified the signed catalog and built the unified local-first app.

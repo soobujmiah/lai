@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `1926443`, [GitHub Actions run 31937804443](https://github.com/soobujmiah/lai/actions/runs/31937804443). Boundaries, coverage, both flavor lints, thirteen modules, local import, scheduler/catalog, native llama.cpp and two debug APKs passed. Final `apkanalyzer` inspection proved the air-gapped APK has no network permissions and a separate application ID. The two-APK artifact archive is approximately 27.54 MB.
+Latest verified remote build: commit `249e4da`, [Android run 31939187860](https://github.com/soobujmiah/lai/actions/runs/31939187860) and [catalog run 31939187858](https://github.com/soobujmiah/lai/actions/runs/31939187858). The unified thirteen-module app, boundaries, coverage, lint, native llama.cpp, signed catalog verifier/cache/UI and APK passed. The catalog's published exact bytes and detached ECDSA signature also passed independent OpenSSL verification. The APK artifact archive is approximately 13.79 MB.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
@@ -11,7 +11,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
 | Layered module backbone | Ready | eleven-module Gradle/manifest graph compiled and packaged remotely |
 | Zero-egress architecture policy | Ready | only download module owns transport; outbound user data denied; boundary check passes |
-| Signed web model catalog | Candidate | ECDSA key/secret, schema validator, publish workflow, verified cache/fallback and supported-list UI added; CI/web test pending |
+| Signed web model catalog | Build verified | encrypted ECDSA signer, stable `catalog-v1` assets, in-app verification/cache/fallback and supported-list UI passed; device refresh pending |
 | Evidence-aware scheduler | Build verified | model loads route through evidence, memory, battery and thermal preflight; physical load validation pending |
 | Reviewed model catalog | Build verified | immutable official Qwen metadata, mandatory digest/size and one-tap UX compiled; device download pending |
 | Android environment provider | Build verified | memory, battery, charging and thermal snapshot compiled and scheduler-integrated; device reading pending |
