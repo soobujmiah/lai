@@ -2,8 +2,8 @@
 
 | Module | Owns | May depend on |
 |---|---|---|
-| `core:contracts` | serializable tool, automation, inference, model, OCR and shell contracts; opaque backend IDs/descriptors | Kotlin/coroutines/serialization only |
-| `core:policy` | agent consent, strict built-in tool schemas/parser, local-first data-flow policy, shell argv allowlist | contracts |
+| `core:contracts` | serializable tool, automation, inference, model, OCR, settings and shell contracts; opaque backend IDs/descriptors | Kotlin/coroutines/serialization only |
+| `core:policy` | agent consent, strict built-in tool schemas/parser, local-first data-flow policy, shell argv allowlist, typed settings validation/migration | contracts |
 | `core:scheduler` | vendor-neutral device profile, compatibility evidence, thermal/battery/memory routing | contracts |
 | `core:model` | immutable reviewed artifact catalog and trust metadata | contracts |
 | `plugins:api` | versioned local-only plugin manifest and constrained context | contracts, policy |

@@ -4,6 +4,18 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Phase 2A typed settings foundation candidate
+
+- Added `SettingsDocumentV1` to `core:contracts`: versioned, typed, non-secret product settings for LLM, image generation, voice, and search, each with bounded numeric/boolean ranges and embedded defaults.
+- Added `SettingsPolicy` to `core:policy`: pure validation, default-merging, sanitization and a deterministic v1 migration seam.
+- Preserved the reviewed Qwen 2.5 1.5B product defaults (temperature `0.7`, top-P `0.9`, maximum new tokens `256`, random-seed sentinel) and a context window default of `4096`.
+- Validation treats unknown fields as forward-compatible warnings (never silent, never fatal); range, finite-number, and type violations are errors.
+- Enforced the context-dependent max-token limit (`maxNewTokens` cannot exceed `maxContextTokens`) in addition to absolute ranges.
+- Hardened load behavior: an unsupported or future schema version, malformed JSON, wrong types, or out-of-range values fall back to safe embedded defaults rather than crashing or persisting an unsafe document.
+- Privacy invariant preserved by construction: the settings schema has no free-text field, so a document can never absorb a prompt, conversation, document, model output, selector, package name, or credential.
+- Added pure-JVM coverage in `core:contracts` and `core:policy` (round trip, defaults, every range boundary, NaN/infinity, unknown fields, malformed input, schema-version handling, precedence/reset, Bangla-Unicode-safe parse).
+- No new Gradle module, no Android/JNI/native code, and no new SDK/NDK/build flags were required; the additions are exercised by the existing `coverageCheck` test step, so the Qwen 1.5B/llama.cpp APK build path is unchanged.
+
 ### Product architecture documentation update
 
 - Merged the dual Standalone Tools Dashboard / Unified Chat **+ Attach Tools** UX into the existing architecture specification.

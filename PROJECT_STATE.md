@@ -1,13 +1,15 @@
 # LAI Project State
 
-Snapshot date: 2026-08-16  
+Snapshot date: 2026-08-17  
 Repository: `soobujmiah/lai`  
 Application ID: `dev.lai.runtime`  
-Source baseline before this state-file commit: `6d02c14`  
+Source baseline before this state-file commit: `e03a4cc`  
 Latest device-test release: [`v0.8.2`](https://github.com/soobujmiah/lai/releases/tag/v0.8.2) (`cbf6ff9`)  
 Release APK: `https://github.com/soobujmiah/lai/releases/download/v0.8.2/app-release.apk`  
 Last documentation/build verification: GitHub Actions run `31959866932`  
 Current physical baseline: Xiaomi/Redmi Turbo 4 Pro, Android API 36, QTI SM8735 / Snapdragon 8s Gen 4
+
+This session advanced **Phase 2A items 1 & 2** (typed settings contracts in `core:contracts` and validation/migration policy in `core:policy`). No new Gradle module, Android/JNI/native code, SDK, NDK, or build flag was introduced, so the Qwen 1.5B / llama.cpp APK build path is unchanged; GitHub Actions is expected to compile, test (pure-JVM coverage), lint, and package as before. Items 3–8 of Phase 2A remain.
 
 This file is a handoff snapshot. `docs/STATUS.md`, `docs/ROADMAP.md`, implementation source, and Git history remain authoritative if a later change conflicts with this snapshot.
 
@@ -524,16 +526,18 @@ Target UI (not implemented): Standalone Tools Dashboard, Chat **+ Attach Tools**
 
 This phase is the dependency for quick settings, Model Center, Dashboard/Chat tool parity, and auto-discovery. Do **not** begin Image Generation, Whisper, SQLCipher, 3B–5B task chaining, or a universal backend manager first.
 
+**Progress (2026-08-17):** items 1 (typed settings contracts) and 2 (validation/migration policy) are implemented with pure-JVM coverage; items 3–8 (the Android `platform:workspace` module, bounded settings store, bounded discovery, minimal UI slice, composition/diagnostics wiring, and their tests) are the next session. The schema is deliberately text-free, so settings can never store prompts, documents, or credentials.
+
 #### 4.1 Code to add
 
-1. **Typed settings contracts in pure core**
-   - Add `core/contracts/src/main/kotlin/dev/lai/runtime/settings/ToolSettings.kt`.
+1. **Typed settings contracts in pure core** — ✅ done this session (2026-08-17)
+   - Added `core/contracts/src/main/kotlin/dev/lai/runtime/settings/ToolSettings.kt`.
    - Define `SettingsDocumentV1`, `LlmSettings`, `ImageGenerationSettings`, `VoiceSettings`, `SearchSettings`, model/tool-scoped defaults, and schema version.
    - Preserve current Qwen test defaults: temperature `0.7`, Top-P `0.9`, maximum new tokens `256` in product state.
    - Do not use an untyped `Map<String, Any>`.
 
-2. **Validation and migration policy**
-   - Add `core/policy/src/main/kotlin/dev/lai/runtime/settings/SettingsPolicy.kt`.
+2. **Validation and migration policy** — ✅ done this session (2026-08-17)
+   - Added `core/policy/src/main/kotlin/dev/lai/runtime/settings/SettingsPolicy.kt`.
    - Validate every documented range, finite number, enum/preset, context-dependent max-token limit, and unknown field policy.
    - Add deterministic `v1 -> future` migration seam and safe embedded defaults.
    - Add JVM tests for minimum/maximum, NaN/infinity, unknown fields, malformed schema, Bangla-safe round trip, and reset/precedence.

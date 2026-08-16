@@ -32,7 +32,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Diagnostics JSON v1 | Device validated | v0.7.1 and v0.8.0 exports contained expected runtime/performance fields and privacy exclusions with no user content observed |
 | Retained model copy | Device validated | v0.8.0 Keep copy survived uninstall; offline Import file restored exact 1,117,320,736-byte reviewed SHA-256 and loaded successfully |
 | Dual Dashboard + Chat tool UX | Planned | Standalone OCR/Voice/Image Generation/Vector Search and Chat **+ Attach Tools** must share contracts/adapters; no duplicate tool engines |
-| Contextual per-tool settings | Planned | typed ranges/defaults, Chat ⚙ bottom sheet and versioned non-secret `settings.json` are documented; no UI/storage implementation yet |
+| Contextual per-tool settings | Build verified (contracts/policy) | typed `SettingsDocumentV1` ranges/defaults and `SettingsPolicy` validation/migration are pure core and unit-tested (NaN/infinity, unknown fields, context-dependent max-token ceiling, deterministic v1 seam); Chat ⚙ sheet, versioned non-secret `settings.json` persistence and SAF store remain pending |
 | User-owned `/sdcard/LAI/` workspace | Planned | must use explicit SAF tree grant, bounded restore/discovery and private verified runtime copies; no broad-storage permission |
 | Categorized Model Center/background download | Planned | signed categories, pause/resume/cancel/process recovery and manual GGUF import are specified; existing 1.5B catalog/download remains active |
 | Native C++ micro-model task chaining | Planned | bounded DAG for LLM + Embedding/Whisper with aggregate memory admission; current 1.5B runtime remains unchanged |
