@@ -266,6 +266,11 @@ private fun FeatureScreen(
 
 @Composable
 private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
+    val diagnosticsExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        uri?.let(viewModel::exportDiagnostics)
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(20.dp),
@@ -330,6 +335,24 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
             }
         }
         item { ModelSetup(state, viewModel) }
+        item {
+            Card {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Support diagnostics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Export versioned JSON with device, scheduler, model and local performance data. " +
+                            "Prompts, responses, screens, OCR text, documents and credentials are excluded.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(state.diagnosticsStatus, style = MaterialTheme.typography.labelSmall)
+                    OutlinedButton(
+                        onClick = { diagnosticsExporter.launch("lai-diagnostics-v1.json") },
+                        enabled = !state.busy,
+                    ) { Text("Export diagnostics JSON") }
+                }
+            }
+        }
         state.notice?.let { notice -> item { StatusCard("Status", notice) } }
     }
 }

@@ -28,6 +28,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | LLM JNI/session interface | Device validated basic | physical model load and 15-token local generation passed; cancellation/metrics pending |
 | llama.cpp CPU inference | Device validated basic | Qwen CPU session loaded and generated locally without reported crash; response/Bangla quality and sustained thermals pending |
 | v0.7 runtime reliability | Build verified | multi-turn templates, token trimming, state machine, Stop, native metrics, storage/memory handling compiled; device validation pending |
+| Diagnostics JSON v1 | Candidate | explicit SAF export, 20-sample local performance history and content exclusion contract added; CI pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | requires licensed SDK/runtime and physical device |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |

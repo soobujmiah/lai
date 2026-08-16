@@ -3,13 +3,23 @@ package dev.lai.runtime.ui
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.lai.runtime.BuildConfig
 import dev.lai.runtime.LaiApplication
 import dev.lai.runtime.agent.ToolCall
 import dev.lai.runtime.core.AppRuntimeEvent
+import dev.lai.runtime.core.LaiJson
+import dev.lai.runtime.diagnostics.AppDiagnostics
+import dev.lai.runtime.diagnostics.DeviceDiagnostics
+import dev.lai.runtime.diagnostics.DiagnosticsPrivacy
+import dev.lai.runtime.diagnostics.DiagnosticsReportV1
+import dev.lai.runtime.diagnostics.GenerationPerformanceDiagnostics
+import dev.lai.runtime.diagnostics.ModelDiagnostics
+import dev.lai.runtime.diagnostics.RuntimeDiagnostics
 import dev.lai.runtime.automation.AccessibilityGateway
 import dev.lai.runtime.inference.ConversationMessage
 import dev.lai.runtime.inference.ConversationRole
@@ -29,13 +39,16 @@ import dev.lai.runtime.scheduler.InferenceWorkload
 import dev.lai.runtime.scheduler.RuntimeEnvironment
 import dev.lai.runtime.shell.ShizukuState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import java.util.UUID
 
@@ -113,7 +126,9 @@ data class MainUiState(
     val estimatedPeakBytes: Long? = null,
     val lastModelLoadMs: Long? = null,
     val lastGenerationMetrics: GenerationMetrics? = null,
+    val performanceHistory: List<GenerationMetrics> = emptyList(),
     val trimmedConversationTurns: Int = 0,
+    val diagnosticsStatus: String = "No diagnostics exported",
 ) {
     val busy: Boolean
         get() = operation in setOf(
@@ -262,6 +277,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             it.copy(
                                 operation = RuntimeOperation.READY,
                                 lastGenerationMetrics = event.metrics,
+                                performanceHistory = event.metrics?.let { metrics ->
+                                    (it.performanceHistory + metrics).takeLast(MAX_PERFORMANCE_SAMPLES)
+                                } ?: it.performanceHistory,
                                 notice = "Generated ${event.tokensGenerated} tokens locally",
                             )
                         }
@@ -600,6 +618,102 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportDiagnostics(uri: Uri) {
+        viewModelScope.launch {
+            val result = runCatching {
+                val report = buildDiagnosticsReport()
+                val json = DIAGNOSTICS_JSON.encodeToString(DiagnosticsReportV1.serializer(), report)
+                withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { output ->
+                        output.write(json.toByteArray(Charsets.UTF_8))
+                        output.flush()
+                    } ?: error("Android could not open the selected export destination")
+                }
+            }
+            result.onSuccess {
+                _state.update {
+                    it.copy(
+                        diagnosticsStatus = "Diagnostics JSON exported by explicit user action",
+                        notice = "Privacy-filtered diagnostics exported",
+                    )
+                }
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(
+                        diagnosticsStatus = "Last export failed",
+                        notice = error.message ?: "Diagnostics export failed",
+                    )
+                }
+            }
+        }
+    }
+
+    private fun buildDiagnosticsReport(): DiagnosticsReportV1 {
+        val current = state.value
+        val environment = container.runtimeEnvironment.snapshot()
+        val capabilities = container.inferenceEngine.capabilities
+        val shizuku = when (val value = current.shizukuState) {
+            ShizukuState.Unavailable -> "UNAVAILABLE"
+            ShizukuState.PermissionRequired -> "PERMISSION_REQUIRED"
+            is ShizukuState.Ready -> "READY_UID_${value.uid}"
+            is ShizukuState.Error -> "ERROR"
+        }
+        return DiagnosticsReportV1(
+            generatedAtEpochMs = System.currentTimeMillis(),
+            app = AppDiagnostics(
+                versionName = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                productionSigned = BuildConfig.PRODUCTION_SIGNED,
+                operation = current.operation.name,
+                catalogStatus = current.catalogStatus,
+            ),
+            device = DeviceDiagnostics(
+                manufacturer = Build.MANUFACTURER,
+                model = Build.MODEL,
+                androidSdk = Build.VERSION.SDK_INT,
+                supportedAbis = Build.SUPPORTED_ABIS.toList(),
+                availableMemoryBytes = environment.availableMemoryBytes,
+                batteryPercent = environment.batteryPercent,
+                charging = environment.charging,
+                thermalState = environment.thermalState.name,
+            ),
+            runtime = RuntimeDiagnostics(
+                nativeLibraryLoaded = capabilities.nativeLibraryLoaded,
+                compiledBackends = capabilities.compiledBackends.map { it.name }.sorted(),
+                activeBackendDecision = current.schedulerDetail,
+                contextSize = container.inferenceEngine.contextSize,
+                activeModelId = current.activeModelId,
+                modelLoadMs = current.lastModelLoadMs,
+                estimatedPeakBytes = current.estimatedPeakBytes,
+                accessibilityConnected = current.accessibilityConnected,
+                shizukuState = shizuku,
+                trimmedConversationTurns = current.trimmedConversationTurns,
+            ),
+            models = current.installedModels.map { model ->
+                ModelDiagnostics(
+                    id = model.id,
+                    displayName = model.displayName,
+                    bytes = model.bytes,
+                    sha256 = model.sha256,
+                    active = model.id == current.activeModelId,
+                )
+            },
+            performance = current.performanceHistory.map(GenerationMetrics::toDiagnostics),
+            privacy = DiagnosticsPrivacy(),
+        )
+    }
+
+    private fun GenerationMetrics.toDiagnostics() = GenerationPerformanceDiagnostics(
+        promptTokens = promptTokens,
+        generatedTokens = generatedTokens,
+        promptEvaluationMs = promptEvaluationMs,
+        timeToFirstTokenMs = timeToFirstTokenMs,
+        decodeMs = decodeMs,
+        totalMs = totalMs,
+        promptTokensPerSecond = promptTokensPerSecond,
+        decodeTokensPerSecond = decodeTokensPerSecond,
+    )
+
     private fun refreshModels() {
         viewModelScope.launch {
             val models = container.modelRepository.list()
@@ -624,6 +738,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val MODEL_CONTEXT_TOKENS = 4096
+        private const val MAX_PERFORMANCE_SAMPLES = 20
         private val GENERATION_CONFIG = GenerationConfig(maxNewTokens = 256)
+        private val DIAGNOSTICS_JSON = Json(LaiJson) { prettyPrint = true }
     }
 }

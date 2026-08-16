@@ -1,0 +1,45 @@
+# Privacy-filtered diagnostics export
+
+LAI exports diagnostics only after the user chooses a destination through Android's Storage Access Framework. The app writes `application/json`; it does not upload, share automatically, request broad storage access, or remember the destination.
+
+## Schema
+
+Current schema: `DiagnosticsReportV1`, `schemaVersion = 1`.
+
+Included:
+
+- app version/code and production-signing flag;
+- operation and signed-catalog status;
+- manufacturer/model, Android SDK and supported ABIs;
+- available memory, battery, charging and thermal state;
+- compiled backends, scheduler decision and context size;
+- active model ID, installed model IDs/sizes/SHA-256 and load time;
+- Accessibility connection boolean and coarse Shizuku state/UID;
+- conversation-turn trim count, never conversation text;
+- up to 20 in-memory generation samples: prompt/output token counts, prefill, TTFT, decode and total duration.
+
+Always excluded:
+
+- prompts and generated text;
+- screenshots, OCR text and Accessibility trees;
+- foreground package/app names;
+- documents, RAG chunks and embeddings;
+- typed automation text and shell output;
+- credentials, IP addresses and network identifiers.
+
+## Example shape
+
+```json
+{
+  "schemaVersion": 1,
+  "generatedAtEpochMs": 0,
+  "app": {"versionName": "0.8.0", "operation": "READY"},
+  "device": {"androidSdk": 36, "thermalState": "NOMINAL"},
+  "runtime": {"compiledBackends": ["CPU"], "contextSize": 4096},
+  "models": [{"id": "model-id", "bytes": 1, "sha256": "...", "active": true}],
+  "performance": [{"promptTokens": 20, "generatedTokens": 15, "timeToFirstTokenMs": 100}],
+  "privacy": {"localOnlyUntilUserExport": true, "excludedData": ["prompts", "generated_text"]}
+}
+```
+
+Consumers must ignore unknown fields and select parsers by `schemaVersion`. Diagnostics are support evidence, not telemetry and not proof of model quality.

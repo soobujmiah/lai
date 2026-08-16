@@ -41,6 +41,8 @@ All notable changes are documented here. The project follows semantic versioning
 - Added native model-load, prompt-evaluation, TTFT, decode and total-time measurements; values remain local.
 - Added Android memory-pressure model release and download/import storage preflight.
 - Recorded Redmi Turbo 4 Pro evidence for Qwen installation, CPU scheduling, memory preflight, nominal thermal state and a 15-token local generation.
+- Added explicit Storage Access Framework export of versioned, privacy-filtered diagnostics JSON.
+- Added an in-memory rolling history of 20 generation performance samples; no automatic persistence or upload.
 
 ### Phase 2 candidate
 
