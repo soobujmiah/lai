@@ -14,6 +14,16 @@
 - [x] first GitHub Actions green build and resulting fixes ([run 31917533925](https://github.com/soobujmiah/lai/actions/runs/31917533925))
 - [x] physical Snapdragon 8s Gen 4 smoke evidence ([Redmi Turbo 4 Pro result](device-results/2026-08-16-redmi-turbo-4-pro.md))
 
+## Backbone hardening — completed
+
+- [x] eleven-module core/platform/runtime/plugin architecture
+- [x] zero-egress network ownership and mandatory artifact digest
+- [x] architecture boundary source gate
+- [x] pure-JVM coverage ratchets
+- [x] evidence/thermal/battery/memory scheduler contract
+- [x] versioned local-only plugin API
+- [x] NpuHub comparison and ADR
+
 ## Phase 2 — usable local intelligence
 
 - [x] pin/fetch llama.cpp in CI

@@ -2,16 +2,16 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `6b1f930`, [GitHub Actions run 31919286438](https://github.com/soobujmiah/lai/actions/runs/31919286438). Source policy, immutable llama.cpp fetch, Kotlin tests, lint, arm64 llama.cpp/ggml/JNI compilation, APK assembly, and artifact upload passed. The `lai-debug-16` artifact archive is approximately 13.7 MB.
+Latest verified remote build: commit `97f039f`, [GitHub Actions run 31921021303](https://github.com/soobujmiah/lai/actions/runs/31921021303). Architecture/privacy boundaries, coverage ratchets, pure-JVM tests, eleven-module Android graph, lint, immutable llama.cpp fetch, arm64 llama.cpp/ggml/JNI compilation, APK assembly, and artifact upload passed. The `lai-debug-24` artifact archive is approximately 13.75 MB.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
 | Capability | Status | Evidence / boundary |
 |---|---|---|
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
-| Layered module backbone | Candidate | eleven modules extracted; awaiting remote Gradle/manifest verification |
-| Zero-egress architecture policy | Candidate | only download module may own network/permission; source boundary check added |
-| Evidence-aware scheduler | Candidate | compile/probe/device/benchmark evidence plus memory/thermal/battery policy; JVM tests added |
+| Layered module backbone | Ready | eleven-module Gradle/manifest graph compiled and packaged remotely |
+| Zero-egress architecture policy | Ready | only download module owns network/permission; boundary check passed in CI |
+| Evidence-aware scheduler | Ready contract | compile/probe/device/benchmark evidence plus memory/thermal/battery tests pass; app routing integration pending |
 | GitHub Android toolchain | Ready | workflow installs API 35, Build Tools, NDK, CMake, Gradle remotely |
 | arm64 native `.so` build | Ready | isolated `runtime:llama` externalNativeBuild compiles C++20 JNI library |
 | Compose three-mode UX | Ready | chat, screen reader, automator; developer controls hidden |
@@ -21,7 +21,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Android 11+ accessibility screenshot | Ready | hardware buffer copied to ARGB and closed |
 | Shizuku binder and permission | Ready | state flow, UID, request listener |
 | Elevated operation allowlist | Ready | Shizuku UserService + argv-only policy; no raw shell; tests for injection |
-| Reviewed GGUF download | Candidate | isolated network module, explicit tap, mandatory SHA-256, redirect review, resume/private storage/GGUF validation |
+| Reviewed GGUF download | Build verified | isolated network module, explicit tap, mandatory SHA-256, redirect review, resume/private storage/GGUF validation; device regression pending |
 | LLM JNI/session interface | Build verified | cancellable per-token callback compiled and packaged; device stream test pending |
 | llama.cpp CPU inference | Build verified (Phase 2) | loader/tokenizer/chat template/sampler compiled; physical GGUF and Bangla validation pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |

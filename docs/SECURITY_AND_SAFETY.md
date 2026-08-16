@@ -43,6 +43,9 @@ Shizuku may run as UID 2000 (ADB shell) or UID 0 (root/Sui). The app surfaces UI
 
 ## Data handling
 
+- outbound user-derived data is denied by `LocalFirstPolicy`;
+- only `platform:download` owns network transport and `INTERNET` permission;
+- downloads require explicit user action, HTTPS, reviewed hosts and mandatory SHA-256;
 - app-private model storage;
 - screenshots in memory and recycled after OCR;
 - no analytics or remote inference dependency;
