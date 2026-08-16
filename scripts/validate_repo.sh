@@ -37,4 +37,6 @@ if grep -RInE '(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})' \
   exit 1
 fi
 
+python3 scripts/check_architecture_boundaries.py
+
 printf 'Source policy OK: %d bytes (limit %d)\n' "$size" "$limit"

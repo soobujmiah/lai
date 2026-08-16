@@ -3,7 +3,7 @@
 ## Model lifecycle
 
 1. User enters a Hugging Face HTTPS file URL in Developer Mode.
-2. `ModelRepository` validates host, ID, and optional SHA-256.
+2. `ModelRepository` validates explicit consent, reviewed host, ID, and mandatory SHA-256 through `LocalFirstPolicy`.
 3. Download streams to `<id>.gguf.part` in app-private no-backup storage.
 4. A partial file is resumed with an HTTP Range request when supported.
 5. LAI calculates SHA-256 and verifies the first four bytes are `GGUF`.

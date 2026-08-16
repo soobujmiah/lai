@@ -20,7 +20,7 @@
   <string name="model_setup">মডেল সেটআপ</string>
   <string name="model_name">মডেলের নাম</string>
   <string name="model_url">Hugging Face HTTPS URL</string>
-  <string name="model_sha">SHA-256 (সুপারিশকৃত)</string>
+  <string name="model_sha">SHA-256 (আবশ্যক)</string>
   <string name="download">ডাউনলোড</string>
   <string name="safety_title">নিয়ন্ত্রণ আপনার হাতে</string>
   <string name="safety_body">এলএআই ইচ্ছামতো শেল কমান্ড ও সংবেদনশীল লেখা ব্লক করে। গুরুত্বপূর্ণ কাজ চালানোর আগে যাচাই করুন।</string>

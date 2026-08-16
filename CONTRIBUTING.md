@@ -25,14 +25,17 @@ Compilation and lint run in GitHub Actions.
 
 ## Engineering rules
 
-1. Preserve module boundaries and inject implementations through interfaces.
-2. No raw shell API or `sh -c` from model/user strings.
-3. New consequential tools require trusted confirmation and threat review.
-4. Bound depth, count, time, output, allocation, and network size where applicable.
-5. Keep telemetry and model internals behind Developer Mode.
-6. Add tests for protocol changes, Bangla UTF-8, rejection paths, and injection attempts.
-7. Include physical-device evidence for hardware/performance claims.
-8. Never log prompts, entered text, screen trees, captures, tokens, or secrets by default.
+1. Preserve the dependency graph in `docs/MODULES.md`; `scripts/check_architecture_boundaries.py` is a release gate.
+2. Network permission/transport belongs only to `platform:download`; outbound user-derived data is forbidden.
+3. Accessibility, Shizuku and JNI APIs remain in their reviewed authority/runtime modules.
+4. Inject implementations through core contracts.
+5. No raw shell API or `sh -c` from model/user strings.
+6. New consequential tools require trusted confirmation and threat review.
+7. Bound depth, count, time, output, allocation, and network size where applicable.
+8. Keep telemetry and model internals behind Developer Mode.
+9. Add tests for protocol changes, Bangla UTF-8, rejection paths, and injection attempts.
+10. Include physical-device evidence for hardware/performance claims.
+11. Never log prompts, entered text, screen trees, captures, tokens, or secrets by default.
 
 ## Commit style
 

@@ -17,6 +17,17 @@ All notable changes are documented here. The project follows semantic versioning
 - Source-only 128 MB and documentation policy checks.
 - Architecture, safety, backend, OCR, automation, build, and device-test documentation.
 
+### Backbone hardening candidate
+
+- Compared LAI with the private NpuHub architecture without copying private source.
+- Extracted pure contracts, policy and evidence-aware scheduler modules.
+- Isolated download, Accessibility and Shizuku authority into platform modules.
+- Isolated llama.cpp, OCR and tool orchestration into runtime modules.
+- Added a versioned local-only plugin API.
+- Made model SHA-256 mandatory and added a central no-outbound-data policy.
+- Added static network/authority/JNI/dependency boundary enforcement.
+- Added per-module pure-JVM coverage ratchets.
+
 ### Phase 2 candidate
 
 - Added immutable-commit llama.cpp acquisition in GitHub Actions without committing upstream source.

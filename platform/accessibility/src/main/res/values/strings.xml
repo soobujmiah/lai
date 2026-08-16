@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="accessibility_service_label">LAI automation</string>
+  <string name="accessibility_service_description">Reads visible interface elements and performs only the actions you approve for local automation.</string>
+</resources>

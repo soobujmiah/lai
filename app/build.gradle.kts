@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -21,36 +19,15 @@ val hasReleaseSigning = listOf(
 android {
     namespace = "dev.lai.runtime"
     compileSdk = 35
-    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "dev.lai.runtime"
         minSdk = 28
         targetSdk = 35
         versionCode = (providers.gradleProperty("lai.versionCode").orNull ?: "1").toInt()
-        versionName = providers.gradleProperty("lai.versionName").orNull ?: "0.1.0"
-
+        versionName = providers.gradleProperty("lai.versionName").orNull ?: "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-
-        ndk {
-            abiFilters += "arm64-v8a"
-        }
-
-        externalNativeBuild {
-            cmake {
-                cppFlags += listOf("-std=c++20", "-Wall", "-Wextra", "-Wpedantic")
-                arguments += listOf(
-                    "-DANDROID_STL=c++_shared",
-                    "-DLAI_ENABLE_LLAMA_CPP=${providers.gradleProperty("lai.enableLlamaCpp").orNull ?: "OFF"}",
-                    "-DLAI_ENABLE_QNN=${providers.gradleProperty("lai.enableQnn").orNull ?: "OFF"}",
-                )
-                providers.gradleProperty("lai.llamaCppDir").orNull?.let {
-                    arguments += "-DLAI_LLAMA_CPP_DIR=$it"
-                }
-            }
-        }
-
         buildConfigField("boolean", "PRODUCTION_SIGNED", hasReleaseSigning.toString())
     }
 
@@ -78,14 +55,10 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = if (hasReleaseSigning) {
                 signingConfigs.getByName("release")
             } else {
-                // CI test releases remain installable. Never distribute this fallback as production.
                 signingConfigs.getByName("debug")
             }
         }
@@ -94,26 +67,15 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-        aidl = true
     }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
     kotlinOptions {
         jvmTarget = "17"
         freeCompilerArgs += "-Xjvm-default=all"
     }
-
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
-
     packaging {
         resources.excludes += setOf(
             "META-INF/AL2.0",
@@ -122,13 +84,21 @@ android {
             "META-INF/NOTICE.md",
         )
     }
-
-    testOptions {
-        unitTests.isIncludeAndroidResources = true
-    }
+    testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
 dependencies {
+    implementation(project(":core:contracts"))
+    implementation(project(":core:policy"))
+    implementation(project(":core:scheduler"))
+    implementation(project(":plugins:api"))
+    implementation(project(":platform:download"))
+    implementation(project(":platform:accessibility"))
+    implementation(project(":platform:shizuku"))
+    implementation(project(":runtime:llama"))
+    implementation(project(":runtime:ocr"))
+    implementation(project(":runtime:orchestrator"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -145,9 +115,5 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.okhttp)
-    implementation(libs.shizuku.api)
-    implementation(libs.shizuku.provider)
-
     testImplementation(libs.junit)
 }

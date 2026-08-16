@@ -4,7 +4,11 @@
 
 LAI separates product UX, agent decisions, Android control, model storage, recognition, and native inference so each can be replaced or tested without granting another component more authority. Phase labels are part of the design: unavailable adapters fail closed and are never presented as accelerated.
 
-## 2. Runtime layers
+## 2. Compile-time module layers
+
+The enforced graph is documented in [MODULES.md](MODULES.md). Core contracts, policy and scheduling are pure JVM; network, Accessibility and Shizuku each have one platform owner; JNI/C++ lives in runtime adapters; `app` is the composition root. See [the NpuHub comparison](ARCHITECTURE_COMPARISON_NPUHUB.md) and [ADR 0002](adr/0002-modular-local-first-backbone.md).
+
+## 3. Runtime layers
 
 ```mermaid
 flowchart TB
@@ -79,7 +83,7 @@ Selectors are deterministic in this order:
 
 ### Model storage
 
-`ModelRepository` streams directly to app-private no-backup storage. It supports HTTP Range resume, optional SHA-256, mandatory HTTPS/Hugging Face host policy, and GGUF magic validation. Registry replacement is write-then-rename. The repository contains no weights. Installed models are loaded only after an explicit user tap, preventing multi-gigabyte startup allocations.
+`ModelRepository` lives in the only network-owning module and streams directly to app-private no-backup storage. It supports HTTP Range resume, mandatory SHA-256, explicit-user-action and reviewed-host policy, redirect revalidation, and GGUF magic validation. Registry replacement is write-then-rename. The repository contains no weights. Installed models are loaded only after an explicit user tap, preventing multi-gigabyte startup allocations.
 
 ### Native inference
 
@@ -99,7 +103,7 @@ A production adapter must provide:
 
 Accessibility screenshot capture creates an ARGB bitmap only in memory. `BanglaOcrService` passes it to an `OcrEngine`; output uses schema version 1 with full text, blocks, BCP-47 language, confidence, polygon, and optional handwritten classification. The current placeholder returns a typed model-required error.
 
-## 3. Control flow
+## 4. Control flow
 
 ```mermaid
 sequenceDiagram
@@ -123,7 +127,7 @@ sequenceDiagram
 
 The current UI exposes safe manual demonstrations; feeding tool proposals from a concrete LLM is Phase 2. The confirmation bit must originate in trusted UI state, never in model-authored JSON.
 
-## 4. Threads and ownership
+## 5. Threads and ownership
 
 | Work | Dispatcher/thread | Owner |
 |---|---|---|
@@ -136,7 +140,7 @@ The current UI exposes safe manual demonstrations; feeding tool proposals from a
 
 No accessibility node survives a command. Bitmaps are recycled after OCR. Native session handles are destroyed by `InferenceEngine.close()`.
 
-## 5. Trust boundaries
+## 6. Trust boundaries
 
 1. **Untrusted model output:** tool names and arguments require strict parsing.
 2. **Untrusted visible UI:** screen text can contain prompt injection; it is data, not authority.
@@ -145,7 +149,7 @@ No accessibility node survives a command. Bitmaps are recycled after OCR. Native
 5. **Downloaded model:** size/hash/format are validated; model license and provenance remain user responsibilities.
 6. **CI secrets:** signing and future proprietary SDK credentials exist only in GitHub Actions secret scope.
 
-## 6. Plugin seams
+## 7. Plugin seams
 
 - `InferenceEngine`: llama.cpp, ExecuTorch, MNN, or QNN adapter.
 - C++ `Backend`: CPU, Vulkan, QNN/HTP.
@@ -154,7 +158,7 @@ No accessibility node survives a command. Bitmaps are recycled after OCR. Native
 
 Plugins must publish capability and safety metadata rather than relying on type discovery.
 
-## 7. Performance design for Snapdragon 8s Gen 4
+## 8. Performance design for Snapdragon 8s Gen 4
 
 - arm64-only initial artifact avoids unused ABI payload.
 - streaming file I/O avoids model-sized heap allocations.

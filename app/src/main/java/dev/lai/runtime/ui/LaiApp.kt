@@ -340,7 +340,8 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
             }
             Button(
                 onClick = viewModel::downloadModel,
-                enabled = !state.busy && state.modelName.isNotBlank() && state.modelUrl.isNotBlank(),
+                enabled = !state.busy && state.modelName.isNotBlank() && state.modelUrl.isNotBlank() &&
+                    state.modelSha.matches(Regex("^[a-fA-F0-9]{64}$")),
             ) { Text(stringResource(R.string.download)) }
         }
     }

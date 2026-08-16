@@ -14,5 +14,5 @@ class AppContainer(context: Context) {
     val modelRepository = ModelRepository(context)
     val inferenceEngine = NativeInferenceEngine()
     val ocrService = BanglaOcrService()
-    val agentRuntime = AgentRuntime(elevatedShell, ocrService)
+    val agentRuntime = AgentRuntime(elevatedShell, shizukuController, ocrService)
 }

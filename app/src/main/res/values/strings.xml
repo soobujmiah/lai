@@ -20,7 +20,7 @@
   <string name="model_setup">Model setup</string>
   <string name="model_name">Model name</string>
   <string name="model_url">Hugging Face HTTPS URL</string>
-  <string name="model_sha">SHA-256 (recommended)</string>
+  <string name="model_sha">SHA-256 (required)</string>
   <string name="download">Download</string>
   <string name="safety_title">You stay in control</string>
   <string name="safety_body">LAI blocks arbitrary shell commands and sensitive text entry. Review consequential actions before execution.</string>

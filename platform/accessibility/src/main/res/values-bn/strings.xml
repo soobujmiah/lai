@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="accessibility_service_label">এলএআই অটোমেশন</string>
+  <string name="accessibility_service_description">স্ক্রিনের দৃশ্যমান উপাদান পড়ে এবং শুধু আপনার অনুমোদিত কাজগুলো করে।</string>
+</resources>

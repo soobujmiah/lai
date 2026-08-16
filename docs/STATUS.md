@@ -9,8 +9,11 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Capability | Status | Evidence / boundary |
 |---|---|---|
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
+| Layered module backbone | Candidate | eleven modules extracted; awaiting remote Gradle/manifest verification |
+| Zero-egress architecture policy | Candidate | only download module may own network/permission; source boundary check added |
+| Evidence-aware scheduler | Candidate | compile/probe/device/benchmark evidence plus memory/thermal/battery policy; JVM tests added |
 | GitHub Android toolchain | Ready | workflow installs API 35, Build Tools, NDK, CMake, Gradle remotely |
-| arm64 native `.so` build | Ready | app externalNativeBuild compiles C++20 JNI library |
+| arm64 native `.so` build | Ready | isolated `runtime:llama` externalNativeBuild compiles C++20 JNI library |
 | Compose three-mode UX | Ready | chat, screen reader, automator; developer controls hidden |
 | Bangla resources and UTF-8 tool protocol | Ready | `values-bn`; JSON unit test |
 | Accessibility connection/snapshot | Ready | bounded flattened tree; password text omitted |
@@ -18,7 +21,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Android 11+ accessibility screenshot | Ready | hardware buffer copied to ARGB and closed |
 | Shizuku binder and permission | Ready | state flow, UID, request listener |
 | Elevated operation allowlist | Ready | Shizuku UserService + argv-only policy; no raw shell; tests for injection |
-| Hugging Face GGUF download | Ready | resume, private storage, SHA-256, GGUF validation |
+| Reviewed GGUF download | Candidate | isolated network module, explicit tap, mandatory SHA-256, redirect review, resume/private storage/GGUF validation |
 | LLM JNI/session interface | Build verified | cancellable per-token callback compiled and packaged; device stream test pending |
 | llama.cpp CPU inference | Build verified (Phase 2) | loader/tokenizer/chat template/sampler compiled; physical GGUF and Bangla validation pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |

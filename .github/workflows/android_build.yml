@@ -104,7 +104,7 @@ jobs:
 
       - name: Unit tests and lint
         run: >-
-          gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:lintDebug
+          gradle --no-daemon --stacktrace coverageCheck :app:testDebugUnitTest :app:lintDebug
           -Plai.enableLlamaCpp=ON
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
 
@@ -133,7 +133,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          find app/build -type f \( -name '*.apk' -o -name 'liblai_runtime.so' \) -print 2>/dev/null || true
+          find app runtime -type f \( -name '*.apk' -o -name 'liblai_runtime.so' \) -print 2>/dev/null || true
 
       - name: Upload debug APK
         if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}

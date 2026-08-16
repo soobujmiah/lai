@@ -13,15 +13,15 @@ LAI is a source-only Android foundation for private, Bangla-first on-device AI a
 - **Source-only Git:** no SDKs, models, APKs, native libraries, caches, or keystores in the repository.
 - **Documentation with code:** behavior, limitations, safety implications, and device evidence are updated in the same change.
 
-## Phase 1 capabilities
+## Current capabilities
 
 | Area | Included now | Intentional boundary |
 |---|---|---|
 | Compose UX | Chat, Screen Reader, Automator, hidden Developer Mode, Bangla resources | Chat reports backend absence rather than fabricating output |
 | Accessibility | Snapshot, selector, click, set text, scroll, global actions, app launch, Android 11+ screenshot | No autonomous consequential action without confirmation |
 | Shizuku | Binder state, permission, UID, structured operation policy, timeout/output limits | No raw shell command API |
-| Models | HTTPS Hugging Face-only download, resume, optional SHA-256, GGUF magic check, app-private registry | No model is bundled |
-| Native runtime | arm64 C++20 shared library, stable JNI session API, backend registry | llama.cpp/Vulkan and QAIRT/QNN adapters are Phase 2/3 |
+| Models | Explicit HTTPS download, mandatory SHA-256, resume, GGUF validation, app-private registry | No model is bundled; only reviewed artifact hosts are accepted |
+| Native runtime | Build-verified arm64 llama.cpp CPU runtime with cancellable token streaming | Physical GGUF/Bangla gate pending; Vulkan and QNN remain Phase 2/3 |
 | Bangla OCR | Screenshot path, plugin interface, versioned structured JSON | Recognition model/runtime is a clearly reported placeholder |
 | Delivery | GitHub-only SDK/NDK/CMake/Gradle setup, tests, lint, APK artifacts, tag releases | Release signing requires repository secrets |
 
@@ -43,7 +43,7 @@ flowchart LR
     JNI --> CPU[llama.cpp CPU]
     JNI --> VK[Adreno Vulkan]
     JNI --> QNN[QAIRT/QNN Hexagon]
-    CPU -. Phase 2 .-> JNI
+    CPU --> JNI
     VK -. Phase 2 .-> JNI
     QNN -. Phase 3 .-> JNI
 ```
@@ -54,20 +54,22 @@ Detailed component, trust-boundary, thread, and data-flow diagrams are in [ARCHI
 
 ```text
 lai/
-├── .github/workflows/android_build.yml  # all Android/native compilation
-├── app/
-│   ├── src/main/java/dev/lai/runtime/
-│   │   ├── agent/                       # function calling and confirmation gate
-│   │   ├── automation/                  # accessibility actions and snapshots
-│   │   ├── inference/                   # model store and JNI-facing runtime
-│   │   ├── ocr/                         # versioned Bangla OCR plugin boundary
-│   │   ├── shell/                       # Shizuku and command allowlist
-│   │   └── ui/                          # Compose product surface
-│   ├── src/main/cpp/                    # C++20 backend/session interface
-│   └── src/test/                        # policy and protocol unit tests
-├── docs/                                # architecture and operating guides
-├── gradle/libs.versions.toml            # centralized remote dependencies
-└── scripts/validate_repo.sh             # 128 MB/source/docs/secret policy
+├── app/                     # composition root and Compose product shell
+├── core/
+│   ├── contracts/           # pure tool/inference/OCR/model contracts
+│   ├── policy/              # consent, shell and zero-egress decisions
+│   └── scheduler/           # evidence/thermal/memory backend routing
+├── platform/
+│   ├── download/            # only network permission and transport
+│   ├── accessibility/       # Android Accessibility authority
+│   └── shizuku/             # ADB/root UserService authority
+├── runtime/
+│   ├── llama/               # isolated JNI/C++ llama.cpp adapter
+│   ├── ocr/                 # replaceable OCR adapter seam
+│   └── orchestrator/        # policy-gated tool dispatch
+├── plugins/api/             # versioned local-only plugin contract
+├── docs/                    # architecture, ADRs and device evidence
+└── scripts/                 # source, privacy and boundary enforcement
 ```
 
 ## Remote build: fastest path
@@ -89,7 +91,7 @@ No Android SDK, NDK, CMake, Gradle distribution, QNN SDK, or model is installed 
 
 ## Release build and signing
 
-Tagging `v0.1.0` builds and publishes an APK. Without signing secrets the workflow uses the Android debug key so the artifact is installable for testing but **not production signed**.
+Tagging a semantic version such as `v0.2.0` builds and publishes an APK. Without signing secrets the workflow uses the Android debug key so the artifact is installable for testing but **not production signed**.
 
 Configure these GitHub Actions secrets for production signing:
 
@@ -102,9 +104,9 @@ See [BUILD_AND_RELEASE.md](docs/BUILD_AND_RELEASE.md) for exact commands and key
 
 ## Model download
 
-Developer Mode accepts an HTTPS Hugging Face file URL plus an optional SHA-256. LAI downloads to `noBackupFilesDir/models`, resumes partial transfers, rejects non-GGUF content, and never requests broad storage permission. A model can be much larger than the APK/repository.
+Developer Mode accepts a reviewed HTTPS artifact URL only with a mandatory SHA-256. `platform:download` is the sole network-owning module; it downloads to `noBackupFilesDir/models`, rechecks redirected hosts, resumes partial transfers, rejects hash/format mismatches, and never requests broad storage permission. No prompts, screen data, generations or telemetry have an outbound path.
 
-Installing a GGUF file does not make Phase 1 inference operational: a concrete backend must be linked first. Backend requirements and the Qualcomm licensing boundary are in [MODELS_AND_BACKENDS.md](docs/MODELS_AND_BACKENDS.md).
+The v0.2 CPU backend can load a compatible GGUF after explicit user selection. Backend requirements and the Qualcomm licensing boundary are in [MODELS_AND_BACKENDS.md](docs/MODELS_AND_BACKENDS.md).
 
 ## Repository initialization (new owner/fork)
 
@@ -121,6 +123,9 @@ Use a credential manager or short-lived token. Never place a token in a remote U
 ## Documentation index
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Module ownership](docs/MODULES.md)
+- [NpuHub comparison](docs/ARCHITECTURE_COMPARISON_NPUHUB.md)
+- [Local-first privacy invariants](docs/PRIVACY_INVARIANTS.md)
 - [Implementation status](docs/STATUS.md)
 - [Build and release](docs/BUILD_AND_RELEASE.md)
 - [Models and native backends](docs/MODELS_AND_BACKENDS.md)

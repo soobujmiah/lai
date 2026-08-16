@@ -1,0 +1,4 @@
+-keep class rikka.shizuku.** { *; }
+-keep class dev.lai.runtime.shell.PrivilegedUserService { public <init>(...); *; }
+-keep interface dev.lai.runtime.shell.IPrivilegedService { *; }
+-dontwarn rikka.shizuku.**

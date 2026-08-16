@@ -14,7 +14,7 @@ The repository is source-only. `gradle-wrapper.jar`, Android SDK/NDK, CMake, QAI
 
 The build performs:
 
-1. source/docs/secret policy validation;
+1. source/docs/secret plus module/network/authority boundary validation;
 2. JDK 17 setup;
 3. API 35, Build Tools 35.0.0, NDK 27.0.12077973, and CMake 3.22.1 install on the runner;
 4. immutable-SHA llama.cpp fetch into runner-temporary storage;
