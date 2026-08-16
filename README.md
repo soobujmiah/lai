@@ -139,7 +139,7 @@ Use a credential manager or short-lived token. Never place a token in a remote U
 - [Local-first privacy invariants](docs/PRIVACY_INVARIANTS.md)
 - [Implementation status](docs/STATUS.md)
 - [Build and release](docs/BUILD_AND_RELEASE.md)
-- [Models and native backends](docs/MODELS_AND_BACKENDS.md)
+- [Models, per-tool configuration, Model Center, and native backends](docs/MODELS_AND_BACKENDS.md)
 - [Bangla OCR](docs/BANGLA_OCR.md)
 - [Automation tool contract](docs/AUTOMATION_TOOLS.md)
 - [Security and safety](docs/SECURITY_AND_SAFETY.md)

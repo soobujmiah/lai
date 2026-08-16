@@ -1,4 +1,6 @@
-# Models and native acceleration
+# Models, product configuration, Model Center and native acceleration
+
+This existing document is the canonical product specification for model acquisition and per-tool configuration; the repository does not maintain a separate `PRD.md`, so these requirements are merged here rather than duplicated in a new file.
 
 ## Model lifecycle
 
@@ -34,6 +36,47 @@ Candidate chat models should be evaluated, not merely advertised as multilingual
 - license allowing mobile distribution or user-initiated download.
 
 Tokenizer changes require model retraining or compatible vocabulary; LAI must not silently bolt a new tokenizer onto an incompatible GGUF.
+
+## Product configuration and contextual quick settings (target)
+
+LAI uses typed, versioned per-tool configuration rather than one unvalidated map. Configuration has three layers, highest precedence first:
+
+1. **one-request override** from the Chat quick-settings sheet;
+2. **conversation/tool-session override**, cleared with New chat or tool-session reset;
+3. **saved defaults** from `config/settings.json`, with embedded safe defaults when no workspace is granted.
+
+The Chat top bar shows a **⚙** icon when a model or attached tool has tunable parameters. It opens a bottom sheet for only the current selection. The sheet provides **Apply to this request**, **Save as default**, and **Reset**; changing a slider must not reload a model until the user applies it. Values are validated before they reach Kotlin/native contracts, and unsupported controls are disabled with the backend/model reason.
+
+Initial typed controls:
+
+| Tool | Parameter | Product range / values | Initial default and notes |
+|---|---|---|---|
+| Image Generation | Steps | integer `1..50` | `20`; backend may publish a lower tested maximum |
+| Image Generation | CFG scale | decimal `1.0..20.0` | `7.0`; finite values only |
+| Image Generation | Aspect ratio | reviewed presets such as `1:1`, `4:3`, `3:4`, `16:9`, `9:16` | `1:1`; adapter maps preset to supported dimensions and pixel budget |
+| Image Generation | Seed | signed 64-bit integer or `Random` | `Random`; resolved seed is shown with the result for local reproducibility |
+| LLM | Temperature | decimal `0.0..2.0` | `0.7`; `0` selects deterministic/greedy behavior where supported |
+| LLM | Top-P | decimal `0.05..1.0` | `0.9` |
+| LLM | Max new tokens | integer `1..4096`, additionally bounded by remaining context | current 1.5B test flow stays at `256` until changed by a reviewed release |
+| Voice/TTS | Speed | decimal `0.5x..2.0x` | `1.0x` |
+| Voice/TTS | Pitch | decimal `0.5x..2.0x` or adapter-declared equivalent | `1.0x`; the UI displays the adapter's unit |
+| Voice/STT | Noise filter | `Off`, `Low`, `Medium`, `High` | `Medium`; quality/latency trade-off must be stated |
+| Vector Search | Chunk size | integer `128..2048` tokenizer tokens | `512`; actual tokenizer/model ID is stored with the index |
+
+`settings.json` stores schema version, tool/model-scoped defaults, and migration metadata only. It must not store credentials, prompts, generated media/text, document chunks, Accessibility content, shell output, or external-provider secrets. Writes use temp-document + replace semantics where the provider supports them; otherwise LAI writes a new version, verifies it, then switches the active document reference. Invalid, non-finite, unknown-security-sensitive, or out-of-range values fail closed to defaults and produce a local migration warning.
+
+## Categorized Model Center (target)
+
+The current signed one-model list remains active while the product evolves into a categorized **Model Center**. Categories are Chat/LLM, OCR & Vision, Speech-to-Text, Text-to-Speech, Embeddings & Rerankers, and Image Generation. Each card shows artifact size, format/quantization, license/source, language/quality evidence, compatible backends/hardware, estimated memory/storage, installed/download state, and whether the artifact is reviewed, local-unreviewed, or device-validated.
+
+Model Center acquisition paths:
+
+- **Reviewed catalog download:** explicit user action; signed metadata; exact size/SHA-256/format checks before atomic activation.
+- **Background download:** WorkManager-backed, promoted to an Android foreground notification for long multi-gigabyte transfers; visible progress; user pause/resume/cancel; HTTP Range/ETag-aware `.part` continuation; network/storage constraints; process-death recovery; no activation until final rehash. Pausing closes transport and preserves only bounded partial bytes plus public download metadata.
+- **Manual local `.gguf` import:** Android SAF picker or user-selected LAI workspace; no broad-storage permission. Known hashes inherit signed catalog compatibility. Unknown GGUF files receive structural/size/hash checks and `LOCAL_UNREVIEWED` status, require explicit load approval/Developer Mode according to policy, and never gain quality/license/backend claims automatically.
+- **Auto-discovered workspace artifact:** registration only after the bounded startup pipeline in [ARCHITECTURE.md](ARCHITECTURE.md#startup-restore-and-model-auto-discovery-target); loading still requires user selection and a verified private runtime copy.
+
+The downloader may contact only approved public artifact endpoints under existing `LocalFirstPolicy`. Model Center must not upload model inventory, prompts, usage, device documents, or failure content. Download/pause state is product metadata; inference continues offline with already installed artifacts.
 
 ## Backend routing design
 

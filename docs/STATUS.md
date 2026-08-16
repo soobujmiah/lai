@@ -31,6 +31,11 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Runtime reliability | Partially device validated | v0.8.0 prompt growth 382→510 and four generations passed; Stop/recovery, New chat, forced trimming and memory-pressure handling pending |
 | Diagnostics JSON v1 | Device validated | v0.7.1 and v0.8.0 exports contained expected runtime/performance fields and privacy exclusions with no user content observed |
 | Retained model copy | Device validated | v0.8.0 Keep copy survived uninstall; offline Import file restored exact 1,117,320,736-byte reviewed SHA-256 and loaded successfully |
+| Dual Dashboard + Chat tool UX | Planned | Standalone OCR/Voice/Image Generation/Vector Search and Chat **+ Attach Tools** must share contracts/adapters; no duplicate tool engines |
+| Contextual per-tool settings | Planned | typed ranges/defaults, Chat ⚙ bottom sheet and versioned non-secret `settings.json` are documented; no UI/storage implementation yet |
+| User-owned `/sdcard/LAI/` workspace | Planned | must use explicit SAF tree grant, bounded restore/discovery and private verified runtime copies; no broad-storage permission |
+| Categorized Model Center/background download | Planned | signed categories, pause/resume/cancel/process recovery and manual GGUF import are specified; existing 1.5B catalog/download remains active |
+| Native C++ micro-model task chaining | Planned | bounded DAG for LLM + Embedding/Whisper with aggregate memory admission; current 1.5B runtime remains unchanged |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | Snapdragon priority; requires a dedicated isolated adapter, converted artifact, licensed SDK/runtime and physical-device evidence |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
@@ -38,6 +43,10 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | One-shot LLM tool proposals | Build verified; model-compliance retest required | v0.8.0 produced no valid proposal; stronger exact-format instruction and privacy-safe accepted/rejected/not-tool counters passed run 31958557120 |
 | Persistent tool audit/replay guard | Build verified v0.8.1 | no-backup JSONL, approval-before-authority fsync, bounded full-chain verification, Android file tests, content-free records and exact-call replay rejection passed run 31956572135; device validation pending |
 | Autonomous multi-step tool loop | Planned | requires foreground binding, typed result provenance/feedback, loop limits, cancellation and adversarial device evidence |
+| Rolling Context Window | Planned | explicit recent-turn/summary token budgeting must replace simple oldest-turn omission only after correctness/device evidence |
+| Dynamic thermal/battery throttling | Planned | current scheduler performs coarse admission; closed-loop thread/batch/backend throttling and hysteresis remain unimplemented |
+| Streaming TTS + Barge-In | Planned | requires bounded PCM queues, parallel synthesis, Interrupt VAD, echo policy and cancellation propagation |
+| Encrypted Vector DB | Planned | SQLCipher/Keystore key lifecycle, embedding metadata, migrations and deletion/export UX require design and implementation |
 | RAG / STT / TTS plugins | Planned | interfaces to be designed after runtime stabilization |
 
 ## Definition of "full featured"

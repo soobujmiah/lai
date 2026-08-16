@@ -27,5 +27,7 @@
 - Only app composes concrete implementations.
 - Only the download platform owns network transport.
 - Only `platform:audit` owns persistent model-tool audit bytes; arguments and outputs never enter its contract.
+- A future SAF workspace owner belongs under `platform`, while settings schemas/discovery decisions remain pure core contracts/policy.
+- A future C++ `TaskGraph` belongs under runtime adapters and schedules compute only; it cannot acquire Android URI, Accessibility, Shizuku, confirmation, or audit authority.
 - Every new module declares its privacy, authority and test boundary in documentation.
-- Feature modules will be introduced for Chat, Reader, Automator and Settings when their state/navigation surfaces are separated from `MainViewModel`; they will depend on contracts, never concrete vendor APIs.
+- Feature modules will be introduced for Chat, Dashboard Tools, Reader, Automator and Settings when their state/navigation surfaces are separated from `MainViewModel`; they depend on shared contracts, never concrete vendor APIs or duplicate tool engines.

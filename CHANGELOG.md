@@ -4,6 +4,15 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Product architecture documentation update
+
+- Merged the dual Standalone Tools Dashboard / Unified Chat **+ Attach Tools** UX into the existing architecture specification.
+- Specified contextual Chat ⚙ quick settings and typed Image Generation, LLM, Voice and Vector Search parameter ranges/defaults.
+- Defined the planned SAF-backed `/sdcard/LAI/` workspace, versioned `config/settings.json`, bounded startup restore and SHA-256 GGUF auto-discovery while preserving private runtime copies.
+- Expanded the existing model document with a categorized Model Center, foreground-capable background pause/resume downloads and manual/local-unreviewed GGUF handling.
+- Documented a future native C++ memory-admitted `TaskGraph` for 3B–5B LLM plus Embedding/Whisper micro-model work without changing the Qwen 1.5B baseline.
+- Added roadmap gates for Rolling Context Window, dynamic thermal/battery throttling, expanded Shizuku automation, parallel streaming TTS with Interrupt VAD barge-in, and SQLCipher-encrypted vector storage.
+
 ### Added
 
 - Phase 1 Compose application with Chat, Screen Reader, and Automator modes.

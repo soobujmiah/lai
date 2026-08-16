@@ -38,12 +38,17 @@
 - [x] CPU model load and local generation on Snapdragon device
 - [ ] Stop/recovery and UTF-safe token streaming device validation
 - [ ] multi-turn history validated basically; context-trimming stress test pending
+- [ ] Rolling Context Window v1: preserve system/tool constraints, recent turns and explicit summary checkpoints under a measured token budget; expose trim/summarization events and never silently claim full recall
 - [x] native TTFT/prefill/decode metrics device validation
 - [ ] GGML Vulkan build and Adreno capability self-test
 - [x] model selection and explicit load/unload
 - [x] conservative pre-load memory estimator and low-memory refusal
 - [x] one-tap immutable reviewed baseline catalog
 - [x] scheduler wiring for memory/battery/thermal-aware model load
+- [ ] dual UX shell: Standalone Tools Dashboard plus Unified Chat **+ Attach Tools** menu over shared contracts
+- [ ] typed per-tool settings schema, user-owned `config/settings.json`, and contextual Chat ⚙ quick-settings bottom sheet
+- [ ] categorized Model Center with foreground-capable background download, pause/resume/cancel, process recovery, and manual `.gguf` import
+- [ ] opt-in `/sdcard/LAI/` SAF workspace, bounded settings restore, and SHA-256 `.gguf` auto-discovery without broad storage permission
 - [ ] Bangla system prompt/templates and evaluation pack
 - [x] parse complete LLM-proposed JSON tool calls with strict per-tool schemas and dispatch revalidation
 - [x] opt-in one-shot trusted confirmation dialog (build verified; v0.8.0 model emitted no valid proposal)
@@ -61,17 +66,22 @@
 - [ ] HTP context manifest/cache
 - [ ] dedicated QNN runtime adapter and explicit fallback (outside `runtime:llama`)
 - [ ] Adreno/HTP/CPU routing under thermal/memory policy
+- [ ] closed-loop Thermal/Battery Safety Throttling: dynamic thread/batch/backend admission, Android thermal callbacks, low-battery/charging policy, cooldown/hysteresis, and visible fallback reason
+- [ ] native C++ bounded `TaskGraph` for memory-admitted LLM + Embedding/Whisper micro-model chaining; parallelize only when aggregate weights/KV/workspaces/buffers fit
+- [ ] qualify 3B–5B LLM task chains without changing or removing the current Qwen 1.5B correctness pipeline
 - [ ] printed and handwritten Bangla OCR QNN acceleration
 - [ ] Snapdragon 8s Gen 4 performance/accuracy report
 
-## Phase 4 — plugin ecosystem
+## Phase 4 — advanced local tools and plugin ecosystem
 
 - [ ] signed capability-based plugin manifest
 - [ ] local RAG vector store abstraction
-- [ ] Bangla/English STT
-- [ ] offline TTS
-- [ ] scoped user-created automation recipes
-- [ ] import/export with permission review
+- [ ] Encrypted Vector DB using SQLCipher, Android Keystore-wrapped key material, versioned embedding/model metadata, bounded migrations, and explicit index deletion/export controls
+- [ ] Bangla/English STT with streaming Whisper-class micro-model adapter
+- [ ] Parallel Streaming TTS with Barge-In: sentence/phrase chunks synthesize while LLM output continues; Interrupt VAD stops queued PCM, active TTS, and generation with bounded latency and echo-suppression policy
+- [ ] Shizuku System Automation v1: scoped user recipes over the existing argv allowlist, per-step confirmation/foreground binding, service-death recovery, persistent audit, loop/time limits, and global stop
+- [ ] scoped user-created automation recipe import/export with capability and permission review
+- [ ] Standalone OCR, Voice, Image Generation, and Vector Search tool surfaces reach feature parity with their Chat attachments
 
 ## Later — progressive vendor expansion
 

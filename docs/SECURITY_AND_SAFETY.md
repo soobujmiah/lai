@@ -18,7 +18,8 @@
 | Screen prompt injection | screen data has no authority | provenance labels in model context |
 | Shell injection | no raw shell; validated argv | fuzz every argument compiler |
 | Password leakage in tree | password text/description omitted | screenshot redaction UX |
-| Untrusted model file | HF HTTPS policy, optional hash, GGUF magic | mandatory signed manifest |
+| Untrusted model file | reviewed-host policy, mandatory SHA-256, exact size and GGUF magic | signed multi-artifact manifests and broader format probes |
+| Malicious workspace/config | planned explicit SAF root, bounded enumeration/schema, digest-based registration, `LOCAL_UNREVIEWED` state | parser fuzzing, provider/device tests and migration recovery |
 | Oversized output/DoS | 400 nodes, depth 24, 64 KiB shell output, timeout | model allocation preflight |
 | Accessibility service retention | weak service ref, fresh roots | lifecycle/instrumentation tests |
 | Secret committed to Git | validation regex, ignored key formats | GitHub secret scanning/protection |
@@ -54,7 +55,8 @@ Shizuku may run as UID 2000 (ADB shell) or UID 0 (root/Sui). The app surfaces UI
 - app-private model storage;
 - screenshots in memory and recycled after OCR;
 - no analytics or remote inference dependency;
-- no broad storage permission;
+- no broad storage permission; the planned `/sdcard/LAI/` workspace uses an explicit SAF tree grant and bounded provider enumeration;
+- external `settings.json`, model and tool files remain untrusted until schema/size/hash/format validation; unknown GGUF files never inherit reviewed claims;
 - no logs of prompts, screen content, typed text, or command stdout by default;
 - load/TTFT/token-rate/thermal samples remain in memory (maximum 20) and have no upload path;
 - diagnostics leave app-private state only after an explicit Storage Access Framework export and exclude user content;
