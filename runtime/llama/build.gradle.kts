@@ -11,6 +11,7 @@ android {
 
     defaultConfig {
         minSdk = 28
+        consumerProguardFiles("consumer-rules.pro")
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake {
@@ -41,7 +42,6 @@ android {
         jvmTarget = "17"
         freeCompilerArgs += "-Xjvm-default=all"
     }
-    consumerProguardFiles("consumer-rules.pro")
 }
 
 dependencies {

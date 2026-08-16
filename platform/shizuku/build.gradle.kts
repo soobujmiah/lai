@@ -6,7 +6,10 @@ plugins {
 android {
     namespace = "dev.lai.runtime.platform.shizuku"
     compileSdk = 35
-    defaultConfig { minSdk = 28 }
+    defaultConfig {
+        minSdk = 28
+        consumerProguardFiles("consumer-rules.pro")
+    }
     buildFeatures {
         aidl = true
         buildConfig = true
@@ -16,7 +19,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    consumerProguardFiles("consumer-rules.pro")
 }
 
 dependencies {
