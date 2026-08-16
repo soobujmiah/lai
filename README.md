@@ -110,7 +110,7 @@ See [BUILD_AND_RELEASE.md](docs/BUILD_AND_RELEASE.md) for exact commands and key
 
 ## Model download
 
-The signed web catalog provides supported models with one-tap explicit download. A verified cache and embedded fallback keep the list available offline. Advanced manual URLs still require a mandatory SHA-256; local file import verifies the same reviewed digest, exact size and GGUF signature without storing the source URI. `platform:download` is the sole network-owning module; no prompts, screen data, generations or telemetry have an outbound path.
+The signed web catalog provides supported models with one-tap explicit download. A verified cache and embedded fallback keep the list available offline. **Keep copy** exports an installed model through Android's document picker and re-verifies SHA-256, creating a user-owned GGUF that survives app uninstall; after reinstall, **Import file** restores it without network download. Advanced manual URLs still require a mandatory SHA-256. `platform:download` is the sole network-owning module; no prompts, screen data, generations or telemetry have an outbound path.
 
 The v0.2 CPU backend can load a compatible GGUF after explicit user selection. Backend requirements and the Qualcomm licensing boundary are in [MODELS_AND_BACKENDS.md](docs/MODELS_AND_BACKENDS.md).
 

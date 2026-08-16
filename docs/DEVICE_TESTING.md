@@ -41,6 +41,10 @@ Open Model Setup and explicitly refresh the supported list; record that the stat
 11. Tap Screen Reader; confirm the missing OCR model is clearly reported rather than fake text.
 12. Background/foreground the app, rotate, lock/unlock, and kill/restart Shizuku.
 
+## Retained model copy
+
+With an installed reviewed model, press **Keep copy**, save to Documents/Downloads, and wait for SHA verification. Uninstall LAI, confirm the GGUF remains in the chosen location, reinstall, choose **Import file**, and verify the model loads without network traffic. App-private and app-specific external directories do not satisfy this test because Android removes both on uninstall.
+
 ## Diagnostics JSON
 
 After model load and several generations, use **Settings → Export diagnostics JSON**. Attach this standard file with feedback; inspect it first. It must contain runtime/performance metadata and must not contain prompt, response, screenshot, OCR, document, package-name or credential content. The schema is documented in [DIAGNOSTICS_EXPORT.md](DIAGNOSTICS_EXPORT.md).

@@ -27,8 +27,9 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Reviewed GGUF download | Device validated baseline | Qwen 1,117,320,736-byte artifact activated with reviewed digest; interruption/resume still pending |
 | LLM JNI/session interface | Device validated metrics | 207-token prompt, 182-token output and native TTFT/prefill/decode/total counters observed; cancellation pending |
 | llama.cpp CPU inference | Device validated basic | Qwen loaded in 578 ms; coherent Bangla output, 45.76 prefill and 20.35 decode tok/s measured; broad quality/thermal testing pending |
-| v0.7 runtime reliability | Partially device validated | multi-turn prompt and native metrics passed; Stop/recovery, New chat, trimming and memory-pressure handling pending |
-| Diagnostics JSON v1 | Build verified | explicit SAF export, 20-sample local history and content-exclusion schema/tests passed; device export inspection pending |
+| v0.7 runtime reliability | Partially device validated | four-turn prompt growth and native metrics passed; Stop/recovery, New chat, trimming and memory-pressure handling pending |
+| Diagnostics JSON v1 | Device validated | v0.7.1 JSON exported with four samples and expected privacy exclusions; no user content observed |
+| Retained model copy | Candidate | SAF export/reopen/SHA verification and post-reinstall import UX added; CI/device validation pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | requires licensed SDK/runtime and physical device |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |

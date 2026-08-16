@@ -25,6 +25,7 @@
 - [x] NpuHub comparison and ADR
 - [x] one local-first application and upgrade path
 - [x] reviewed local GGUF import through Android file picker
+- [x] uninstall-safe user-owned GGUF export with destination hash verification
 - [x] signed web supported-model catalog with verified offline fallback
 
 ## Phase 2 — usable local intelligence

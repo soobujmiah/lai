@@ -59,6 +59,7 @@ enum class RuntimeOperation {
     IDLE,
     DOWNLOADING,
     IMPORTING,
+    EXPORTING,
     LOADING,
     READY,
     GENERATING,
@@ -134,6 +135,7 @@ data class MainUiState(
         get() = operation in setOf(
             RuntimeOperation.DOWNLOADING,
             RuntimeOperation.IMPORTING,
+            RuntimeOperation.EXPORTING,
             RuntimeOperation.LOADING,
             RuntimeOperation.GENERATING,
             RuntimeOperation.CANCELLING,
@@ -527,6 +529,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         startModelDownload(model.toModelSpec())
+    }
+
+    fun exportInstalledModel(modelId: String, destination: Uri) {
+        if (state.value.busy) return
+        val model = state.value.installedModels.firstOrNull { it.id == modelId }
+            ?: run {
+                _state.update { it.copy(notice = "Installed model was not found") }
+                return
+            }
+        _state.update {
+            it.copy(
+                operation = RuntimeOperation.EXPORTING,
+                notice = "Creating uninstall-safe model copy…",
+                downloadProgress = DownloadProgress(0, model.bytes),
+            )
+        }
+        viewModelScope.launch {
+            container.modelRepository.exportModel(
+                model = model,
+                contentResolver = getApplication<Application>().contentResolver,
+                destination = destination,
+            ) { progress -> _state.update { it.copy(downloadProgress = progress) } }
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
+                            notice = "Retained GGUF copy verified. It will survive LAI uninstall.",
+                            downloadProgress = null,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            operation = RuntimeOperation.ERROR,
+                            notice = error.message ?: "Model export failed",
+                            downloadProgress = null,
+                        )
+                    }
+                }
+        }
     }
 
     fun importRecommendedModel(uri: Uri) {

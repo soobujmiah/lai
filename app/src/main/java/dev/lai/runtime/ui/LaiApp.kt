@@ -38,6 +38,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -362,6 +364,14 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
     val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::importRecommendedModel)
     }
+    val pendingExportModelId = remember { mutableStateOf<String?>(null) }
+    val modelExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        val modelId = pendingExportModelId.value
+        if (uri != null && modelId != null) viewModel.exportInstalledModel(modelId, uri)
+        pendingExportModelId.value = null
+    }
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.model_setup), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -421,6 +431,11 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
             }
             if (state.installedModels.isNotEmpty()) {
                 Text("Installed", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Use Keep copy to save a verified GGUF in Documents/Downloads. That copy survives app uninstall and can be imported after reinstall.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 state.installedModels.forEach { model ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -434,13 +449,22 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
                                 style = MaterialTheme.typography.labelSmall,
                             )
                         }
-                        if (state.activeModelId == model.id) {
-                            OutlinedButton(onClick = viewModel::unloadModel, enabled = !state.busy) {
-                                Text("Unload")
-                            }
-                        } else {
-                            Button(onClick = { viewModel.loadModel(model.id) }, enabled = !state.busy) {
-                                Text("Load")
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedButton(
+                                onClick = {
+                                    pendingExportModelId.value = model.id
+                                    modelExporter.launch(model.fileName)
+                                },
+                                enabled = !state.busy,
+                            ) { Text("Keep copy") }
+                            if (state.activeModelId == model.id) {
+                                OutlinedButton(onClick = viewModel::unloadModel, enabled = !state.busy) {
+                                    Text("Unload")
+                                }
+                            } else {
+                                Button(onClick = { viewModel.loadModel(model.id) }, enabled = !state.busy) {
+                                    Text("Load")
+                                }
                             }
                         }
                     }

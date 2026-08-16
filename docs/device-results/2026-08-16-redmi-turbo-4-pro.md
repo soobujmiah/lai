@@ -88,12 +88,30 @@ The conversation showed several user/assistant turns and the final request recei
 
 The supported-model status still showed the embedded offline list; signed web refresh/cache was not tested.
 
+## v0.7.1 Diagnostics JSON evidence
+
+The user exported `lai-diagnostics-v1.json`; the file itself remains outside the repository. Text-only observations:
+
+- schema version 1, app v0.7.1 build 46, `productionSigned=false`;
+- operation `READY`, native CPU backend loaded, 4,096-token context;
+- model load 585 ms;
+- 3,176,853,504 bytes available (~3,029.7 MiB) versus 1,922,627,104-byte estimate (~1,833.6 MiB);
+- battery 64%, not charging, thermal `NOMINAL`;
+- four local performance samples with prompt growth 159 → 183 → 220 → 295 tokens, providing stronger multi-turn-history evidence;
+- average TTFT 5,575 ms (range 4,422–7,825);
+- average prefill 38.60 tok/s (range 32.95–42.21);
+- average decode 20.43 tok/s (range 19.47–21.72);
+- average total 7,156 ms (range 5,283–10,598);
+- no context turns trimmed yet;
+- Accessibility disconnected and Shizuku permission required during this chat-only test;
+- the export contained runtime/model/performance metadata and its privacy exclusion declaration, with no prompts, generated text, screenshots, OCR text, Accessibility trees, documents, credentials, package names, or network identifiers.
+
 ## Remaining gate
 
 - refresh and cache the signed catalog, then restart offline;
 - press Stop during a long response and immediately generate again;
 - verify New chat forgets prior turns;
 - force enough turns to exercise context trimming;
-- export and inspect Diagnostics JSON v1 from v0.7.1;
+- create a retained GGUF copy and import it after reinstall;
 - run a 10-minute thermal test;
 - provide crash/log evidence if any.

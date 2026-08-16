@@ -109,6 +109,45 @@ class ModelRepository private constructor(
         File(modelDir, model.fileName).also { check(it.isFile) { "Model file is missing" } }
     }
 
+    suspend fun exportModel(
+        model: InstalledModel,
+        contentResolver: ContentResolver,
+        destination: Uri,
+        onProgress: (DownloadProgress) -> Unit = {},
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val source = File(modelDir, model.fileName)
+            check(source.isFile && source.length() == model.bytes) { "Installed model file is missing or changed" }
+            val digest = MessageDigest.getInstance("SHA-256")
+            contentResolver.openOutputStream(destination, "w")?.buffered()?.use { output ->
+                source.inputStream().buffered().use { input ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var copied = 0L
+                    var lastReport = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        digest.update(buffer, 0, count)
+                        copied += count
+                        if (copied - lastReport >= PROGRESS_STEP_BYTES) {
+                            onProgress(DownloadProgress(copied, model.bytes))
+                            lastReport = copied
+                        }
+                    }
+                    output.flush()
+                    check(copied == model.bytes) { "Retained model copy is incomplete" }
+                    onProgress(DownloadProgress(copied, model.bytes))
+                }
+            } ?: error("Android could not open the selected model destination")
+            val streamedDigest = digest.digest().joinToString("") { "%02x".format(it) }
+            check(streamedDigest == model.sha256) { "Installed model changed during export" }
+            val retainedDigest = contentResolver.openInputStream(destination)?.buffered()?.use { input -> sha256(input) }
+                ?: error("Android could not reopen the retained model copy for verification")
+            check(retainedDigest == model.sha256) { "Retained model copy failed SHA-256 verification" }
+        }
+    }
+
     suspend fun delete(id: String): Boolean = withContext(Dispatchers.IO) {
         val models = readRegistry()
         val target = models.firstOrNull { it.id == id } ?: return@withContext false
@@ -232,15 +271,15 @@ class ModelRepository private constructor(
         check(temporary.renameTo(registryFile))
     }
 
-    private fun sha256(file: File): String {
+    private fun sha256(file: File): String = file.inputStream().buffered().use { input -> sha256(input) }
+
+    private fun sha256(input: InputStream): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().buffered().use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }

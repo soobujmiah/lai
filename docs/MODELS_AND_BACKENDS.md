@@ -9,8 +9,9 @@
 5. LAI calculates SHA-256 and verifies the first four bytes are `GGUF`.
 6. The file is renamed to `<id>.gguf`; metadata is written atomically to `registry.json`.
 7. A selected backend opens it through an opaque JNI session handle.
+8. **Keep copy** writes a user-selected document, reopens it, and verifies SHA-256 before reporting success.
 
-The app requests neither all-files access nor media storage permission. Uninstalling the app removes its models.
+The app requests neither all-files access nor media storage permission. Android removes the optimized private model on uninstall, but a user-owned Keep copy in Documents/Downloads remains. After reinstall, Import file verifies and restores the private runtime copy without redownloading.
 
 ## Reviewed built-in catalog
 

@@ -43,6 +43,8 @@ All notable changes are documented here. The project follows semantic versioning
 - Recorded Redmi Turbo 4 Pro evidence for Qwen installation, CPU scheduling, memory preflight, coherent Bangla output, 578 ms load, 4,533 ms TTFT, 45.76 prefill tok/s and 20.35 decode tok/s.
 - Added explicit Storage Access Framework export of versioned, privacy-filtered diagnostics JSON.
 - Added an in-memory rolling history of 20 generation performance samples; no automatic persistence or upload.
+- Recorded v0.7.1 Diagnostics JSON evidence: four multi-turn samples, 5.58 s average TTFT, 38.60 prefill tok/s and 20.43 decode tok/s with no user content in the export.
+- Added **Keep copy**: user-selected SAF export, destination re-open and SHA-256 verification so a GGUF survives app uninstall and can be imported after reinstall.
 
 ### Phase 2 candidate
 
