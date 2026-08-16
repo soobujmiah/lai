@@ -118,3 +118,4 @@ All notable changes are documented here. The project follows semantic versioning
 - GitHub Actions run 31956572135 passed persistent-ledger and Android file/reopen/replay/corruption tests, fourteen-module boundaries, coverage, lint, native runtime and APK assembly.
 - Release run 31957058631 published v0.8.1 with an 8,371,584-byte temporary/debug-signed APK.
 - GitHub Actions run 31958557120 passed proposal outcome telemetry/privacy tests, strengthened prompt integration, persistent audit tests, coverage, lint, native runtime and APK assembly.
+- Release run 31958838061 published v0.8.2 with an 8,371,584-byte temporary/debug-signed APK.

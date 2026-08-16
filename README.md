@@ -2,7 +2,7 @@
 
 LAI is a source-only Android foundation for private, Bangla-first on-device AI and consent-driven Android automation. It targets modern arm64 Snapdragon devices, beginning with Snapdragon 8s Gen 4 (Hexagon NPU + Adreno GPU).
 
-> **Current status:** v0.8.1 adds build-verified vendor-neutral backend contracts, opt-in one-shot local tool proposals, and an approval-before-execution private hash-chained audit with exact-call replay protection. Snapdragon 8s Gen 4 has physically passed reviewed Qwen installation, CPU scheduling, memory preflight, multi-turn local inference, coherent Bangla output, ~20 tok/s decode, and retained-model offline restore after uninstall. The v0.8.0 model-proposal attempt produced no valid recognized proposal, so proposal-format diagnostics/refinement, Stop/recovery, forced context trimming, and sustained thermal behavior remain gates. See [status](docs/STATUS.md).
+> **Current status:** v0.8.2 adds build-verified vendor-neutral backend contracts, opt-in one-shot local tool proposals, approval-before-execution hash-chained audit/replay protection, and privacy-safe parser outcome diagnostics for the next Qwen compliance test. Snapdragon 8s Gen 4 has physically passed reviewed Qwen installation, CPU scheduling, memory preflight, multi-turn local inference, coherent Bangla output, ~20 tok/s decode, and retained-model offline restore after uninstall. The v0.8.0 model-proposal attempt produced no valid recognized proposal, so proposal-format diagnostics/refinement, Stop/recovery, forced context trimming, and sustained thermal behavior remain gates. See [status](docs/STATUS.md).
 
 ## Product principles
 
@@ -80,7 +80,7 @@ lai/
 └── scripts/                 # source, privacy and boundary enforcement
 ```
 
-Current device-test APK: [LAI v0.8.1](https://github.com/soobujmiah/lai/releases/download/v0.8.1/app-release.apk) (temporary/debug signing).
+Current device-test APK: [LAI v0.8.2](https://github.com/soobujmiah/lai/releases/download/v0.8.2/app-release.apk) (temporary/debug signing).
 
 ## Remote build: fastest path
 

@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest release: [`v0.8.1`](https://github.com/soobujmiah/lai/releases/tag/v0.8.1), commit `a0f2561`, [release run 31957058631](https://github.com/soobujmiah/lai/actions/runs/31957058631). Persistent-ledger/Android file/replay/corruption tests, strict tool schemas, trusted review UI, diagnostics privacy, vendor boundaries, catalog v3, coverage, lint, Kotlin/JNI/native runtime and release APK assembly passed. The published temporary/debug-signed `app-release.apk` is 8,371,584 bytes. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) signed and published revision 3; the exact 1,131-byte catalog asset and detached signature were independently verified.
+Latest release: [`v0.8.2`](https://github.com/soobujmiah/lai/releases/tag/v0.8.2), commit `cbf6ff9`, [release run 31958838061](https://github.com/soobujmiah/lai/actions/runs/31958838061). Privacy-safe proposal counters, strengthened exact-format instruction, persistent-ledger/Android file/replay/corruption tests, strict schemas, trusted review UI, diagnostics privacy, vendor boundaries, coverage, lint, Kotlin/JNI/native runtime and release APK assembly passed. The published temporary/debug-signed `app-release.apk` is 8,371,584 bytes. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) signed and published revision 3; the exact 1,131-byte catalog asset and detached signature were independently verified.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
