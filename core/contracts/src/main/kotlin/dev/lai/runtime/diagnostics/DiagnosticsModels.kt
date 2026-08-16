@@ -51,6 +51,16 @@ data class RuntimeDiagnostics(
     val accessibilityConnected: Boolean,
     val shizukuState: String,
     val trimmedConversationTurns: Int,
+    /**
+     * Why the most recent generation attempt ended without producing tokens, if it did.
+     *
+     * Two field reports arrived with `performance: []` and no other clue, which made it
+     * impossible to distinguish a native failure from a silent stall. This is a short, fixed
+     * diagnostic reason produced by LAI itself - never model output, prompt text, or a file path.
+     */
+    val lastGenerationFailure: String? = null,
+    /** Attempts that ended with zero tokens since app start. */
+    val emptyGenerationCount: Int = 0,
 )
 
 @Serializable

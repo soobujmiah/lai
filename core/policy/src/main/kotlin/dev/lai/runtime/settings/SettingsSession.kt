@@ -143,17 +143,34 @@ class SettingsSessionPolicy(private val policy: SettingsPolicy = SettingsPolicy(
     fun discardOverride(session: SettingsSession): SettingsSession = session.copy(pendingLlmOverride = null)
 
     /**
-     * Ceiling the quick sheet must apply to "max new tokens": the smaller of the configured
-     * context budget and the context the loaded native runtime actually reports.
+     * Ceiling the quick sheet must apply to "max new tokens".
+     *
+     * The reply budget can never be the *whole* context: the prompt has to fit alongside it.
+     * `prepareConversation` enforces `promptTokens + maxNewTokens <= contextSize`, so a ceiling
+     * equal to the context size makes that condition unsatisfiable — the trim loop strips every
+     * message and then throws, which the user experiences as "the app just never replies".
+     *
+     * A share of the context is therefore always reserved for the prompt. The reply may claim at
+     * most [REPLY_CONTEXT_NUMERATOR]/[REPLY_CONTEXT_DENOMINATOR] of the smaller of the configured
+     * budget and the context the loaded runtime actually reports.
      */
     fun maxNewTokensCeiling(session: SettingsSession, runtimeContextTokens: Int?): Int {
         val configured = session.saved.llm.context.maxContextTokens
         val runtime = runtimeContextTokens?.takeIf { it > 0 } ?: configured
-        return minOf(ABSOLUTE_MAX_NEW_TOKENS, configured, runtime).coerceAtLeast(1)
+        val usable = minOf(configured, runtime)
+        val replyBudget = usable * REPLY_CONTEXT_NUMERATOR / REPLY_CONTEXT_DENOMINATOR
+        return minOf(ABSOLUTE_MAX_NEW_TOKENS, replyBudget).coerceAtLeast(MIN_REPLY_TOKENS)
     }
 
     private companion object {
         /** Mirrors the absolute `maxNewTokens` range enforced by [SettingsPolicy]. */
         const val ABSOLUTE_MAX_NEW_TOKENS = 4096
+
+        /** At most half the context may be spent on the reply; the rest is reserved for the prompt. */
+        const val REPLY_CONTEXT_NUMERATOR = 1
+        const val REPLY_CONTEXT_DENOMINATOR = 2
+
+        /** Even a tiny context must still allow a usable reply. */
+        const val MIN_REPLY_TOKENS = 32
     }
 }

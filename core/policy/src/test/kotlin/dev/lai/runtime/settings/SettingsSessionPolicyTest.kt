@@ -119,18 +119,38 @@ class SettingsSessionPolicyTest {
     }
 
     @Test
-    fun `max new tokens ceiling honours the smaller of configured and runtime context`() {
+    fun `max new tokens ceiling always reserves context for the prompt`() {
         val session = policy.fromLoad(
             SettingsDocumentV1(llm = LlmSettings(context = ContextPolicy(maxContextTokens = 8192))),
             fromFile = true,
             fellBackToDefaults = false,
         )
-        // Runtime context is the binding constraint.
-        assertEquals(2048, policy.maxNewTokensCeiling(session, runtimeContextTokens = 2048))
-        // The absolute policy maximum still applies when both budgets are larger.
+        // Runtime context is the binding constraint, and only half of it may go to the reply.
+        assertEquals(1024, policy.maxNewTokensCeiling(session, runtimeContextTokens = 2048))
+        // The absolute policy maximum still caps very large contexts.
         assertEquals(4096, policy.maxNewTokensCeiling(session, runtimeContextTokens = 32768))
         // An unknown/zero runtime context falls back to the configured budget, never to zero.
         assertEquals(4096, policy.maxNewTokensCeiling(session, runtimeContextTokens = null))
         assertEquals(4096, policy.maxNewTokensCeiling(session, runtimeContextTokens = 0))
+    }
+
+    @Test
+    fun `the ceiling can never consume the whole context`() {
+        // Regression: a ceiling equal to the context size makes
+        // promptTokens + maxNewTokens <= contextSize unsatisfiable, so every send trimmed the
+        // whole conversation and then threw - the user just saw the app never reply.
+        listOf(512, 1024, 2048, 4096, 8192, 32768).forEach { runtimeContext ->
+            val session = policy.fromLoad(
+                SettingsDocumentV1(llm = LlmSettings(context = ContextPolicy(maxContextTokens = runtimeContext))),
+                fromFile = true,
+                fellBackToDefaults = false,
+            )
+            val ceiling = policy.maxNewTokensCeiling(session, runtimeContext)
+            assertTrue(
+                "ceiling $ceiling must leave room for a prompt in context $runtimeContext",
+                ceiling < runtimeContext,
+            )
+            assertTrue("ceiling must stay usable", ceiling >= 32)
+        }
     }
 }

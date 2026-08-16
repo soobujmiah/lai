@@ -19,6 +19,9 @@
 namespace {
 
 std::mutex g_mutex;
+// Poll the Kotlin cancellation flag every N tokens instead of on every token: each poll is a JNI
+// upcall, and doing one per decode step measurably slows generation on mobile.
+constexpr int kCancelPollInterval = 8;
 std::string g_last_error;
 long long g_next_handle = 1;
 std::unordered_map<long long, std::shared_ptr<lai::BackendSession>> g_sessions;
@@ -283,9 +286,20 @@ Java_dev_lai_runtime_inference_NativeBindings_generate(
             static_cast<long long>(seed),
         };
         std::string pending_utf8;
+        // Cancellation is polled per token, but a JNI upcall is not free: GetObjectClass/
+        // CallBooleanMethod round-trips add latency to every single decode step and can stall
+        // when the JVM side is busy. Poll at a bounded interval instead of on literally every
+        // token; 8 tokens is far below human perception but removes most of the upcalls.
+        int cancel_poll_counter = 0;
+        bool cancel_latched = false;
         auto cancelled = [&]() {
+            if (cancel_latched) return true;
+            if ((cancel_poll_counter++ % kCancelPollInterval) != 0) return false;
             const jboolean result = env->CallBooleanMethod(callback, is_cancelled_method);
-            return env->ExceptionCheck() || result == JNI_TRUE;
+            if (env->ExceptionCheck() || result == JNI_TRUE) {
+                cancel_latched = true;
+            }
+            return cancel_latched;
         };
         auto emit = [&](std::string_view bytes) {
             pending_utf8.append(bytes);
@@ -297,6 +311,7 @@ Java_dev_lai_runtime_inference_NativeBindings_generate(
             pending_utf8.erase(0, complete);
             return !env->ExceptionCheck() && !cancelled();
         };
+
 
         const lai::GenerationResult generated = session->generate(conversation, options, emit, cancelled);
         if (!pending_utf8.empty() && !cancelled()) {

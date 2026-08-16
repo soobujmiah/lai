@@ -153,6 +153,9 @@ data class MainUiState(
     val toolAuditStatus: String = "Persistent tool audit not loaded",
     val toolAuditIntegrityValid: Boolean = false,
     val workspace: WorkspaceUiState = WorkspaceUiState(),
+    /** Short, LAI-authored reason the last attempt produced no tokens. Never model/prompt text. */
+    val lastGenerationFailure: String? = null,
+    val emptyGenerationCount: Int = 0,
 ) {
     val busy: Boolean
         get() = operation in setOf(
@@ -491,6 +494,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // The native call is still running. Releasing the session stops the CPU burn and
                 // the model must be loaded again, which is stated plainly rather than implied.
                 generationJob = null
+                recordGenerationFailure("Native generation did not yield within ${CANCEL_GRACE_MS} ms")
                 container.inferenceEngine.close()
                 _state.update {
                     it.copy(
@@ -780,6 +784,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun markGenerationFailed(message: String) {
+        recordGenerationFailure(message)
         _state.update {
             val updated = it.messages.toMutableList()
             val last = updated.lastOrNull()
@@ -794,6 +799,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             it.copy(messages = updated, operation = RuntimeOperation.ERROR, notice = message)
+        }
+    }
+
+    /**
+     * Records why an attempt produced nothing, so a support export can explain a silent failure.
+     * The reason is truncated and LAI-authored; prompts and model output are never stored.
+     */
+    private fun recordGenerationFailure(reason: String) {
+        _state.update {
+            it.copy(
+                lastGenerationFailure = reason.take(MAX_FAILURE_REASON_CHARS),
+                emptyGenerationCount = it.emptyGenerationCount + 1,
+            )
         }
     }
 
@@ -1183,6 +1201,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 accessibilityConnected = current.accessibilityConnected,
                 shizukuState = shizuku,
                 trimmedConversationTurns = current.trimmedConversationTurns,
+                lastGenerationFailure = current.lastGenerationFailure,
+                emptyGenerationCount = current.emptyGenerationCount,
             ),
             models = current.installedModels.map { model ->
                 ModelDiagnostics(
@@ -1261,6 +1281,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         /** How long Stop waits for a native call to yield before force-releasing the engine. */
         private const val CANCEL_GRACE_MS = 4_000L
         private const val MAX_PERFORMANCE_SAMPLES = 20
+        private const val MAX_FAILURE_REASON_CHARS = 200
         private const val MAX_TOOL_AUDIT_RECORDS = 50
         private val DIAGNOSTICS_JSON = Json(LaiJson) { prettyPrint = true }
     }
