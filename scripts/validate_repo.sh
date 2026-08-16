@@ -39,5 +39,6 @@ fi
 
 python3 scripts/check_architecture_boundaries.py
 python3 scripts/validate_model_catalog.py
+python3 scripts/validate_documentation.py
 
 printf 'Source policy OK: %d bytes (limit %d)\n' "$size" "$limit"

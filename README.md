@@ -70,14 +70,28 @@ lai/
 │   ├── audit/               # private hash-chained model-tool security events
 │   ├── device/              # memory/battery/thermal environment
 │   ├── accessibility/       # Android Accessibility authority
+│   ├── workspace/           # SAF grant, settings persistence and model discovery
 │   └── shizuku/             # ADB/root UserService authority
 ├── runtime/
 │   ├── llama/               # isolated JNI/C++ llama.cpp adapter
 │   ├── ocr/                 # replaceable OCR adapter seam
 │   └── orchestrator/        # policy-gated tool dispatch
 ├── plugins/api/             # versioned local-only plugin contract
-├── docs/                    # architecture, ADRs and device evidence
-└── scripts/                 # source, privacy and boundary enforcement
+├── catalog/                 # signed supported-model catalog source/public key
+├── .github/workflows/       # Android build and catalog publication CI
+├── docs/
+│   ├── architecture/        # audited system/module/AI/agent/security/plugin maps
+│   ├── implementation/      # current state, implementation plan and testing plan
+│   ├── product/             # feature matrix and roadmap compatibility path
+│   ├── decisions/           # ADR policy/index; accepted legacy ADRs remain in docs/adr
+│   ├── development/         # documentation-first engineering policy
+│   ├── legal/               # licensing/distribution map to root registers
+│   ├── ROADMAP.md           # canonical Phase 0–14 roadmap + retained implementation backlog
+│   └── device-results/      # named physical-device evidence
+├── scripts/                 # source, documentation, privacy and boundary enforcement
+├── THIRD_PARTY_NOTICES.md   # third-party notice register
+├── THIRD_PARTY_LICENSES.md  # dependency license register
+└── MODEL_LICENSES.md        # reviewed/local model license register
 ```
 
 Current device-test APK: [LAI v0.8.2](https://github.com/soobujmiah/lai/releases/download/v0.8.2/app-release.apk) (temporary/debug signing).
@@ -132,6 +146,18 @@ Use a credential manager or short-lived token. Never place a token in a remote U
 
 ## Documentation index
 
+- [Documentation map](docs/README.md)
+- [Audited current implementation state](docs/implementation/current-state.md)
+- [Master feature matrix](docs/product/feature-matrix.md)
+- [Master Phase 0–14 roadmap and implementation backlog](docs/ROADMAP.md)
+- [Implementation plan](docs/implementation/implementation-plan.md)
+- [Testing plan](docs/implementation/testing-plan.md)
+- [Master directive documentation coverage](docs/implementation/directive-coverage.md)
+- [PDF section-by-section compliance audit](docs/implementation/pdf-compliance-audit.md)
+- [Definition of done](docs/product/definition-of-done.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [System architecture](docs/architecture/system-architecture.md)
+- [ADR index and policy](docs/decisions/README.md)
 - [Current project handoff state](PROJECT_STATE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Snapdragon-first vendor backend strategy](docs/VENDOR_BACKEND_STRATEGY.md)

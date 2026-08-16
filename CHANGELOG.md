@@ -4,6 +4,22 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Documentation-first repository audit
+
+- Added the source-verified current-state audit and class/interface inventory; architecture/system/module/AI/agent/security/plugin documents; complete feature matrix; canonical Phase 0–14 roadmap; implementation/testing plans; ADR index; definition of done; development policy; and documentation map.
+- Added a section-by-section audit of all 48 PDF directive sections while preserving useful legacy documentation instead of creating empty roadmap placeholders.
+- Added `THIRD_PARTY_NOTICES.md`, `THIRD_PARTY_LICENSES.md`, `MODEL_LICENSES.md`, and the legal distribution map; production still requires generated exact resolved notices, SBOM, and provenance.
+- Added `scripts/validate_documentation.py` to enforce required substantive files, exact Phase 0–14 roadmap structure, feature-matrix columns/statuses/26 targets, PDF sections 1–48, and local Markdown links.
+- Recorded implementation/documentation conflicts, actual module/test evidence, security/privacy boundaries, and explicit MISSING/PARTIAL roadmap capabilities.
+
+### Bounded model stream hardening candidate
+
+- Added a pre-write byte ceiling to model download/import copying: reviewed expected size when known, otherwise currently writable storage minus the 256 MiB reserve, always capped at 8 GiB.
+- Rejects oversized declared responses before reading and deceptive/unknown-length streams before writing beyond the ceiling; limit violations remove unsafe staging bytes.
+- Validates expected/provider model sizes against the GGUF minimum and hard maximum and discards stale staging files already beyond policy.
+- Added `:platform:download` unit coverage for inclusive bounds, overflow rejection, resumed-transfer base accounting, and invalid limits; added the module test task to CI.
+- This candidate is not build-verified until the updated CI workflow passes.
+
 ### Verified
 
 - GitHub Actions run 31968037878 (commit `34e1281`) passed the fifteen-module source/architecture/catalog policy, pure-JVM coverage ratchets (typed settings + workspace classifier/codec + GGUF magic detector), `:platform:audit`/`:platform:workspace`/`:app` unit tests, lint, the native llama.cpp arm64 build, and debug APK assembly for the Phase 2A settings + workspace foundation.

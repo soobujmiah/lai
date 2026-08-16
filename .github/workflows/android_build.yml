@@ -104,7 +104,7 @@ jobs:
 
       - name: Unit tests and lint
         run: >-
-          gradle --no-daemon --stacktrace coverageCheck :platform:audit:testDebugUnitTest :platform:workspace:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug
+          gradle --no-daemon --stacktrace coverageCheck :platform:audit:testDebugUnitTest :platform:download:testDebugUnitTest :platform:workspace:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug
           -Plai.enableLlamaCpp=ON
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
 

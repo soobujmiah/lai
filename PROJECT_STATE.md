@@ -8,7 +8,7 @@ Latest verified build: GitHub Actions run [`31968037878`](https://github.com/soo
 Latest device-test release: [`v0.8.2`](https://github.com/soobujmiah/LAI/releases/tag/v0.8.2) (`cbf6ff9`); temporary/debug-signed APK  
 Current graph: **15 Gradle modules** (added `platform:workspace` this session)
 
-> This is a handoff snapshot. `docs/STATUS.md`, `docs/ROADMAP.md`, source, and Git history remain authoritative on conflict.
+> This is a handoff snapshot. Current source/tests are authoritative; `docs/implementation/current-state.md` is the latest audited state, `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap, and accepted ADRs govern architectural decisions. The documentation/master-roadmap and bounded model-stream changes in the working tree remain CI-unverified until an updated workflow run passes.
 
 Status vocabulary: **Implemented** = source/contracts exist · **Build verified** = CI compiles/tests/packages it · **Device validated** = named physical behavior observed · **Scaffold** = compiling boundary with honest unavailable behavior · **Planned** = documented only.
 
@@ -92,7 +92,9 @@ Generated/build/cache dirs and `.git` internals are omitted; every tracked sourc
 ```text
 lai/
 ├── PROJECT_STATE.md                         # this file
-├── README.md · CHANGELOG.md · CONTRIBUTING.md · SECURITY.md · LICENSE · .editorconfig · .gitignore
+├── README.md · CHANGELOG.md · CONTRIBUTING.md · SECURITY.md · LICENSE
+├── THIRD_PARTY_NOTICES.md · THIRD_PARTY_LICENSES.md · MODEL_LICENSES.md
+├── .editorconfig · .gitignore
 ├── build.gradle.kts                         # root plugins + pure-JVM coverage ratchets
 ├── settings.gradle.kts                      # 15-module graph
 ├── gradle.properties · gradle/libs.versions.toml
@@ -137,6 +139,7 @@ lai/
 │   ├── audit/          → ToolAuditRepository (no-backup JSONL) (+ test)
 │   ├── device/         → AndroidRuntimeEnvironmentProvider
 │   ├── download/       → ModelRepository · RemoteModelCatalogRepository (sole network owner)
+│   │   └── tests       → BoundedStreamCopyTest (pre-write stream ceiling; CI pending)
 │   ├── shizuku/        → ElevatedShell · PrivilegedUserService · ShizukuController · ShizukuUserServiceClient (+ AIDL)
 │   └── workspace/      → WorkspaceRepository · WorkspaceSettingsStore · WorkspaceDiscovery · WorkspaceSaf · ModelFormatDetector (+ test)   # (Phase 2A, NEW)
 ├── runtime/
@@ -144,11 +147,20 @@ lai/
 │   ├── ocr/            → BanglaOcrService (placeholder engine)
 │   └── orchestrator/   → AgentRuntime (tool dispatch)
 ├── plugins/api/        → LaiPlugin (+ test)
-├── docs/               → ARCHITECTURE, MODULES, STATUS, ROADMAP, SECURITY_AND_SAFETY, BANGLA_OCR,
-│                         AUTOMATION_TOOLS, MODELS_AND_BACKENDS, VENDOR_BACKEND_STRATEGY, PRIVACY_INVARIANTS,
-│                         BUILD_AND_RELEASE, DEVICE_TESTING, DIAGNOSTICS_EXPORT, adr/0002-0007,
-│                         device-results/2026-08-16-redmi-turbo-4-pro.md
-└── scripts/            → {validate_repo.sh, check_architecture_boundaries.py, validate_model_catalog.py, ci/fetch_llama_cpp.sh}
+├── docs/
+│   ├── README.md                           # documentation map
+│   ├── architecture/                       # audited overview, module, AI, agent, security, plugin maps
+│   ├── implementation/                     # current state, plans, tests, directive coverage
+│   ├── product/                            # feature matrix + canonical-roadmap compatibility path
+│   ├── decisions/README.md                 # ADR policy/index
+│   ├── ROADMAP.md                          # canonical Phase 0–14 roadmap + retained detailed backlog
+│   ├── ARCHITECTURE · MODULES · STATUS · SECURITY_AND_SAFETY · BANGLA_OCR
+│   ├── AUTOMATION_TOOLS · MODELS_AND_BACKENDS · VENDOR_BACKEND_STRATEGY · PRIVACY_INVARIANTS
+│   ├── BUILD_AND_RELEASE · DEVICE_TESTING · DIAGNOSTICS_EXPORT
+│   ├── adr/0002-0007                       # accepted legacy-path ADRs
+│   └── device-results/2026-08-16-redmi-turbo-4-pro.md
+└── scripts/            → {validate_repo.sh, validate_documentation.py, check_architecture_boundaries.py,
+                           validate_model_catalog.py, ci/fetch_llama_cpp.sh}
 ```
 
 The repository contains no APK/AAB/AAR/SO, GGUF/ONNX/TFLite/QNN model, SDK, keystore, generated build output, Gradle wrapper JAR, or diagnostics attachment. Source footprint is ~608 KB (limit 128 MB).
