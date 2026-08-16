@@ -16,7 +16,7 @@
 
 ## Backbone hardening — completed
 
-- [x] eleven-module core/platform/runtime/plugin architecture
+- [x] thirteen-module core/platform/runtime/plugin architecture
 - [x] zero-egress network ownership and mandatory artifact digest
 - [x] architecture boundary source gate
 - [x] pure-JVM coverage ratchets
@@ -30,7 +30,9 @@
 - [x] CPU session, cancellation, token streaming
 - [ ] GGML Vulkan build and Adreno capability self-test
 - [x] model selection and explicit load/unload
-- [ ] pre-load memory estimator and low-memory refusal
+- [x] conservative pre-load memory estimator and low-memory refusal
+- [x] one-tap immutable reviewed baseline catalog
+- [x] scheduler wiring for memory/battery/thermal-aware model load
 - [ ] Bangla system prompt/templates and evaluation pack
 - [ ] parse LLM-proposed tool calls with strict schema
 - [ ] trusted confirmation sheet and redacted audit records

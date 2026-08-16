@@ -18,6 +18,7 @@ val coverageFloors = mapOf(
     ":core:contracts" to 0.15,
     ":core:policy" to 0.55,
     ":core:scheduler" to 0.70,
+    ":core:model" to 0.50,
     ":plugins:api" to 0.50,
 )
 val coverageCheck = tasks.register("coverageCheck") {

@@ -27,6 +27,8 @@ All notable changes are documented here. The project follows semantic versioning
 - Made model SHA-256 mandatory and added a central no-outbound-data policy.
 - Added static network/authority/JNI/dependency boundary enforcement.
 - Added per-module pure-JVM coverage ratchets.
+- Added an immutable reviewed model catalog and one-tap digest-pinned baseline installation.
+- Added Android memory/battery/thermal observation and conservative pre-load estimation for scheduler routing.
 
 ### Phase 2 candidate
 

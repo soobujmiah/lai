@@ -11,7 +11,9 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
 | Layered module backbone | Ready | eleven-module Gradle/manifest graph compiled and packaged remotely |
 | Zero-egress architecture policy | Ready | only download module owns network/permission; boundary check passed in CI |
-| Evidence-aware scheduler | Ready contract | compile/probe/device/benchmark evidence plus memory/thermal/battery tests pass; app routing integration pending |
+| Evidence-aware scheduler | Candidate integration | contract/tests ready; model loads now route through device environment and memory preflight; CI/device verification pending |
+| Reviewed model catalog | Candidate | immutable official Qwen baseline metadata, digest, size and one-tap UX; CI/device verification pending |
+| Android environment provider | Candidate | available memory, battery, charging and thermal snapshot isolated in `platform:device` |
 | GitHub Android toolchain | Ready | workflow installs API 35, Build Tools, NDK, CMake, Gradle remotely |
 | arm64 native `.so` build | Ready | isolated `runtime:llama` externalNativeBuild compiles C++20 JNI library |
 | Compose three-mode UX | Ready | chat, screen reader, automator; developer controls hidden |

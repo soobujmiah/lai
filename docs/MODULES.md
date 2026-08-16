@@ -5,8 +5,10 @@
 | `core:contracts` | serializable tool, automation, inference, model, OCR and shell contracts | Kotlin/coroutines/serialization only |
 | `core:policy` | agent consent, local-first data-flow policy, shell argv allowlist | contracts |
 | `core:scheduler` | backend evidence and thermal/battery/memory routing | contracts |
+| `core:model` | immutable reviewed artifact catalog and trust metadata | contracts |
 | `plugins:api` | versioned local-only plugin manifest and constrained context | contracts, policy |
 | `platform:download` | the only network transport, artifact streaming/hash/activation | core |
+| `platform:device` | Android memory, battery, charging and thermal observations | scheduler |
 | `platform:accessibility` | Accessibility service, node capture, screenshots and UI actions | contracts |
 | `platform:shizuku` | Shizuku binder/UserService and privileged process boundary | contracts, policy |
 | `runtime:llama` | JNI/C++ llama.cpp adapter | contracts |

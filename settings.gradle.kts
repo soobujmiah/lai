@@ -23,10 +23,12 @@ include(":app")
 include(":core:contracts")
 include(":core:policy")
 include(":core:scheduler")
+include(":core:model")
 include(":plugins:api")
 
 // Android authority boundaries.
 include(":platform:download")
+include(":platform:device")
 include(":platform:accessibility")
 include(":platform:shizuku")
 

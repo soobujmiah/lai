@@ -133,7 +133,9 @@ The current UI exposes safe manual demonstrations; feeding tool proposals from a
 |---|---|---|
 | Compose/state | Main | Activity/ViewModel |
 | Accessibility node operations | Main immediate | Accessibility service |
-| Model network and hashing | IO | ModelRepository |
+| Model catalog/policy/scheduling | caller / pure JVM | core model, policy and scheduler |
+| Android memory/battery/thermal snapshot | short synchronous platform call | platform:device |
+| Model network and hashing | IO | platform:download ModelRepository |
 | Shizuku process streams | IO coroutines | ElevatedShell |
 | OCR preprocessing/inference | Default or plugin-owned | OcrEngine |
 | Native token generation | dedicated native worker (Phase 2) | BackendSession |

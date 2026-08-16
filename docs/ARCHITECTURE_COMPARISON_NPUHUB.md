@@ -39,7 +39,7 @@ The right global product is not either repository unchanged. LAI adopts NpuHub's
 
 ## Patterns deliberately not copied unchanged
 
-- Twenty-five modules immediately would slow iteration and obscure the product. LAI starts with eleven cohesive modules and splits feature UI when ownership warrants it.
+- Twenty-five modules immediately would slow iteration and obscure the product. LAI starts with thirteen cohesive modules and splits feature UI when ownership warrants it.
 - NpuHub's plugin interface validates input but does not provide a full capability-scoped execution lifecycle. LAI's API includes a constrained execution context, while dynamic third-party loading remains disabled.
 - Large single-screen Compose files are not a target architecture. LAI will add feature modules plus state/route separation as each surface grows.
 - A committed Gradle wrapper JAR conflicts with LAI's source-only rule. CI obtains Gradle remotely.
@@ -53,8 +53,10 @@ flowchart TB
   CONTRACTS[core:contracts]
   POLICY[core:policy]
   SCHED[core:scheduler]
+  MODEL[core:model]
   PLUGIN[plugins:api]
   DL[platform:download]
+  DEVICE[platform:device]
   AX[platform:accessibility]
   SH[platform:shizuku]
   LLAMA[runtime:llama]
@@ -63,10 +65,12 @@ flowchart TB
 
   POLICY --> CONTRACTS
   SCHED --> CONTRACTS
+  MODEL --> CONTRACTS
   PLUGIN --> CONTRACTS
   PLUGIN --> POLICY
   DL --> CONTRACTS
   DL --> POLICY
+  DEVICE --> SCHED
   AX --> CONTRACTS
   SH --> CONTRACTS
   SH --> POLICY
@@ -78,6 +82,8 @@ flowchart TB
   ORCH --> SH
   ORCH --> OCR
   APP --> DL
+  APP --> DEVICE
+  APP --> MODEL
   APP --> LLAMA
   APP --> ORCH
   APP --> SCHED

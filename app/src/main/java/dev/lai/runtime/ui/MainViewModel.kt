@@ -13,6 +13,12 @@ import dev.lai.runtime.inference.InferenceBackend
 import dev.lai.runtime.inference.InferenceEvent
 import dev.lai.runtime.inference.InstalledModel
 import dev.lai.runtime.inference.ModelSpec
+import dev.lai.runtime.model.ReviewedModel
+import dev.lai.runtime.model.ReviewedModelCatalog
+import dev.lai.runtime.scheduler.BackendCapability
+import dev.lai.runtime.scheduler.CapabilityEvidence
+import dev.lai.runtime.scheduler.InferenceWorkload
+import dev.lai.runtime.scheduler.RuntimeEnvironment
 import dev.lai.runtime.shell.ShizukuState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +33,20 @@ enum class UiMode { CHAT, SCREEN_READER, AUTOMATOR }
 
 data class ChatMessage(val fromUser: Boolean, val text: String)
 
+private data class ScheduledLoad(
+    val backend: InferenceBackend,
+    val reason: String,
+    val estimatedPeakBytes: Long,
+    val environment: RuntimeEnvironment,
+)
+
+private fun environmentSummary(environment: RuntimeEnvironment): String {
+    val memory = environment.availableMemoryBytes?.let { "${it / 1_048_576} MB available" } ?: "memory unknown"
+    val battery = environment.batteryPercent?.let { "$it% battery" } ?: "battery unknown"
+    val charging = when (environment.charging) { true -> "charging"; false -> "not charging"; null -> "charge unknown" }
+    return "$memory • $battery • $charging • thermal ${environment.thermalState.name}"
+}
+
 data class MainUiState(
     val mode: UiMode = UiMode.CHAT,
     val input: String = "",
@@ -39,6 +59,7 @@ data class MainUiState(
     val developerMode: Boolean = false,
     val settingsVisible: Boolean = false,
     val installedModels: List<InstalledModel> = emptyList(),
+    val recommendedModel: ReviewedModel = ReviewedModelCatalog.recommendedCpuBaseline,
     val activeModelId: String? = null,
     val modelName: String = "",
     val modelUrl: String = "",
@@ -46,12 +67,18 @@ data class MainUiState(
     val downloadProgress: DownloadProgress? = null,
     val notice: String? = null,
     val runtimeDetail: String = "",
+    val schedulerDetail: String = "No model has been scheduled",
+    val environmentDetail: String = "",
+    val estimatedPeakBytes: Long? = null,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val container = (application as LaiApplication).container
     private val _state = MutableStateFlow(
-        MainUiState(runtimeDetail = container.inferenceEngine.capabilities.detail),
+        MainUiState(
+            runtimeDetail = container.inferenceEngine.capabilities.detail,
+            environmentDetail = environmentSummary(container.runtimeEnvironment.snapshot()),
+        ),
     )
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
@@ -177,18 +204,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loadModel(modelId: String) {
         if (state.value.busy) return
         val model = state.value.installedModels.firstOrNull { it.id == modelId } ?: return
-        _state.update { it.copy(busy = true, notice = "Loading ${model.displayName}…") }
+        _state.update { it.copy(busy = true, notice = "Checking device resources for ${model.displayName}…") }
         viewModelScope.launch {
-            val result = runCatching { container.modelRepository.resolve(model) }
-                .mapCatching { file ->
-                    container.inferenceEngine.load(file.absolutePath, InferenceBackend.CPU).getOrThrow()
+            val result = runCatching {
+                val estimate = container.memoryEstimator.estimate(model.bytes, MODEL_CONTEXT_TOKENS)
+                val environment = container.runtimeEnvironment.snapshot()
+                val runtime = container.inferenceEngine.capabilities
+                val evidence = buildSet {
+                    if (runtime.nativeLibraryLoaded) add(CapabilityEvidence.COMPILED)
+                    if (runtime.nativeLibraryLoaded) add(CapabilityEvidence.RUNTIME_PROBED)
                 }
-            result.onSuccess {
+                val capabilities = runtime.compiledBackends
+                    .filter { it != InferenceBackend.AUTO }
+                    .map { backend ->
+                        BackendCapability(
+                            backend = backend,
+                            supported = true,
+                            evidence = evidence,
+                            estimatedPeakBytes = estimate.estimatedPeakBytes,
+                        )
+                    }
+                val decision = container.inferenceScheduler.select(
+                    workload = InferenceWorkload(estimate.estimatedPeakBytes),
+                    environment = environment,
+                    capabilities = capabilities,
+                )
+                val file = container.modelRepository.resolve(model)
+                container.inferenceEngine.load(file.absolutePath, decision.selected).getOrThrow()
+                ScheduledLoad(
+                    backend = decision.selected,
+                    reason = decision.reason,
+                    estimatedPeakBytes = estimate.estimatedPeakBytes,
+                    environment = environment,
+                )
+            }
+            result.onSuccess { load ->
                 _state.update {
                     it.copy(
                         busy = false,
                         activeModelId = model.id,
-                        notice = "${model.displayName} is ready for local chat",
+                        schedulerDetail = "${load.backend.name}: ${load.reason}",
+                        environmentDetail = environmentSummary(load.environment),
+                        estimatedPeakBytes = load.estimatedPeakBytes,
+                        notice = "${model.displayName} is ready for local chat on ${load.backend.name}",
                     )
                 }
             }.onFailure { error ->
@@ -196,6 +254,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     it.copy(
                         busy = false,
                         activeModelId = null,
+                        schedulerDetail = "Load rejected: ${error.message ?: "unknown reason"}",
                         notice = error.message ?: "Model loading failed",
                     )
                 }
@@ -208,22 +267,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(activeModelId = null, notice = "Model unloaded") }
     }
 
+    fun installRecommendedModel() {
+        if (state.value.installedModels.any { it.id == state.value.recommendedModel.id }) {
+            _state.update { it.copy(notice = "Recommended model is already installed") }
+            return
+        }
+        startModelDownload(state.value.recommendedModel.toModelSpec())
+    }
+
     fun downloadModel() {
         val current = state.value
-        if (current.busy) return
         val id = current.modelName.trim().lowercase()
             .replace(Regex("[^a-z0-9._-]+"), "-")
             .trim('-')
-        _state.update { it.copy(busy = true, notice = null, downloadProgress = DownloadProgress(0, null)) }
+        startModelDownload(
+            ModelSpec(
+                id = id,
+                displayName = current.modelName.trim(),
+                url = current.modelUrl.trim(),
+                sha256 = current.modelSha.trim().ifBlank { null },
+            ),
+        )
+    }
+
+    private fun startModelDownload(spec: ModelSpec) {
+        if (state.value.busy) return
+        _state.update { it.copy(busy = true, notice = null, downloadProgress = DownloadProgress(0, spec.expectedBytes)) }
         viewModelScope.launch {
-            val result = container.modelRepository.download(
-                ModelSpec(
-                    id = id,
-                    displayName = current.modelName.trim(),
-                    url = current.modelUrl.trim(),
-                    sha256 = current.modelSha.trim().ifBlank { null },
-                ),
-            ) { progress -> _state.update { it.copy(downloadProgress = progress) } }
+            val result = container.modelRepository.download(spec) { progress ->
+                _state.update { it.copy(downloadProgress = progress) }
+            }
             result.onSuccess { model ->
                 _state.update {
                     it.copy(
@@ -253,5 +326,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         container.inferenceEngine.close()
         super.onCleared()
+    }
+
+    companion object {
+        private const val MODEL_CONTEXT_TOKENS = 4096
     }
 }

@@ -266,9 +266,16 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
         }
         if (state.developerMode) {
             item { StatusCard("Native runtime", state.runtimeDetail) }
+            item { StatusCard("Scheduler", state.schedulerDetail) }
             item {
-                ModelSetup(state, viewModel)
+                StatusCard(
+                    "Device environment",
+                    state.environmentDetail + (state.estimatedPeakBytes?.let {
+                        " • estimated model peak ${it / 1_048_576} MB"
+                    } ?: ""),
+                )
             }
+            item { ModelSetup(state, viewModel) }
         }
         state.notice?.let { notice -> item { StatusCard("Status", notice) } }
     }
@@ -280,9 +287,27 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.model_setup), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "Models download directly to app-private storage. LAI accepts HTTPS links from Hugging Face and verifies GGUF format.",
+                "Models download directly to app-private storage. Every artifact requires a reviewed SHA-256.",
                 style = MaterialTheme.typography.bodySmall,
             )
+            val recommended = state.recommendedModel
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Recommended baseline", style = MaterialTheme.typography.labelLarge)
+                    Text(recommended.displayName, fontWeight = FontWeight.Bold)
+                    Text(recommended.description, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "${recommended.bytes / 1_048_576} MB • ${recommended.quantization} • ${recommended.license}",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    Button(
+                        onClick = viewModel::installRecommendedModel,
+                        enabled = !state.busy && state.installedModels.none { it.id == recommended.id },
+                    ) {
+                        Text(if (state.installedModels.any { it.id == recommended.id }) "Installed" else "Download securely")
+                    }
+                }
+            }
             if (state.installedModels.isNotEmpty()) {
                 Text("Installed", fontWeight = FontWeight.SemiBold)
                 state.installedModels.forEach { model ->

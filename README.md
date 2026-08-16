@@ -58,9 +58,11 @@ lai/
 ├── core/
 │   ├── contracts/           # pure tool/inference/OCR/model contracts
 │   ├── policy/              # consent, shell and zero-egress decisions
-│   └── scheduler/           # evidence/thermal/memory backend routing
+│   ├── scheduler/           # evidence/thermal/memory backend routing
+│   └── model/               # immutable reviewed model catalog
 ├── platform/
 │   ├── download/            # only network permission and transport
+│   ├── device/              # memory/battery/thermal environment
 │   ├── accessibility/       # Android Accessibility authority
 │   └── shizuku/             # ADB/root UserService authority
 ├── runtime/
@@ -104,7 +106,7 @@ See [BUILD_AND_RELEASE.md](docs/BUILD_AND_RELEASE.md) for exact commands and key
 
 ## Model download
 
-Developer Mode accepts a reviewed HTTPS artifact URL only with a mandatory SHA-256. `platform:download` is the sole network-owning module; it downloads to `noBackupFilesDir/models`, rechecks redirected hosts, resumes partial transfers, rejects hash/format mismatches, and never requests broad storage permission. No prompts, screen data, generations or telemetry have an outbound path.
+Developer Mode offers a one-tap immutable reviewed CPU baseline; advanced manual URLs still require a mandatory SHA-256. `platform:download` is the sole network-owning module; it downloads to `noBackupFilesDir/models`, rechecks redirected hosts, resumes partial transfers, rejects hash/format mismatches, and never requests broad storage permission. No prompts, screen data, generations or telemetry have an outbound path.
 
 The v0.2 CPU backend can load a compatible GGUF after explicit user selection. Backend requirements and the Qualcomm licensing boundary are in [MODELS_AND_BACKENDS.md](docs/MODELS_AND_BACKENDS.md).
 

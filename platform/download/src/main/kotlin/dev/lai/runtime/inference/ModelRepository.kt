@@ -78,6 +78,11 @@ class ModelRepository private constructor(
             val digest = sha256(partialFile)
             val expected = requireNotNull(spec.sha256).lowercase()
             check(digest == expected) { "SHA-256 mismatch; partial file retained for inspection" }
+            spec.expectedBytes?.let { expectedBytes ->
+                check(partialFile.length() == expectedBytes) {
+                    "Artifact size mismatch: expected $expectedBytes, received ${partialFile.length()}"
+                }
+            }
             check(partialFile.length() > 4) { "Downloaded model is empty" }
             FileInputStream(partialFile).use { stream ->
                 val magic = ByteArray(4)

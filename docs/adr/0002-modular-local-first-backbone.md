@@ -9,10 +9,10 @@ LAI's Phase 1 and llama.cpp Phase 2 proved product and native-runtime paths in o
 
 ## Decision
 
-Adopt an eleven-module layered architecture:
+Adopt a cohesive layered architecture, currently thirteen modules:
 
-- pure JVM: `core:contracts`, `core:policy`, `core:scheduler`, `plugins:api`;
-- Android authority: `platform:download`, `platform:accessibility`, `platform:shizuku`;
+- pure JVM: `core:contracts`, `core:policy`, `core:scheduler`, `core:model`, `plugins:api`;
+- Android platform: `platform:download`, `platform:device`, `platform:accessibility`, `platform:shizuku`;
 - runtime adapters: `runtime:llama`, `runtime:ocr`, `runtime:orchestrator`;
 - composition/product: `app`.
 
