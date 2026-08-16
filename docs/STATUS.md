@@ -2,6 +2,8 @@
 
 Last reviewed: 2026-08-16
 
+Latest verified remote build: commit `9ac684e`, [GitHub Actions run 31917533925](https://github.com/soobujmiah/lai/actions/runs/31917533925). Source policy, Kotlin/C++, unit tests, lint, APK assembly, and artifact upload passed. The resulting `lai-debug-9` artifact is approximately 10.9 MB.
+
 Legend: **Ready** = implemented and intended to work; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
 | Capability | Status | Evidence / boundary |

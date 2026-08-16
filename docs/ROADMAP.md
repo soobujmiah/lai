@@ -11,7 +11,7 @@
 - [x] C++ backend/session ABI
 - [x] Bangla OCR interface/schema and honest placeholder
 - [x] architecture, safety, build, and test documentation
-- [ ] first GitHub Actions green build and resulting fixes
+- [x] first GitHub Actions green build and resulting fixes ([run 31917533925](https://github.com/soobujmiah/lai/actions/runs/31917533925))
 - [ ] physical Snapdragon 8s Gen 4 smoke evidence
 
 ## Phase 2 — usable local intelligence
