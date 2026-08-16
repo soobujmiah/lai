@@ -337,6 +337,16 @@ source/architecture/catalog/documentation policy, the pure-JVM coverage ratchets
 `:platform:audit` / `:platform:download` / `:platform:workspace` / `:app` unit tests and lint, the
 native llama.cpp arm64 build, and debug APK assembly.
 
+**Open device regression (2026-08-17, build `0.6.78-debug`).** A physical chat run on the Redmi
+Turbo 4 Pro reported device heating, an empty reply, and a permanently stuck **Stop**. Root causes
+for the heat, the stuck cancel, the empty bubble, the IME/status-bar overlap and the missing
+Settings back affordance were fixed in `e4ad398` (CI
+[`31979369975`](https://github.com/soobujmiah/lai/actions/runs/31979369975) green). **Still
+unconfirmed:** why the generation produced zero tokens and why the model was unloaded — memory
+pressure and a masked native failure are both consistent with the evidence. See
+`docs/device-results/2026-08-17-redmi-turbo-4-pro-chat-regression.md` for the full analysis and the
+capture steps for the next run.
+
 One gate remains:
 
 1. **Device gate (Redmi Turbo 4 Pro, SM8735).** Physically confirm the Phase 2A acceptance list in

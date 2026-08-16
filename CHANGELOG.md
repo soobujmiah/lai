@@ -18,6 +18,8 @@ All notable changes are documented here. The project follows semantic versioning
 
 ### Fixed
 
+- **Device regression fixes from the 2026-08-17 Redmi Turbo 4 Pro run** (`e4ad398`): halved CPU worker threads so prompt batches stop saturating the little cores and heating the SoC; added a Stop watchdog so a cancel blocked inside a non-suspending JNI call can no longer strand the UI on "Stopping…"; dropped the empty assistant bubble left by a stopped or failed reply; added a `SEVERE`+ thermal admission check to `sendMessage`; fixed the edge-to-edge keyboard inset that pushed the app into the status bar; added a real back arrow plus `BackHandler` for Settings. Analysis in `docs/device-results/2026-08-17-redmi-turbo-4-pro-chat-regression.md`.
+
 - Restored `ModelRepository.PROGRESS_STEP_BYTES` (512 KiB), deleted by `dcc42d2` while the retained-copy export at line 166 still referenced it. `main` had been red since that commit (run `31973297070` failed `:platform:download` compilation with `Unresolved reference 'PROGRESS_STEP_BYTES'`); this was a pre-existing break, not a Phase 2A regression.
 
 ### Documentation-first repository audit
