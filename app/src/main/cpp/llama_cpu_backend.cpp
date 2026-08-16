@@ -191,8 +191,7 @@ public:
         initialize_llama_once();
         llama_model_params model_params = llama_model_default_params();
         model_params.n_gpu_layers = 0;
-        model_params.use_mmap = true;
-        model_params.use_mlock = false;
+        model_params.load_mode = LLAMA_LOAD_MODE_MMAP;
         llama_model* model = llama_model_load_from_file(model_path.c_str(), model_params);
         if (model == nullptr) {
             error = "llama.cpp could not load the GGUF model";

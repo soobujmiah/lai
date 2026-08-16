@@ -20,7 +20,7 @@ All notable changes are documented here. The project follows semantic versioning
 ### Phase 2 candidate
 
 - Added immutable-commit llama.cpp acquisition in GitHub Actions without committing upstream source.
-- Added real CPU GGUF loading, model chat-template formatting, bounded prompt evaluation and sampling.
+- Added real CPU GGUF loading with the pinned `LLAMA_LOAD_MODE_MMAP` API, model chat-template formatting, bounded prompt evaluation and sampling.
 - Added cancellable per-token JNI streaming with UTF-8/UTF-16-safe conversion.
 - Added explicit model load/unload controls and live Compose chat updates.
 - Recorded successful Redmi Turbo 4 Pro Phase 1 physical-device evidence.
