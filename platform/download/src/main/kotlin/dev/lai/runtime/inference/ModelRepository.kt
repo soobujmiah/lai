@@ -342,6 +342,13 @@ class ModelRepository private constructor(
             .build()
 
         private const val LOCAL_IMPORT_SOURCE = "local-import"
+
+        /**
+         * Progress is reported at most once per 512 KiB so a long export cannot flood the UI
+         * state flow. Removed by mistake in `dcc42d2` while the retained-copy call site still
+         * referenced it, which broke `:platform:download:compileDebugKotlin` on main.
+         */
+        private const val PROGRESS_STEP_BYTES = 512L * 1024L
         private const val STORAGE_RESERVE_BYTES = 256L * 1024L * 1024L
         private const val MIN_MODEL_BYTES = 5L
         private const val MAX_MODEL_BYTES = 8L * 1024L * 1024L * 1024L
