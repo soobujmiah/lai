@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `97f039f`, [GitHub Actions run 31921021303](https://github.com/soobujmiah/lai/actions/runs/31921021303). Architecture/privacy boundaries, coverage ratchets, pure-JVM tests, eleven-module Android graph, lint, immutable llama.cpp fetch, arm64 llama.cpp/ggml/JNI compilation, APK assembly, and artifact upload passed. The `lai-debug-24` artifact archive is approximately 13.75 MB.
+Latest verified remote build: commit `4841f8d`, [GitHub Actions run 31936642189](https://github.com/soobujmiah/lai/actions/runs/31936642189). Architecture/privacy boundaries, coverage ratchets, thirteen-module graph, reviewed catalog, scheduler/memory tests, Android environment provider, lint, immutable llama.cpp fetch, arm64 native compilation, APK assembly, and artifact upload passed. The `lai-debug-28` artifact archive is approximately 13.76 MB.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
@@ -11,9 +11,9 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
 | Layered module backbone | Ready | eleven-module Gradle/manifest graph compiled and packaged remotely |
 | Zero-egress architecture policy | Ready | only download module owns network/permission; boundary check passed in CI |
-| Evidence-aware scheduler | Candidate integration | contract/tests ready; model loads now route through device environment and memory preflight; CI/device verification pending |
-| Reviewed model catalog | Candidate | immutable official Qwen baseline metadata, digest, size and one-tap UX; CI/device verification pending |
-| Android environment provider | Candidate | available memory, battery, charging and thermal snapshot isolated in `platform:device` |
+| Evidence-aware scheduler | Build verified | model loads route through evidence, memory, battery and thermal preflight; physical load validation pending |
+| Reviewed model catalog | Build verified | immutable official Qwen metadata, mandatory digest/size and one-tap UX compiled; device download pending |
+| Android environment provider | Build verified | memory, battery, charging and thermal snapshot compiled and scheduler-integrated; device reading pending |
 | GitHub Android toolchain | Ready | workflow installs API 35, Build Tools, NDK, CMake, Gradle remotely |
 | arm64 native `.so` build | Ready | isolated `runtime:llama` externalNativeBuild compiles C++20 JNI library |
 | Compose three-mode UX | Ready | chat, screen reader, automator; developer controls hidden |
