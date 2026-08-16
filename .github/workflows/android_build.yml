@@ -1,0 +1,162 @@
+name: Android build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: APK variant
+        required: true
+        default: debug
+        type: choice
+        options: [debug, release, both]
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_VERSION: '8.13'
+  ANDROID_API: '35'
+  ANDROID_BUILD_TOOLS: '35.0.0'
+  ANDROID_NDK: '27.0.12077973'
+  CMAKE_VERSION: '3.22.1'
+
+jobs:
+  source-policy:
+    name: Source and documentation policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce source-only repository
+        run: bash scripts/validate_repo.sh
+
+  build:
+    name: Compile Kotlin, C++ and APK
+    needs: source-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android command-line tools
+        uses: android-actions/setup-android@v3
+
+      - name: Install remote Android toolchain
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platforms;android-${ANDROID_API}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            "ndk;${ANDROID_NDK}" \
+            "cmake;${CMAKE_VERSION}"
+
+      # No Gradle wrapper JAR is committed: this action obtains Gradle only on CI.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Decode optional release keystore
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$KEYSTORE_BASE64" ]]; then
+            echo "No release keystore configured; build will use debug signing for device testing."
+            exit 0
+          fi
+          KEYSTORE_FILE="${RUNNER_TEMP}/lai-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          {
+            echo "LAI_KEYSTORE_FILE=$KEYSTORE_FILE"
+            echo "LAI_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+            echo "LAI_KEY_ALIAS=$KEY_ALIAS"
+            echo "LAI_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Unit tests and lint
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:lintDebug
+
+      - name: Build debug APK and native arm64 library
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
+        run: >-
+          gradle --no-daemon --stacktrace :app:assembleDebug
+          -Plai.versionCode=${{ github.run_number }}
+          -Plai.versionName=0.1.${{ github.run_number }}
+
+      - name: Build release APK and native arm64 library
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
+        shell: bash
+        run: |
+          VERSION_NAME="${GITHUB_REF_NAME#v}"
+          if [[ "$VERSION_NAME" == "$GITHUB_REF_NAME" ]]; then VERSION_NAME="0.1.${GITHUB_RUN_NUMBER}"; fi
+          gradle --no-daemon --stacktrace :app:assembleRelease \
+            -Plai.versionCode="${GITHUB_RUN_NUMBER}" \
+            -Plai.versionName="$VERSION_NAME"
+
+      - name: Inventory native and APK artifacts
+        if: always()
+        shell: bash
+        run: |
+          find app/build -type f \( -name '*.apk' -o -name 'liblai_runtime.so' \) -print 2>/dev/null || true
+
+      - name: Upload debug APK
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lai-debug-${{ github.run_number }}
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload release APK
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lai-release-${{ github.run_number }}
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-${{ github.run_number }}
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --title "LAI $GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" app/build/outputs/apk/release/*.apk --clobber
+        # The job receives write permission below only for tags.
+    permissions:
+      contents: write

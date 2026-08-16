@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="app_name">এলএআই</string>
+  <string name="accessibility_service_label">এলএআই অটোমেশন</string>
+  <string name="accessibility_service_description">স্ক্রিনের দৃশ্যমান উপাদান পড়ে এবং শুধু আপনার অনুমোদিত কাজগুলো করে।</string>
+  <string name="home_title">আপনার নিয়ন্ত্রণে লোকাল এআই</string>
+  <string name="home_subtitle">ব্যক্তিগত, বাংলা-প্রথম বুদ্ধিমত্তা ও অ্যান্ড্রয়েড সহায়তা।</string>
+  <string name="chat">চ্যাট</string>
+  <string name="screen_reader">স্ক্রিন রিডার</string>
+  <string name="automator">অটোমেটর</string>
+  <string name="settings">সেটিংস</string>
+  <string name="send">পাঠান</string>
+  <string name="message_hint">বাংলা বা English-এ লিখুন</string>
+  <string name="read_screen">বর্তমান স্ক্রিন পড়ুন</string>
+  <string name="enable_accessibility">অ্যাক্সেসিবিলিটি চালু করুন</string>
+  <string name="inspect_screen">নিরাপদে স্ক্রিন দেখুন</string>
+  <string name="connect_shizuku">Shizuku সংযুক্ত করুন</string>
+  <string name="developer_mode">ডেভেলপার মোড</string>
+  <string name="developer_mode_summary">রানটাইমের তথ্য ও মডেল ইনস্টল নিয়ন্ত্রণ দেখান।</string>
+  <string name="model_setup">মডেল সেটআপ</string>
+  <string name="model_name">মডেলের নাম</string>
+  <string name="model_url">Hugging Face HTTPS URL</string>
+  <string name="model_sha">SHA-256 (সুপারিশকৃত)</string>
+  <string name="download">ডাউনলোড</string>
+  <string name="safety_title">নিয়ন্ত্রণ আপনার হাতে</string>
+  <string name="safety_body">এলএআই ইচ্ছামতো শেল কমান্ড ও সংবেদনশীল লেখা ব্লক করে। গুরুত্বপূর্ণ কাজ চালানোর আগে যাচাই করুন।</string>
+</resources>

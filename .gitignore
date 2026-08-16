@@ -1,0 +1,33 @@
+# Android / Gradle outputs
+.gradle/
+**/build/
+local.properties
+.cxx/
+.externalNativeBuild/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Signing and credentials
+*.jks
+*.keystore
+keystore.properties
+.env
+secrets.properties
+
+# Models and generated native artifacts
+*.gguf
+*.onnx
+*.tflite
+*.bin
+*.dlc
+*.serialized.bin
+qnn-sdk/
+models/
+
+# Logs and captures
+*.log
+captures/
