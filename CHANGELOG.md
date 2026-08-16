@@ -64,3 +64,4 @@ All notable changes are documented here. The project follows semantic versioning
 - GitHub Actions runs 31939187858 and 31939187860 published/verified the signed catalog and built the unified local-first app.
 - GitHub Actions run 31941189803 passed v0.7 multi-turn Kotlin/JNI, native metrics/cancellation, memory lifecycle, lint and APK assembly.
 - GitHub Actions run 31942344604 passed diagnostics privacy schema/tests, coverage, lint, native runtime and APK assembly.
+- GitHub Actions run 31944742526 passed retained-model export/reopen/hash, catalog v2, lint, native runtime and APK assembly.

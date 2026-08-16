@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `6e29bfe`, [Android run 31942344604](https://github.com/soobujmiah/lai/actions/runs/31942344604). Boundaries, catalog validation, coverage, diagnostics privacy schema/tests, lint, Kotlin/JNI/native runtime and APK assembly passed. The APK artifact archive is approximately 13.85 MB. Signed catalog publication remains verified by runs 31939187858/31939187860.
+Latest verified remote build: commit `d097b42`, [Android run 31944742526](https://github.com/soobujmiah/lai/actions/runs/31944742526). Boundaries, catalog v2, coverage, retained-model SAF export/reopen/SHA path, diagnostics, lint, Kotlin/JNI/native runtime and APK assembly passed. The APK artifact archive is approximately 13.85 MB. Signed catalog revision 2 was independently verified.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
@@ -29,7 +29,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | llama.cpp CPU inference | Device validated basic | Qwen loaded in 578 ms; coherent Bangla output, 45.76 prefill and 20.35 decode tok/s measured; broad quality/thermal testing pending |
 | v0.7 runtime reliability | Partially device validated | four-turn prompt growth and native metrics passed; Stop/recovery, New chat, trimming and memory-pressure handling pending |
 | Diagnostics JSON v1 | Device validated | v0.7.1 JSON exported with four samples and expected privacy exclusions; no user content observed |
-| Retained model copy | Candidate | SAF export/reopen/SHA verification and post-reinstall import UX added; CI/device validation pending |
+| Retained model copy | Build verified | SAF export, destination reopen/SHA verification and post-reinstall import UX passed CI; device uninstall/reimport pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | requires licensed SDK/runtime and physical device |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
