@@ -2,7 +2,7 @@
 
 LAI is a source-only Android foundation for private, Bangla-first on-device AI and consent-driven Android automation. It targets modern arm64 Snapdragon devices, beginning with Snapdragon 8s Gen 4 (Hexagon NPU + Adreno GPU).
 
-> **Current status:** Phase 1 is physically validated on Snapdragon 8s Gen 4. Phase 2 CPU inference is build-verified with a CI-fetched immutable llama.cpp revision; physical GGUF loading and Bangla generation are the next release gate. Bangla OCR remains a model-required plugin boundary. See [status](docs/STATUS.md).
+> **Current status:** Snapdragon 8s Gen 4 has physically passed Qwen installation, CPU scheduling, memory preflight, model load and a 15-token local generation. v0.7 adds build-verified multi-turn history, Stop/recovery, native performance metrics and memory lifecycle; those behaviors await device validation. Bangla response quality and OCR remain explicit gates. See [status](docs/STATUS.md).
 
 ## Product principles
 

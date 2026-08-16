@@ -58,3 +58,4 @@ All notable changes are documented here. The project follows semantic versioning
 - GitHub Actions run 31936642189 passed the thirteen-module catalog/device/scheduler graph, memory and routing tests, lint, native llama.cpp, APK assembly, and artifact upload.
 - GitHub Actions run 31937804443 verified the superseded dual-edition experiment before product unification.
 - GitHub Actions runs 31939187858 and 31939187860 published/verified the signed catalog and built the unified local-first app.
+- GitHub Actions run 31941189803 passed v0.7 multi-turn Kotlin/JNI, native metrics/cancellation, memory lifecycle, lint and APK assembly.

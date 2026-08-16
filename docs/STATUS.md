@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `249e4da`, [Android run 31939187860](https://github.com/soobujmiah/lai/actions/runs/31939187860) and [catalog run 31939187858](https://github.com/soobujmiah/lai/actions/runs/31939187858). The unified thirteen-module app, boundaries, coverage, lint, native llama.cpp, signed catalog verifier/cache/UI and APK passed. The catalog's published exact bytes and detached ECDSA signature also passed independent OpenSSL verification. The APK artifact archive is approximately 13.79 MB.
+Latest verified remote build: commit `f7fa761`, [Android run 31941189803](https://github.com/soobujmiah/lai/actions/runs/31941189803). Boundaries, catalog validation, coverage, lint, multi-turn Kotlin/JNI contracts, native token counting/metrics/cancellation, memory lifecycle and APK assembly passed. The APK artifact archive is approximately 13.82 MB. Signed catalog publication remains verified by runs 31939187858/31939187860.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
@@ -27,7 +27,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Reviewed GGUF download | Device validated baseline | Qwen 1,117,320,736-byte artifact activated with reviewed digest; interruption/resume still pending |
 | LLM JNI/session interface | Device validated basic | physical model load and 15-token local generation passed; cancellation/metrics pending |
 | llama.cpp CPU inference | Device validated basic | Qwen CPU session loaded and generated locally without reported crash; response/Bangla quality and sustained thermals pending |
-| v0.7 runtime reliability | Candidate | multi-turn templates, token trimming, state machine, Stop, native metrics, storage/memory-pressure handling; CI pending |
+| v0.7 runtime reliability | Build verified | multi-turn templates, token trimming, state machine, Stop, native metrics, storage/memory handling compiled; device validation pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | requires licensed SDK/runtime and physical device |
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
