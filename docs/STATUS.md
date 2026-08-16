@@ -25,9 +25,9 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Shizuku binder and permission | Ready | state flow, UID, request listener |
 | Elevated operation allowlist | Ready | Shizuku UserService + argv-only policy; no raw shell; tests for injection |
 | Reviewed GGUF download | Device validated baseline | Qwen 1,117,320,736-byte artifact activated with reviewed digest; interruption/resume still pending |
-| LLM JNI/session interface | Device validated basic | physical model load and 15-token local generation passed; cancellation/metrics pending |
-| llama.cpp CPU inference | Device validated basic | Qwen CPU session loaded and generated locally without reported crash; response/Bangla quality and sustained thermals pending |
-| v0.7 runtime reliability | Build verified | multi-turn templates, token trimming, state machine, Stop, native metrics, storage/memory handling compiled; device validation pending |
+| LLM JNI/session interface | Device validated metrics | 207-token prompt, 182-token output and native TTFT/prefill/decode/total counters observed; cancellation pending |
+| llama.cpp CPU inference | Device validated basic | Qwen loaded in 578 ms; coherent Bangla output, 45.76 prefill and 20.35 decode tok/s measured; broad quality/thermal testing pending |
+| v0.7 runtime reliability | Partially device validated | multi-turn prompt and native metrics passed; Stop/recovery, New chat, trimming and memory-pressure handling pending |
 | Diagnostics JSON v1 | Build verified | explicit SAF export, 20-sample local history and content-exclusion schema/tests passed; device export inspection pending |
 | Adreno Vulkan offload | Planned (Phase 2) | requires pinned adapter/device qualification |
 | QAIRT/QNN HTP offload | Planned (Phase 3) | requires licensed SDK/runtime and physical device |

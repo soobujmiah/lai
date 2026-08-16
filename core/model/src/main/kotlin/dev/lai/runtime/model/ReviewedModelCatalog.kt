@@ -52,7 +52,7 @@ object ReviewedModelCatalog {
     val recommendedCpuBaseline = ReviewedModel(
         id = "qwen2.5-1.5b-instruct-q4-k-m",
         displayName = "Qwen 2.5 1.5B Instruct",
-        description = "Official multilingual Q4_K_M CPU baseline; Bangla quality evaluation pending.",
+        description = "Device-validated Snapdragon CPU baseline; broader Bangla quality evaluation pending.",
         sourceRepository = "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
         fileName = "qwen2.5-1.5b-instruct-q4_k_m.gguf",
         url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/" +
@@ -62,15 +62,19 @@ object ReviewedModelCatalog {
         license = "Apache-2.0",
         architecture = "qwen2",
         quantization = "Q4_K_M",
-        reviewState = setOf(ArtifactReviewState.METADATA_VERIFIED, ArtifactReviewState.BUILD_COMPATIBLE),
+        reviewState = setOf(
+            ArtifactReviewState.METADATA_VERIFIED,
+            ArtifactReviewState.BUILD_COMPATIBLE,
+            ArtifactReviewState.DEVICE_VALIDATED,
+        ),
         banglaQualityValidated = false,
     )
 
     val all: List<ReviewedModel> = listOf(recommendedCpuBaseline)
     val embeddedDocument = ReviewedModelCatalogDocument(
         schemaVersion = 1,
-        revision = 1,
-        generatedAt = "2026-08-16T00:00:00Z",
+        revision = 2,
+        generatedAt = "2026-08-16T16:39:00+06:00",
         models = all,
     )
 

@@ -64,11 +64,36 @@ The supported-model status remained `Embedded supported-model list available off
 
 The supplied screenshots were reviewed but not committed because status bars contain device/network metadata.
 
-## Next gate
+## v0.7.0 runtime reliability evidence
+
+A later v0.7.0 test supplied text-visible device evidence (screenshots reviewed but not committed):
+
+| Measurement | Result |
+|---|---:|
+| Backend | llama.cpp CPU |
+| Scheduler | CPU, evidence/fallback policy |
+| Available memory | 3,589 MiB |
+| Estimated peak | 1,833 MiB |
+| Model load | 578 ms |
+| Battery | 72%, not charging |
+| Thermal | NOMINAL |
+| Prompt tokens | 207 |
+| Output tokens | 182 |
+| Time to first token | 4,533 ms |
+| Prefill | 45.76 tok/s |
+| Decode | 20.35 tok/s |
+| Total generation | 13,473 ms |
+
+The conversation showed several user/assistant turns and the final request received a coherent Bangla response, providing basic evidence that history reached the formatted prompt and Bangla output rendered correctly. This is not a broad Bangla quality evaluation. The model remained loaded and no crash/freeze was reported.
+
+The supported-model status still showed the embedded offline list; signed web refresh/cache was not tested.
+
+## Remaining gate
 
 - refresh and cache the signed catalog, then restart offline;
-- capture the actual Bangla response;
-- measure load time, TTFT and decode speed with v0.7;
-- cancel a long response and immediately generate again;
+- press Stop during a long response and immediately generate again;
+- verify New chat forgets prior turns;
+- force enough turns to exercise context trimming;
+- export and inspect Diagnostics JSON v1 from v0.7.1;
 - run a 10-minute thermal test;
 - provide crash/log evidence if any.

@@ -32,8 +32,8 @@
 - [x] pin/fetch llama.cpp in CI
 - [x] CPU model load and local generation on Snapdragon device
 - [ ] Stop/recovery and UTF-safe token streaming device validation
-- [ ] multi-turn history and context-trimming device validation
-- [ ] native TTFT/prefill/decode metrics device validation
+- [ ] multi-turn history validated basically; context-trimming stress test pending
+- [x] native TTFT/prefill/decode metrics device validation
 - [ ] GGML Vulkan build and Adreno capability self-test
 - [x] model selection and explicit load/unload
 - [x] conservative pre-load memory estimator and low-memory refusal

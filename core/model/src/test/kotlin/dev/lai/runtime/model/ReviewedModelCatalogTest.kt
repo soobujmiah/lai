@@ -13,7 +13,7 @@ class ReviewedModelCatalogTest {
         assertEquals(64, model.sha256.length)
         assertTrue(ArtifactReviewState.METADATA_VERIFIED in model.reviewState)
         assertTrue(ArtifactReviewState.BUILD_COMPATIBLE in model.reviewState)
-        assertFalse(ArtifactReviewState.DEVICE_VALIDATED in model.reviewState)
+        assertTrue(ArtifactReviewState.DEVICE_VALIDATED in model.reviewState)
         assertFalse(model.banglaQualityValidated)
         assertEquals(model.sha256, model.toModelSpec().sha256)
         assertEquals(model.bytes, model.toModelSpec().expectedBytes)
