@@ -45,14 +45,15 @@ Open Model Setup and explicitly refresh the supported list; record that the stat
 
 1. Confirm Local action proposals is off by default and ordinary chat behavior is unchanged.
 2. Enable it in Settings and request one harmless action against a non-sensitive test app.
-3. Verify mixed prose plus JSON, markdown fences, unknown fields, `confirmed`, `allowSensitiveInput`, wrong types, invalid packages and non-allowlisted shell operations do not open an executable proposal.
-4. For valid JSON, verify the dialog shows the exact action/risk and that nothing happens before approval.
-5. Press **Do not run** and verify no Accessibility/Shizuku action occurs.
-6. Propose again, press **Approve once**, verify exactly one action occurs, then verify the exact call cannot be approved again after rotation, backgrounding, Activity recreation, or process restart.
-7. Restart LAI and verify Developer Mode reports a valid persistent chained audit with approval and completion events.
-8. Verify password fields remain blocked and no argument, selector, typed text, fingerprint, record hash, package or result appears in diagnostics/logs.
-9. Confirm tool result is not automatically sent back to the model and no second action runs.
-10. If a test build deliberately corrupts/truncates the audit file, verify proposal mode disables and no approved action executes.
+3. Make one explicit, unambiguous Android action request. Immediately check Developer Mode: the parser must report `ACCEPTED`, `NOT_TOOL_CALL`, or a coarse `REJECTED_*` outcome without exposing response text.
+4. Verify mixed prose plus JSON, markdown fences, unknown fields, `confirmed`, `allowSensitiveInput`, wrong types, invalid packages and non-allowlisted shell operations do not open an executable proposal and increment only content-free rejection counters.
+5. For valid JSON, verify the dialog shows the exact action/risk and that nothing happens before approval.
+6. Press **Do not run** and verify no Accessibility/Shizuku action occurs.
+7. Propose again, press **Approve once**, verify exactly one action occurs, then verify the exact call cannot be approved again after rotation, backgrounding, Activity recreation, or process restart.
+8. Restart LAI and verify Developer Mode reports a valid persistent chained audit with approval and completion events.
+9. Verify password fields remain blocked and no argument, selector, typed text, fingerprint, record hash, package or result appears in diagnostics/logs.
+10. Confirm tool result is not automatically sent back to the model and no second action runs.
+11. If a test build deliberately corrupts/truncates the audit file, verify proposal mode disables and no approved action executes.
 
 ## Retained model copy
 

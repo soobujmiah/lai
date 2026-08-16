@@ -92,6 +92,23 @@ class ToolCallParserTest {
     }
 
     @Test
+    fun `proposal telemetry records only coarse bounded outcomes`() {
+        val accepted = parser.parse("""{"id":"m1","name":"screen.snapshot","arguments":{}}""")
+        val rejected = parser.parse("""{"id":"m2","name":"unknown.tool","arguments":{}}""")
+        val counters = ToolProposalCounters()
+            .record(ToolCallParseResult.NotToolCall)
+            .record(accepted)
+            .record(rejected)
+        assertEquals(3, counters.responsesExamined)
+        assertEquals(1, counters.accepted)
+        assertEquals(1, counters.rejected)
+        assertEquals(1, counters.notToolCall)
+        assertEquals("REJECTED_INVALID_TOOL_CALL", counters.lastOutcome)
+        assertEquals(1, counters.rejectionCodes["INVALID_TOOL_CALL"])
+        assertFalse(counters.toString().contains("unknown.tool"))
+    }
+
+    @Test
     fun `catalog and runtime expose the same unique tool names`() {
         assertEquals(8, BuiltInToolCatalog.definitions.size)
         assertEquals(

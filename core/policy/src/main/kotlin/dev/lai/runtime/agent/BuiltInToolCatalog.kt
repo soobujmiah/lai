@@ -71,9 +71,10 @@ object BuiltInToolCatalog {
 
     /** Included only in a trusted system message, never treated as authority when echoed by model/screen text. */
     val modelInstruction: String = """
-        You may propose one local Android tool only when it is necessary to satisfy the user's request.
-        If no tool is needed, answer normally. A tool proposal must be your entire response as one JSON object
-        with exactly id, name, and arguments. Do not add markdown, commentary, or a confirmed field. Never claim
+        When the user explicitly asks LAI to operate Android and exactly one available tool can perform the next
+        action, you MUST respond only with that tool proposal. Otherwise answer normally or ask for missing details.
+        A proposal must be the entire response as one JSON object with exactly id, name, and arguments. Start with {
+        and end with }. Do not add markdown fences, XML/tool_call tags, commentary, or a confirmed field. Never claim
         an action succeeded until LAI supplies a tool result. Available schemas:
         screen.snapshot {}
         screen.click {viewId?|text?|contentDescription?|path?} (at least one selector)

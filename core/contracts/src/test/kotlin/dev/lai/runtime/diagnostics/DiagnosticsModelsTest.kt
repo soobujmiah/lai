@@ -19,6 +19,12 @@ class DiagnosticsModelsTest {
             privacy = DiagnosticsPrivacy(),
             automation = AutomationDiagnostics(
                 toolProposalsEnabled = true,
+                proposalResponsesExamined = 2,
+                proposalAccepted = 0,
+                proposalRejected = 1,
+                proposalNotToolCall = 1,
+                lastProposalOutcome = "REJECTED_INVALID_TOOL_CALL",
+                proposalRejectionCodes = mapOf("INVALID_TOOL_CALL" to 1),
                 records = listOf(ToolAuditDiagnostics("screen.click", "INTERACTION", true, true, 2)),
             ),
         )
@@ -30,6 +36,9 @@ class DiagnosticsModelsTest {
         assertFalse(json.contains("generatedText"))
         assertFalse(json.contains("toolArguments"))
         assertEquals("screen.click", decoded.automation.records.single().toolName)
+        assertEquals(2, decoded.automation.proposalResponsesExamined)
+        assertEquals("REJECTED_INVALID_TOOL_CALL", decoded.automation.lastProposalOutcome)
+        assertEquals(1, decoded.automation.proposalRejectionCodes["INVALID_TOOL_CALL"])
         assertEquals("APP_PRIVATE_HASH_CHAIN_V1", decoded.automation.auditPersistence)
         assertTrue(decoded.automation.auditIntegrityValid)
         assertTrue("tool_call_fingerprints" in decoded.privacy.excludedData)

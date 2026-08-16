@@ -14,9 +14,9 @@ Results always correlate by `callId` and contain `success`, bounded `output`, an
 
 ## Model-proposal boundary
 
-Local action proposals are disabled by default. When the user enables them, LAI adds a trusted system instruction describing the built-in schemas. A proposal is recognized only when the model's entire response is one JSON object with exactly `id`, `name`, and `arguments`. The envelope is limited to 16 KiB; tool IDs/names, object keys, types, selector depth, strings, package names, enums, and shell operations are bounded. Markdown-wrapped, mixed prose, malformed, unknown-field, unknown-tool, and wrong-type proposals fail closed.
+Local action proposals are disabled by default. When enabled, LAI instructs the model that an explicit Android operation request **must** produce one bare JSON proposal when a single schema can perform the next action; otherwise it should answer normally or ask for missing details. A proposal is recognized only when the model's entire response is one JSON object with exactly `id`, `name`, and `arguments`. The envelope is limited to 16 KiB; tool IDs/names, object keys, types, selector depth, strings, package names, enums, and shell operations are bounded. Markdown-wrapped, mixed prose, malformed, unknown-field, unknown-tool, and wrong-type proposals fail closed.
 
-The same validator runs again in `AgentRuntime` before authority dispatch. Natural-language answers and unrelated JSON remain assistant text.
+The same validator runs again in `AgentRuntime` before authority dispatch. Natural-language answers and unrelated JSON remain assistant text. Developer Mode and user-exported diagnostics expose session-only content-free counters for examined, accepted, rejected and ordinary responses plus coarse rejection codes; no model response or argument text is retained.
 
 ## Confirmation rule
 

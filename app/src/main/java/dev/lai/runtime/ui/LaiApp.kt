@@ -380,6 +380,15 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
             item { StatusCard("Native runtime", state.runtimeDetail) }
             item { StatusCard("Scheduler", state.schedulerDetail) }
             item {
+                val counters = state.toolProposalCounters
+                StatusCard(
+                    "Tool proposal parser",
+                    "${counters.responsesExamined} examined • ${counters.accepted} accepted • " +
+                        "${counters.rejected} rejected • ${counters.notToolCall} ordinary response(s) • " +
+                        "last ${counters.lastOutcome}",
+                )
+            }
+            item {
                 val latest = state.toolAuditHistory.lastOrNull()
                 StatusCard(
                     "Local tool audit",

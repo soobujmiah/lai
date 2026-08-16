@@ -33,6 +33,20 @@ All notable changes are documented here. The project follows semantic versioning
 - Superseded the short-lived dual-edition experiment with one local-first app and upgrade path.
 - Added an ECDSA-signed web supported-model catalog, encrypted CI signing key, schema validation, verified cache and embedded offline fallback.
 
+### v0.8.0 physical evidence
+
+- Verified **Keep copy** survived uninstall and the reviewed Qwen GGUF was restored and loaded through offline **Import file** with exact size and SHA-256.
+- Recorded four multi-turn CPU samples averaging 9,174 ms TTFT, 47.36 prefill tok/s, 20.70 decode tok/s and 10,421 ms total; prompt tokens grew 382→510 with no trimming.
+- Confirmed the v0.8.0 diagnostics export contained no prompts, generated text, screen/OCR content, foreground packages, documents, tool arguments/results, typed text, credentials or network identifiers.
+- Recorded a negative tool-compliance result: proposal mode was enabled, but Qwen produced no valid recognized proposal and the in-memory audit remained empty.
+- Stop/recovery, New chat, forced trimming and sustained thermals were not exercised.
+
+### Privacy-safe proposal diagnostics candidate
+
+- Strengthened the trusted system instruction so explicit single-step Android requests require one bare JSON proposal when a built-in schema can perform the next action.
+- Added session-only content-free counters for examined, accepted, rejected and ordinary model responses, last coarse outcome, and rejection-code counts.
+- Added Developer Mode visibility and diagnostics export fields without retaining model output, prompts, arguments, selectors or typed text.
+
 ### Persistent tool-audit candidate
 
 - Added concrete `platform:audit` ownership for app-private, no-backup, content-free JSONL security events.

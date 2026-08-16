@@ -55,7 +55,7 @@ Costs:
 
 ## Current limitation
 
-This is a one-action proposal mechanism, not an autonomous agent. GitHub run 31953199936 passed parser tests, coverage, Kotlin/C++, lint and APK assembly, but it still needs physical validation with the selected Qwen model, Accessibility, Shizuku, rotation/backgrounding, denial, replay attempts, prompt injection, and diagnostics inspection.
+This is a one-action proposal mechanism, not an autonomous agent. GitHub run 31953199936 passed parser tests, coverage, Kotlin/C++, lint and APK assembly. In the first v0.8.0 physical attempt, proposal mode was enabled but Qwen produced no valid recognized proposal, so dialog/execution safety was not exercised. The next build adds content-free parser outcome counters and stronger exact-format instruction; Qwen compliance, Accessibility/Shizuku execution, rotation/backgrounding, denial, replay, prompt injection, and diagnostics still require physical validation.
 
 ## Future migration path
 

@@ -77,6 +77,12 @@ data class GenerationPerformanceDiagnostics(
 @Serializable
 data class AutomationDiagnostics(
     val toolProposalsEnabled: Boolean = false,
+    val proposalResponsesExamined: Int = 0,
+    val proposalAccepted: Int = 0,
+    val proposalRejected: Int = 0,
+    val proposalNotToolCall: Int = 0,
+    val lastProposalOutcome: String = "NONE",
+    val proposalRejectionCodes: Map<String, Int> = emptyMap(),
     val auditPersistence: String = "APP_PRIVATE_HASH_CHAIN_V1",
     val auditIntegrityValid: Boolean = true,
     val records: List<ToolAuditDiagnostics> = emptyList(),

@@ -11,6 +11,7 @@ import dev.lai.runtime.BuildConfig
 import dev.lai.runtime.LaiApplication
 import dev.lai.runtime.agent.ToolCall
 import dev.lai.runtime.agent.ToolCallParseResult
+import dev.lai.runtime.agent.ToolProposalCounters
 import dev.lai.runtime.agent.ToolRisk
 import dev.lai.runtime.audit.ToolAuditOutcome
 import dev.lai.runtime.audit.ToolAuditRecordV1
@@ -143,6 +144,7 @@ data class MainUiState(
     val diagnosticsStatus: String = "No diagnostics exported",
     val toolProposalsEnabled: Boolean = false,
     val pendingToolProposal: PendingToolProposal? = null,
+    val toolProposalCounters: ToolProposalCounters = ToolProposalCounters(),
     val toolAuditHistory: List<ToolAuditRecordV1> = emptyList(),
     val toolAuditStatus: String = "Persistent tool audit not loaded",
     val toolAuditIntegrityValid: Boolean = false,
@@ -364,11 +366,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val performance = event.metrics?.let { metrics ->
                 (latest.performanceHistory + metrics).takeLast(MAX_PERFORMANCE_SAMPLES)
             } ?: latest.performanceHistory
+            val proposalCounters = if (current.toolProposalsEnabled) {
+                latest.toolProposalCounters.record(proposal)
+            } else {
+                latest.toolProposalCounters
+            }
             when (proposal) {
                 ToolCallParseResult.NotToolCall -> latest.copy(
                     operation = RuntimeOperation.READY,
                     lastGenerationMetrics = event.metrics,
                     performanceHistory = performance,
+                    toolProposalCounters = proposalCounters,
                     notice = "Generated ${event.tokensGenerated} tokens locally",
                 )
                 is ToolCallParseResult.Accepted -> latest.copy(
@@ -379,6 +387,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     operation = RuntimeOperation.READY,
                     lastGenerationMetrics = event.metrics,
                     performanceHistory = performance,
+                    toolProposalCounters = proposalCounters,
                     pendingToolProposal = PendingToolProposal(
                         call = proposal.call,
                         summary = proposal.confirmationSummary,
@@ -394,6 +403,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     operation = RuntimeOperation.READY,
                     lastGenerationMetrics = event.metrics,
                     performanceHistory = performance,
+                    toolProposalCounters = proposalCounters,
                     notice = proposal.message,
                 )
             }
@@ -993,6 +1003,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             privacy = DiagnosticsPrivacy(),
             automation = AutomationDiagnostics(
                 toolProposalsEnabled = current.toolProposalsEnabled,
+                proposalResponsesExamined = current.toolProposalCounters.responsesExamined,
+                proposalAccepted = current.toolProposalCounters.accepted,
+                proposalRejected = current.toolProposalCounters.rejected,
+                proposalNotToolCall = current.toolProposalCounters.notToolCall,
+                lastProposalOutcome = current.toolProposalCounters.lastOutcome,
+                proposalRejectionCodes = current.toolProposalCounters.rejectionCodes,
                 auditIntegrityValid = current.toolAuditIntegrityValid,
                 records = current.toolAuditHistory.map { record ->
                     ToolAuditDiagnostics(

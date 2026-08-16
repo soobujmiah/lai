@@ -106,12 +106,46 @@ The user exported `lai-diagnostics-v1.json`; the file itself remains outside the
 - Accessibility disconnected and Shizuku permission required during this chat-only test;
 - the export contained runtime/model/performance metadata and its privacy exclusion declaration, with no prompts, generated text, screenshots, OCR text, Accessibility trees, documents, credentials, package names, or network identifiers.
 
+## v0.8.0 retained-model and tool-proposal evidence
+
+The user supplied a v0.8.0 `lai-diagnostics-v1.json` export and answered the behavioral test checklist. The JSON attachment remains outside the repository; only these text observations are retained.
+
+| Measurement | Result |
+|---|---:|
+| App/build | v0.8.0 / versionCode 55 / temporary signing |
+| Report time | 2026-08-16 21:37:53 +06:00 |
+| Android / SoC report | API 36 / QTI SM8735 / 8 CPU cores / arm64-v8a |
+| Backend | `llama-cpu` |
+| Available memory | 4,313,878,528 bytes (~4,114.0 MiB) |
+| Estimated model peak | 1,933,521,832 bytes (~1,844.0 MiB) |
+| Model load | 514 ms |
+| Battery / thermal at export | 84%, not charging / `NOMINAL` |
+| Accessibility / Shizuku | connected / UID 2000 |
+| Prompt-token range | 382 → 406 → 442 → 510 |
+| Output tokens | 9, 23, 38, 32 |
+| Average TTFT | 9,174 ms (range 8,616–10,402) |
+| Average prefill | 47.36 tok/s (range 44.38–49.07) |
+| Average decode | 20.70 tok/s (range 19.49–21.44) |
+| Average total | 10,421 ms (range 9,035–12,043) |
+| Context trimming | 0 turns |
+
+The four samples provide another basic multi-turn growth result. Their larger prompts and enabled tool instruction make direct latency comparison with v0.7.1 inappropriate; decode remained around the previously observed 20 tok/s.
+
+The retained-model acceptance gate passed: **Keep copy** created the reviewed GGUF, the file survived LAI uninstall, v0.8.0 was reinstalled, and **Import file** restored and loaded the model without a network download. The active imported artifact reported the exact reviewed 1,117,320,736-byte size and full SHA-256 `6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e`.
+
+Local action proposals were enabled, but no valid model proposal appeared and the v0.8.0 in-memory audit contained zero records. Therefore parser-dialog approval/denial and Android action execution did **not** pass physical validation. This negative result requires privacy-safe proposal outcome diagnostics and/or prompt-format refinement before another model-compliance test.
+
+Only ordinary multi-turn generation was exercised. Stop/recovery, New chat reset, forced context trimming, and sustained thermal behavior were not tested. `NOMINAL` is one export-time observation, not sustained thermal evidence.
+
+The export contained no prompts, generated text, screenshots, OCR text, Accessibility trees, foreground packages, documents, tool arguments/results, typed automation text, credentials, or network identifiers. Catalog status remained the embedded offline fallback; signed web refresh/cache remains unvalidated.
+
 ## Remaining gate
 
 - refresh and cache the signed catalog, then restart offline;
+- diagnose model tool-proposal formatting without exporting user/model content, then validate rejection, denial and one-time approval on v0.8.1 or later;
+- verify the v0.8.1 persistent audit survives process restart and blocks exact-call replay;
 - press Stop during a long response and immediately generate again;
 - verify New chat forgets prior turns;
 - force enough turns to exercise context trimming;
-- create a retained GGUF copy and import it after reinstall;
 - run a 10-minute thermal test;
 - provide crash/log evidence if any.

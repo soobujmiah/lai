@@ -46,8 +46,10 @@
 - [x] scheduler wiring for memory/battery/thermal-aware model load
 - [ ] Bangla system prompt/templates and evaluation pack
 - [x] parse complete LLM-proposed JSON tool calls with strict per-tool schemas and dispatch revalidation
-- [x] opt-in one-shot trusted confirmation dialog
+- [x] opt-in one-shot trusted confirmation dialog (build verified; v0.8.0 model emitted no valid proposal)
 - [x] bounded app-private hash-chained audit, approval-before-execution and exact-call replay guard
+- [x] privacy-safe proposal outcome/rejection counters (source candidate; remote build pending)
+- [ ] Qwen exact-format compliance retest
 - [ ] foreground/screen binding, result provenance and tool-result feedback before any autonomous multi-step loop
 - [ ] select and integrate printed Bangla OCR baseline
 - [ ] benchmark profile hidden in Developer Mode (implementation candidate added)
