@@ -9,7 +9,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Capability | Status | Evidence / boundary |
 |---|---|---|
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
-| Layered module backbone | Ready | fourteen-module graph including dedicated persistent-audit ownership; latest audit module changes await remote build |
+| Layered module backbone | Ready | fourteen-module graph including dedicated persistent-audit ownership passed run 31956572135 |
 | Zero-egress architecture policy | Ready | only download module owns transport; outbound user data denied; boundary check passes |
 | Signed web model catalog | Build verified | encrypted ECDSA signer, stable `catalog-v1` assets, in-app verification/cache/fallback and supported-list UI passed; device refresh pending |
 | Evidence-aware scheduler | Device validated (CPU) | Redmi selected CPU with 3,077 MiB available vs 1,833 MiB estimated peak at nominal thermal state |
@@ -36,7 +36,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Bangla printed OCR model | Scaffold | contract and JSON ready; engine returns model-required error |
 | Bangla handwriting OCR | Planned | dataset/model/license selection required |
 | One-shot LLM tool proposals | Build verified v0.8.0 | strict parser, revalidation and trusted review passed release run 31953763295; device validation pending |
-| Persistent tool audit/replay guard | Source candidate | no-backup JSONL, approval-before-authority fsync, bounded full-chain verification, content-free records and exact-call replay rejection; CI/device validation pending |
+| Persistent tool audit/replay guard | Build verified | no-backup JSONL, approval-before-authority fsync, bounded full-chain verification, Android file tests, content-free records and exact-call replay rejection passed run 31956572135; device validation pending |
 | Autonomous multi-step tool loop | Planned | requires replay-resistant persistent audit, foreground binding, result feedback, loop limits and adversarial device evidence |
 | RAG / STT / TTS plugins | Planned | interfaces to be designed after runtime stabilization |
 

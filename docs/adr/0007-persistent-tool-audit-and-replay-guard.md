@@ -1,6 +1,6 @@
 # ADR 0007: Persistent content-free tool audit and replay guard
 
-- Status: Accepted implementation candidate; remote/device verification pending
+- Status: Accepted; build verified, device verification pending
 - Date: 2026-08-16
 - Refines: [ADR 0006](0006-one-shot-model-tool-proposals.md)
 
@@ -53,6 +53,10 @@ Costs and limits:
 - **Execute first, write later:** rejected because audit failure would leave an unaudited action.
 - **Android Keystore HMAC immediately:** deferred; it improves root/tamper resistance but adds key lifecycle, backup, device-lock, invalidation, and recovery behavior requiring a dedicated design and physical tests.
 - **Silent truncation/rotation:** rejected because it would erase security history without explicit policy.
+
+## Verification
+
+GitHub Actions run 31956572135 passed pure-JVM ledger tests, Android file persistence/reopen/corruption/replay tests, coverage, Kotlin/C++, lint and APK assembly. Physical process-death, fsync failure, capacity, corruption-test-build and diagnostics inspection remain pending.
 
 ## Future migration path
 
