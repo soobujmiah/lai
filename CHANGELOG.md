@@ -76,3 +76,5 @@ All notable changes are documented here. The project follows semantic versioning
 - GitHub Actions run 31941189803 passed v0.7 multi-turn Kotlin/JNI, native metrics/cancellation, memory lifecycle, lint and APK assembly.
 - GitHub Actions run 31942344604 passed diagnostics privacy schema/tests, coverage, lint, native runtime and APK assembly.
 - GitHub Actions run 31944742526 passed retained-model export/reopen/hash, catalog v2, lint, native runtime and APK assembly.
+- GitHub Actions run 31951341085 passed opaque backend/device-profile/catalog-v3 contracts, architecture boundaries, coverage, lint, native runtime and APK assembly.
+- Catalog run 31951341094 signed and published revision 3; exact published bytes and detached signature were independently verified.

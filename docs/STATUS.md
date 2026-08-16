@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `d097b42`, [Android run 31944742526](https://github.com/soobujmiah/lai/actions/runs/31944742526). Boundaries, catalog v2, coverage, retained-model SAF export/reopen/SHA path, diagnostics, lint, Kotlin/JNI/native runtime and APK assembly passed. The APK artifact archive is approximately 13.85 MB. Signed catalog revision 2 was independently verified.
+Latest verified remote build: commit `a0b9f29`, [Android run 31951341085](https://github.com/soobujmiah/lai/actions/runs/31951341085). Vendor boundaries, catalog v3, coverage, retained-model SAF path, diagnostics, lint, Kotlin/JNI/native runtime and APK assembly passed. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) signed and published revision 3; the exact 1,131-byte asset and detached signature were independently verified.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
@@ -13,8 +13,8 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Zero-egress architecture policy | Ready | only download module owns transport; outbound user data denied; boundary check passes |
 | Signed web model catalog | Build verified | encrypted ECDSA signer, stable `catalog-v1` assets, in-app verification/cache/fallback and supported-list UI passed; device refresh pending |
 | Evidence-aware scheduler | Device validated (CPU) | Redmi selected CPU with 3,077 MiB available vs 1,833 MiB estimated peak at nominal thermal state |
-| Vendor-neutral backend boundary | Source candidate | opaque adapter IDs, generic descriptors, model-format checks, `DeviceProfile`, isolated llama runtime and CI terminology guard; remote build pending |
-| Reviewed model catalog | Device validated baseline; revision 3 source candidate | official Qwen artifact installed with expected size/hash; source now declares GGUF/backend/ABI/context/memory compatibility and prevents downgrade; signed rev3 publication/refresh pending |
+| Vendor-neutral backend boundary | Build verified | opaque adapter IDs, generic descriptors, artifact/backend/ABI checks, `DeviceProfile`, isolated llama runtime and CI terminology guard passed run 31951341085 |
+| Reviewed model catalog | Device validated baseline; revision 3 published | official Qwen artifact installed with expected size/hash; signed metadata declares GGUF/backend/ABI/context/memory compatibility and prevents downgrade; in-app rev3 refresh pending |
 | Android environment provider | Device validated | Redmi reported memory, 79% battery, charging=false and thermal=NOMINAL |
 | GitHub Android toolchain | Ready | workflow installs API 35, Build Tools, NDK, CMake, Gradle remotely |
 | arm64 native `.so` build | Ready | isolated `runtime:llama` externalNativeBuild compiles C++20 JNI library |
