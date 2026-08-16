@@ -6,10 +6,10 @@ Application ID: `dev.lai.runtime`
 Source baseline before this state-file commit: `e03a4cc`  
 Latest device-test release: [`v0.8.2`](https://github.com/soobujmiah/lai/releases/tag/v0.8.2) (`cbf6ff9`)  
 Release APK: `https://github.com/soobujmiah/lai/releases/download/v0.8.2/app-release.apk`  
-Last documentation/build verification: GitHub Actions run `31959866932`  
+Last documentation/build verification: GitHub Actions run `31968037878` (Phase 2A settings + workspace foundation; fifteen-module graph)  
 Current physical baseline: Xiaomi/Redmi Turbo 4 Pro, Android API 36, QTI SM8735 / Snapdragon 8s Gen 4
 
-This session advanced **Phase 2A** substantially: items 1–2 (typed settings contracts + validation/migration policy); then the pure-core **workspace decision layer** (`WorkspacePolicy` classifier + `WorkspaceSettingsCodec`); then the **`platform:workspace` Android SAF adapter** (`WorkspaceRepository`, `WorkspaceSettingsStore`, `WorkspaceDiscovery`) registered in the build graph and wired into `AppContainer`. No native/NDK/build-flag changes were required and the Qwen 1.5B / llama.cpp APK path is unchanged; GitHub Actions now also runs `:platform:workspace:testDebugUnitTest`. Remaining Phase 2A: the minimal Chat ⚙ settings bottom sheet, `MainViewModel`/diagnostics integration, and physical SAF grant/discovery device tests (items 6–8).
+This session advanced **Phase 2A** substantially: items 1–2 (typed settings contracts + validation/migration policy); then the pure-core **workspace decision layer** (`WorkspacePolicy` classifier + `WorkspaceSettingsCodec`); then the **`platform:workspace` Android SAF adapter** (`WorkspaceRepository`, `WorkspaceSettingsStore`, `WorkspaceDiscovery`) registered in the build graph and wired into `AppContainer`. **GitHub Actions run `31968037878` verified the fifteen-module graph** — all pure-JVM coverage (settings + workspace + GGUF magic detector), the `:platform:workspace` test, lint, the native llama.cpp build, and debug APK assembly passed. No native/NDK/build-flag changes were required and the Qwen 1.5B / llama.cpp APK path is unchanged. Remaining Phase 2A: the minimal Chat ⚙ settings bottom sheet, `MainViewModel`/diagnostics integration, and physical SAF grant/discovery device tests (items 6–8).
 
 This file is a handoff snapshot. `docs/STATUS.md`, `docs/ROADMAP.md`, implementation source, and Git history remain authoritative if a later change conflicts with this snapshot.
 

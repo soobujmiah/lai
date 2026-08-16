@@ -4,6 +4,11 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Verified
+
+- GitHub Actions run 31968037878 (commit `34e1281`) passed the fifteen-module source/architecture/catalog policy, pure-JVM coverage ratchets (typed settings + workspace classifier/codec + GGUF magic detector), `:platform:audit`/`:platform:workspace`/`:app` unit tests, lint, the native llama.cpp arm64 build, and debug APK assembly for the Phase 2A settings + workspace foundation.
+- Intermediate commits (`7904ce3`, `f4eee3f`, `a362b4d`) failed `:core:policy:compileKotlin`: `SettingsPolicy.validate(document)` called `checkVoice`/`checkSearch` without the required `path` argument, and `WorkspacePolicyTest` missed three settings imports. Fixed in `34e1281`; the local source gate does not compile Kotlin, so these were caught only by CI.
+
 ### Phase 2A workspace SAF adapter candidate
 
 - Added the `platform:workspace` Android module: `WorkspaceRepository` (SAF tree grant via `ACTION_OPEN_DOCUMENT_TREE`, persistable read/write permission, canonical child resolution through `DocumentsContract` document IDs, idempotent layout creation), `WorkspaceSettingsStore` (bounded read with fallback-to-defaults, temp-write-then-replace write that verifies the exact v1 schema first), and `WorkspaceDiscovery` (depth/count/size-bounded traversal that streams SHA-256 and classifies via the pure `WorkspacePolicy`).
