@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-08-16
 
-Latest verified remote build: commit `4841f8d`, [GitHub Actions run 31936642189](https://github.com/soobujmiah/lai/actions/runs/31936642189). Architecture/privacy boundaries, coverage ratchets, thirteen-module graph, reviewed catalog, scheduler/memory tests, Android environment provider, lint, immutable llama.cpp fetch, arm64 native compilation, APK assembly, and artifact upload passed. The `lai-debug-28` artifact archive is approximately 13.76 MB.
+Latest verified remote build: commit `1926443`, [GitHub Actions run 31937804443](https://github.com/soobujmiah/lai/actions/runs/31937804443). Boundaries, coverage, both flavor lints, thirteen modules, local import, scheduler/catalog, native llama.cpp and two debug APKs passed. Final `apkanalyzer` inspection proved the air-gapped APK has no network permissions and a separate application ID. The two-APK artifact archive is approximately 27.54 MB.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
@@ -11,7 +11,7 @@ Legend: **Ready** = implemented and intended to work; **Build verified** = compi
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
 | Layered module backbone | Ready | eleven-module Gradle/manifest graph compiled and packaged remotely |
 | Zero-egress architecture policy | Ready | only download module owns transport; outbound user data denied; boundary check passes |
-| Air-gapped APK | Candidate | separate app ID, manifest permission removal, local reviewed import and final APK check added; CI pending |
+| Air-gapped APK | Build verified | separate app ID, no final debug APK network permissions, reviewed file import; release/device checks pending |
 | Evidence-aware scheduler | Build verified | model loads route through evidence, memory, battery and thermal preflight; physical load validation pending |
 | Reviewed model catalog | Build verified | immutable official Qwen metadata, mandatory digest/size and one-tap UX compiled; device download pending |
 | Android environment provider | Build verified | memory, battery, charging and thermal snapshot compiled and scheduler-integrated; device reading pending |
