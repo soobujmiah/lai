@@ -4,6 +4,11 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Bangla output quality: tuned system prompt + repetition penalty
+
+- Rewrote the native `kSystemPrompt`: explicit bilingual instruction to answer Bangla in short, simple, everyday sentences, never literal translations or unprompted English mixing, and to admit ignorance directly — the failure modes visible in the 0.9.0 field screenshot. Costs ~40 extra prompt tokens once per conversation (KV-prefix reuse absorbs it afterwards).
+- Added a mild repetition penalty (1.1 over the last 64 tokens) to the sampling chain, placed after top-p per the pinned header's performance note for the 151k Qwen vocabulary; greedy path untouched. 1.5B-class models loop worst in low-resource languages; this is the standard conservative mitigation.
+
 ### Rolling Context Window — `keepLastTurns` is now real
 
 - `ContextWindowPolicy` (`core:policy`, pure JVM, 6 tests incl. Bangla content): keeps the last N completed turns plus the in-flight request, dropping oldest turns from the front so the kept history always starts at a USER message. Applied in `prepareConversation` before token counting; the quick-settings "conversation memory" slider now actually bounds the prompt. Reported honestly as `windowedConversationTurns` in state and diagnostics (default 0), distinct from token-overflow `trimmedConversationTurns`. Interaction with KV-prefix reuse documented: stable prefix (maximal reuse) under the window; bounded re-prefill once it slides.

@@ -261,7 +261,7 @@ Current thermal handling only *refuses* at `SEVERE`. Needed: Android thermal cal
 
 ### Then, in order
 
-1. **Bangla output quality** — replies are fluent in English but partly incoherent in Bangla (Qwen 2.5 1.5B base limitation). Options: Bangla-tuned system prompt, a reviewed Bangla-stronger small model in the catalog, or a quality pack. Decide before investing in OCR→LLM flows.
+1. **Bangla output quality** — cheap levers SHIPPED (tuned bilingual system prompt: short simple sentences, no literal translation, admit ignorance; + repetition penalty 1.1/64 after top-p). **Device-compare Bangla replies against the 0.9.0 screenshot.** If still weak, the remaining lever is a reviewed Bangla-stronger small model in the signed catalog — a model-selection decision for the owner.
 2. **Phase 2A device acceptance** — SAF grant/revoke, settings persist across restart, malformed `settings.json` falls back, scan registers without loading.
 3. **Model Center + WorkManager downloader** — pause/resume/cancel surviving app exit.
 4. **Rolling Context Window** — `keepLastTurns` is typed and user-editable but does nothing yet; pairs naturally with the KV-prefix work.

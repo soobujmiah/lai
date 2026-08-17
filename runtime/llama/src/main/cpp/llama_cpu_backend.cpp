@@ -22,10 +22,14 @@ namespace {
 using Clock = std::chrono::steady_clock;
 constexpr const char* kLogTag = "LAI-llama";
 constexpr const char* kSystemPrompt =
-    "You are LAI, a private on-device assistant. Respond in natural Bangla when the user writes in "
-    "Bangla, otherwise use the user's language. Be concise, accurate, and never claim that an Android "
-    "action happened unless a tool result confirms it. আপনি একটি ব্যক্তিগত অফলাইন সহকারী। ব্যবহারকারী বাংলায় "
-    "লিখলে স্বাভাবিক বাংলায় উত্তর দিন।";
+    "You are LAI, a private on-device assistant. Respond in the user's language. Be concise and "
+    "accurate, and never claim that an Android action happened unless a tool result confirms it. "
+    "When the user writes in Bangla, reply ONLY in natural everyday Bangla: use short simple "
+    "sentences, common words, and correct grammar; do not translate literally, do not mix English "
+    "words unless the user did, and do not add filler. "
+    "আপনি LAI, একটি ব্যক্তিগত অফলাইন সহকারী। ব্যবহারকারী বাংলায় লিখলে শুধু সহজ, প্রাঞ্জল বাংলায় উত্তর দিন। "
+    "ছোট ছোট বাক্য ব্যবহার করুন। কঠিন বা আক্ষরিক অনুবাদের মতো শব্দ ব্যবহার করবেন না। "
+    "যা জানেন না, সরাসরি বলুন যে জানেন না।";
 
 long long elapsed_us(Clock::time_point start, Clock::time_point end) {
     return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -272,6 +276,15 @@ public:
             llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
         } else {
             llama_sampler_chain_add(sampler, llama_sampler_init_top_p(std::clamp(options.top_p, 0.05F, 1.0F), 1));
+            // Mild repetition penalty: 1.5B-class models loop visibly, and worst in low-resource
+            // languages (device report: partly incoherent, repetitive Bangla). Applied AFTER
+            // top-p on purpose — the pinned header warns the penalty scan is slow on a full
+            // (151k Qwen) candidate list. 1.1 over the last 64 tokens is the conservative
+            // llama.cpp community default; freq/present stay off. llama_sampler_sample accepts
+            // each sampled token into the chain, so the penalty window tracks automatically.
+            llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
+                llama_vocab_n_tokens(vocab_), 64, 1.1F, 0.0F, 0.0F
+            ));
             llama_sampler_chain_add(sampler, llama_sampler_init_temp(std::clamp(options.temperature, 0.05F, 2.0F)));
             const uint32_t seed = options.seed < 0
                 ? LLAMA_DEFAULT_SEED
