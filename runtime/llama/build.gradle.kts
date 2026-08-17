@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "dev.lai.runtime.runtime.llama"
-    compileSdk = 35
+    compileSdk = 37
     ndkVersion = "27.0.12077973"
 
     defaultConfig {

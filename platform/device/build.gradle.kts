@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace = "dev.lai.runtime.platform.device"
-    compileSdk = 35
+    compileSdk = 37
     defaultConfig { minSdk = 28 }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
