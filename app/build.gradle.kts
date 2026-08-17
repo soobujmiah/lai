@@ -71,10 +71,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += "-Xjvm-default=all"
-    }
+    // AGP 9.3 provides Kotlin via its built-in integration; kotlinOptions is removed.
+    // JVM target is inferred from compileOptions (17) and the bundled Kotlin toolchain.
     packaging {
         resources.excludes += setOf(
             "META-INF/AL2.0",
