@@ -3,7 +3,7 @@
 Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime`
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
-Latest CI: run [`31984508342`](https://github.com/soobujmiah/lai/actions/runs/31984508342) → **build `0.6.85`** (`c04fabe`) — **green** · prefill-cut + native-tracing commit pushed after; confirm its run before device test
+Latest CI: run [`31987089883`](https://github.com/soobujmiah/lai/actions/runs/31987089883) → **release `0.9.0`** (`ae2ebd8`, tag `v0.9.0`) — **green, production-signed**
 Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **146** unit tests
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
@@ -61,8 +61,8 @@ Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **
 | Android build | Ready | JDK 17, API 35, NDK 27, CMake, Gradle 8.13, pinned llama.cpp; tests + lint + APK |
 | Tests / coverage | Ready | 142 tests; JaCoCo ratchets (contracts .15 / policy .55 / scheduler .70 / model .50 / plugins .50) |
 | Catalog publish | Ready | Validates/signs/verifies `catalog-v1` (revision 3) |
-| Releases | Device-test only | Tag-triggered APK; **debug-signed — not production** |
-| Production supply chain | **Pending** | Permanent key, SBOM, provenance, reproducible builds |
+| Releases | **Production-signed (v0.9.0)** | Tag-triggered APK; `v0.9.0` (run 88) signed with the permanent `lai-release` RSA-4096 key (V1–V4), cert SHA-256 `80:03:8D:3E…7E:8E`, verified against the published asset |
+| Production supply chain | **Partial** | ✅ Permanent key (PKCS12, secrets `ANDROID_KEYSTORE_*`; owner holds offline copy — never commit it) · still pending: SBOM, provenance, reproducible builds |
 
 ### 1.5 Tool configuration & SAF workspace (Phase 2A — complete)
 
