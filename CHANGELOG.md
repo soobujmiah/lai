@@ -4,6 +4,13 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Prefill cost cut + native stall tracing (P0: chat has never replied on device)
+
+- **Gated the tool instruction on relevance** (`ToolInstructionGate`, `core:policy`, pure JVM): the tool-proposal instruction is now prepended only when the latest user message plausibly requests an Android action (English word-boundary regex + inflection-tolerant Bangla stems). A plain "hi" previously paid a ~314-token instruction inside a ~407-token prefill — 7–27 s of CPU before the first token on 4 threads; it now carries no tool tokens at all. Recall-biased by design: a false positive costs prefill time only, and authority is unchanged — proposals are still parsed, validated twice, and user-confirmed before dispatch. 4 new gate tests.
+- **Compressed `BuiltInToolCatalog.modelInstruction`** from ~314 to roughly half the tokens while keeping every schema, the single-JSON-object envelope rule, the no-self-confirmation rule, and the never-claim-success rule.
+- **Added native `LAI-llama` stall tracing** (`llama_cpu_backend.cpp`): µs-precision `__android_log_print` around mutex acquisition (the suspected `COUNTING_TOKENS` stall point), chat-template application, tokenization, per-chunk prefill progress, prefill completion with tok/s, first sampled token, and total generation. Four device reports could not distinguish "prefill is slow" from "prefill is wedged"; the next `adb logcat -s LAI-llama` will name the exact blocking call and elapsed time.
+- No build-flag, NDK, or workflow change was required; versioning remains CI-derived (`0.6.<run_number>`).
+
 ### Phase 2A vertical slice complete: quick settings, workspace UI and one-request overrides
 
 - Added pure `SettingsSession` / `SettingsSessionPolicy` (`core:policy`) that models the two distinct notions of "current settings": persisted defaults and a one-request quick-sheet override. Validation happens before every transition, so an invalid candidate is rejected with typed issues instead of being silently sanitized.

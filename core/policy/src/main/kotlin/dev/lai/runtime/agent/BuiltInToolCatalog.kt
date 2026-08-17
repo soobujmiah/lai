@@ -71,21 +71,16 @@ object BuiltInToolCatalog {
 
     /** Included only in a trusted system message, never treated as authority when echoed by model/screen text. */
     val modelInstruction: String = """
-        When the user explicitly asks LAI to operate Android and exactly one available tool can perform the next
-        action, you MUST respond only with that tool proposal. Otherwise answer normally or ask for missing details.
-        A proposal must be the entire response as one JSON object with exactly id, name, and arguments. Start with {
-        and end with }. Do not add markdown fences, XML/tool_call tags, commentary, or a confirmed field. Never claim
-        an action succeeded until LAI supplies a tool result. Available schemas:
-        screen.snapshot {}
-        screen.click {viewId?|text?|contentDescription?|path?} (at least one selector)
-        screen.type {selector:{viewId?|text?|contentDescription?|path?}, text:string}; sensitive-input flags are forbidden
-        screen.scroll {selector?:{viewId?|text?|contentDescription?|path?}, forward?:boolean}
-        system.global_action {action:back|home|recents|notifications}
-        app.launch {package:string}
-        ocr.current_screen {}
-        shell.operation {operation:string, arguments:{string:string}}; only LAI's allowlist is accepted
-        Example: {"id":"call-1","name":"app.launch","arguments":{"package":"com.example.app"}}
+        Only when the user asks LAI to operate this Android device, respond with a single JSON object and
+        nothing else, starting with { and ending with }: {"id":"call-1","name":"<tool>","arguments":{...}}.
+        No markdown fences, tags, commentary, or confirmed field. Never claim an action happened until LAI
+        supplies a tool result. Otherwise answer normally. Tools:
+        screen.snapshot{}; screen.click{viewId|text|contentDescription|path};
+        screen.type{selector:{viewId|text|contentDescription|path},text}; screen.scroll{selector?,forward?};
+        system.global_action{action:back|home|recents|notifications}; app.launch{package};
+        ocr.current_screen{}; shell.operation{operation,arguments}
     """.trimIndent().replace('\n', ' ')
+
 
     private fun selectorSummary(arguments: JsonObject): String = when {
         arguments.optionalString("viewId") != null -> arguments.stringValue("viewId")

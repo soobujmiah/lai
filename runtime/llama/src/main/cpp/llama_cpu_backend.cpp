@@ -140,8 +140,21 @@ public:
     }
 
     int count_tokens(const std::vector<ChatMessage>& conversation) override {
+        const auto lock_wait_start = Clock::now();
         std::lock_guard<std::mutex> lock(generation_mutex_);
-        return static_cast<int>(tokenize(vocab_, apply_chat_template(model_, conversation)).size());
+        const auto start = Clock::now();
+        // The shared generation_mutex_ is a suspected stall point (stage COUNTING_TOKENS in the
+        // diagnostics export): if generate() holds it, this blocks with no visible progress.
+        __android_log_print(
+            ANDROID_LOG_INFO, kLogTag,
+            "count_tokens: lock acquired after %lld us", elapsed_us(lock_wait_start, start)
+        );
+        const int count = static_cast<int>(tokenize(vocab_, apply_chat_template(model_, conversation)).size());
+        __android_log_print(
+            ANDROID_LOG_INFO, kLogTag,
+            "count_tokens: %d tokens in %lld us", count, elapsed_us(start, Clock::now())
+        );
+        return count;
     }
 
     GenerationResult generate(
@@ -150,14 +163,28 @@ public:
         const TokenCallback& on_token,
         const CancelCallback& is_cancelled
     ) override {
+        const auto lock_wait_start = Clock::now();
         std::lock_guard<std::mutex> lock(generation_mutex_);
         if (options.max_new_tokens < 1 || options.max_new_tokens > 4096) {
             throw std::invalid_argument("maxNewTokens is outside the supported range");
         }
 
         const auto total_start = Clock::now();
+        __android_log_print(
+            ANDROID_LOG_INFO, kLogTag,
+            "generate: lock acquired after %lld us", elapsed_us(lock_wait_start, total_start)
+        );
         llama_memory_clear(llama_get_memory(context_), true);
-        std::vector<llama_token> prompt_tokens = tokenize(vocab_, apply_chat_template(model_, conversation));
+        const std::string templated = apply_chat_template(model_, conversation);
+        const auto template_end = Clock::now();
+        std::vector<llama_token> prompt_tokens = tokenize(vocab_, templated);
+        const auto tokenize_end = Clock::now();
+        __android_log_print(
+            ANDROID_LOG_INFO, kLogTag,
+            "generate: template %zu chars in %lld us, tokenize %zu tokens in %lld us",
+            templated.size(), elapsed_us(total_start, template_end),
+            prompt_tokens.size(), elapsed_us(template_end, tokenize_end)
+        );
         const int32_t context_size = static_cast<int32_t>(llama_n_ctx(context_));
         if (static_cast<int64_t>(prompt_tokens.size()) + options.max_new_tokens > context_size) {
             throw std::runtime_error("Conversation and requested response exceed the loaded context size");
@@ -176,8 +203,22 @@ public:
             llama_batch batch = llama_batch_get_one(prompt_tokens.data() + offset, count);
             if (llama_decode(context_, batch) != 0) throw std::runtime_error("Prompt evaluation failed");
             offset += static_cast<size_t>(count);
+            // Per-chunk progress: four device reports could not distinguish "prefill is slow"
+            // from "prefill is wedged". This names the exact chunk where progress stops.
+            __android_log_print(
+                ANDROID_LOG_INFO, kLogTag,
+                "generate: prefill %zu/%zu tokens at %lld us",
+                offset, prompt_tokens.size(), elapsed_us(prompt_start, Clock::now())
+            );
         }
         const auto prompt_end = Clock::now();
+        const long long prefill_us = elapsed_us(prompt_start, prompt_end);
+        __android_log_print(
+            ANDROID_LOG_INFO, kLogTag,
+            "generate: prefill done, %zu tokens in %lld us (%.1f tok/s)",
+            prompt_tokens.size(), prefill_us,
+            prefill_us > 0 ? static_cast<double>(prompt_tokens.size()) * 1e6 / static_cast<double>(prefill_us) : 0.0
+        );
 
         llama_sampler* sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
         if (sampler == nullptr) throw std::runtime_error("Sampler allocation failed");
@@ -205,13 +246,25 @@ public:
             llama_token token = llama_sampler_sample(sampler, context_, -1);
             if (llama_vocab_is_eog(vocab_, token)) break;
             const std::string piece = token_piece(vocab_, token);
-            if (generated == 0) first_token_time = Clock::now();
+            if (generated == 0) {
+                first_token_time = Clock::now();
+                __android_log_print(
+                    ANDROID_LOG_INFO, kLogTag,
+                    "generate: first token sampled at %lld us from start",
+                    elapsed_us(total_start, first_token_time)
+                );
+            }
             if (!piece.empty() && !on_token(piece)) break;
             ++generated;
             llama_batch batch = llama_batch_get_one(&token, 1);
             if (llama_decode(context_, batch) != 0) throw std::runtime_error("Generated-token evaluation failed");
         }
         const auto end = Clock::now();
+        __android_log_print(
+            ANDROID_LOG_INFO, kLogTag,
+            "generate: done, %d tokens in %lld us total",
+            generated, elapsed_us(total_start, end)
+        );
         return GenerationResult{
             static_cast<int>(prompt_tokens.size()),
             generated,

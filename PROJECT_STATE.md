@@ -3,8 +3,8 @@
 Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime`
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
-Latest CI: run [`31984508342`](https://github.com/soobujmiah/lai/actions/runs/31984508342) → **build `0.6.85`** (`c04fabe`) — **green**
-Graph: **15 Gradle modules** · Source footprint **822 KB** (limit 128 MB) · **142** unit tests
+Latest CI: run [`31984508342`](https://github.com/soobujmiah/lai/actions/runs/31984508342) → **build `0.6.85`** (`c04fabe`) — **green** · prefill-cut + native-tracing commit pushed after; confirm its run before device test
+Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **146** unit tests
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
 
@@ -39,7 +39,7 @@ Graph: **15 Gradle modules** · Source footprint **822 KB** (limit 128 MB) · **
 | Actions | Build verified | Click/type/scroll/global/launch; selectors by viewId/text/contentDescription/path | Physical per-action harness |
 | Screenshot | Capability observed | Android 11+ accessibility screenshot → in-memory ARGB | OCR + redaction |
 | Shizuku | Device validated (UID 2000) | Binder state, dedicated UserService, argv allowlist, time/output bounds | Recipe orchestration |
-| One-shot tool proposals | Build verified | Bounded JSON parser, canonical schemas, trusted Compose review, second-dispatch validation | ❗ Physical retest blocked by §1.1 |
+| One-shot tool proposals | Build verified | Bounded JSON parser, canonical schemas, trusted Compose review, second-dispatch validation; **`ToolInstructionGate` relevance gate + compressed instruction (this session)** | ❗ Physical retest blocked by §1.1 |
 | Persistent tool audit | Build verified | App-private no-backup JSONL hash chain, approval-before-authority fsync, replay guard | Restart/replay device test |
 
 ### 1.3 Bangla OCR
@@ -237,15 +237,19 @@ Four device reports, zero replies. **Do not add features until a reply is observ
 
 **Current hypothesis (untested):** the 4 s cancel watchdog was aborting healthy prompt prefill. A "hi" becomes ~407 prompt tokens (≈90 bilingual system prompt + ≈314 tool instruction when proposals are on), which needs **7–27 s** at a realistic 15–60 tok/s on 4 CPU threads. `CANCEL_GRACE_MS` is now **45 s** in `0.6.85`.
 
+**Done this session (build pending CI):**
+
+- **Prefill cut shipped.** `ToolInstructionGate` (`core:policy`, pure JVM, 4 tests) now includes the tool instruction only when the latest user message plausibly requests an Android action (English word-boundary regex + Bangla verb stems). A plain "hi" carries **zero** tool tokens even with proposals enabled. `modelInstruction` itself was also compressed to roughly half its former token count with all schemas intact. Expected 2–4× faster first token on non-action messages.
+- **Native stall tracing shipped.** `llama_cpu_backend.cpp` now logs µs timings to `LAI-llama`: mutex-acquisition wait (both `count_tokens` and `generate` — the suspected `COUNTING_TOKENS` stall), template chars, tokenize count, per-chunk prefill progress, prefill tok/s, first-token latency, total. Capture with `adb logcat -s LAI-llama` during the next failure.
+
 **Next session must, in order:**
 
-1. **Get the device result for `0.6.85`.** Send "hi", wait ~30 s. If `performance[]` gains an entry, the hypothesis is confirmed.
-2. **If it still fails,** read `lastGenerationFailure` — it now names the stage:
-   - `COUNTING_TOKENS` → the stall is in `countTokens`/`apply_chat_template`, likely the shared `generation_mutex_`.
-   - `AWAITING_FIRST_TOKEN` → prefill is genuinely slower than 45 s; profile `llama_decode` and cut the prompt.
+1. **Get the device result for the new build.** Send "hi", wait ~30 s. Watchdog fix (45 s) + prefill cut are now both in; if `performance[]` gains an entry, P0 closes.
+2. **If it still fails,** read `lastGenerationFailure` (names the stage) **and** capture `adb logcat -s LAI-llama` — the trace now shows exactly which native call stalls and for how long:
+   - `COUNTING_TOKENS` → look for a large "lock acquired after" value: the shared `generation_mutex_`.
+   - `AWAITING_FIRST_TOKEN` → per-chunk prefill lines show whether prefill progresses slowly or stops dead.
    - `STREAMING` → the channel/collector path.
-3. **Cut prefill cost regardless** (biggest real win): the ~314-token tool instruction is prepended to *every* message. Send it only when proposals are enabled **and** the user's text plausibly requests an action, or compress it to <100 tokens. Expect a 2–4× faster first token.
-4. **Add a native `logcat` trace** (`LAI-llama`) around tokenize/prefill/first-sample with elapsed µs, so the next failure is measured, not inferred.
+3. **Add a closed-loop thermal governor** once a reply is observed (Priority 2 below).
 
 ### Priority 1 — Confirm the `0.6.85` UI fixes on device
 

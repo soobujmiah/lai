@@ -11,6 +11,7 @@ import dev.lai.runtime.BuildConfig
 import dev.lai.runtime.LaiApplication
 import dev.lai.runtime.agent.ToolCall
 import dev.lai.runtime.agent.ToolCallParseResult
+import dev.lai.runtime.agent.ToolInstructionGate
 import dev.lai.runtime.agent.ToolProposalCounters
 import dev.lai.runtime.agent.ToolRisk
 import dev.lai.runtime.audit.ToolAuditOutcome
@@ -761,8 +762,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun prepareConversation(config: GenerationConfig): PreparedConversation {
         val current = state.value
+        // Prefill is the dominant pre-first-token cost on the 4-thread CPU path, and the tool
+        // instruction is its single biggest line item. It is only prepended when the latest user
+        // message plausibly requests an Android action (ToolInstructionGate) — a plain "hi" now
+        // carries no tool tokens at all. Authority is unchanged: proposals are still validated
+        // twice and confirmed by the user before dispatch.
+        val latestUserText = current.messages.lastOrNull { it.fromUser && it.contextEligible }?.text.orEmpty()
+        val includeToolInstruction = current.toolProposalsEnabled &&
+            ToolInstructionGate.shouldIncludeInstruction(latestUserText)
         val all = buildList {
-            if (current.toolProposalsEnabled) {
+            if (includeToolInstruction) {
                 add(ConversationMessage(ConversationRole.SYSTEM, container.agentRuntime.modelToolInstruction))
             }
             current.messages
@@ -774,7 +783,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
         }.toMutableList()
-        val protectedPrefix = if (current.toolProposalsEnabled) 1 else 0
+        val protectedPrefix = if (includeToolInstruction) 1 else 0
         require(all.size > protectedPrefix) { "Conversation is empty" }
         var trimmed = 0
         while (true) {
