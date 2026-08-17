@@ -9,14 +9,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.BackHandler
@@ -46,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,18 +68,26 @@ import dev.lai.runtime.shell.ShizukuState
 import dev.lai.runtime.workspace.WorkspaceGrantState
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun LaiApp(viewModel: MainViewModel) {
     val state by viewModel.state.collectAsState()
     // Hardware/gesture back must leave Settings as well; otherwise back exits the whole app from
     // a screen the user thinks of as "inside" something.
     BackHandler(enabled = state.settingsVisible) { viewModel.toggleSettings() }
+    val imeVisible = WindowInsets.isImeVisible
     Scaffold(
-        // The activity is edge-to-edge and resizes for the keyboard. Without an explicit contentWindowInsets
-        // the Scaffold keeps reserving the status-bar inset while the IME is up, which pushed the whole
-        // layout upward and made the top bar collide with the status bar (field report, Redmi Turbo 4 Pro).
-        contentWindowInsets = WindowInsets.safeDrawing,
+        // Keyboard handling, arrived at over three device reports:
+        //  - imePadding() on the Scaffold lifts the ENTIRE scaffold (content + bottom bar) above the
+        //    keyboard. Padding only the composer row does not work, because when a Scaffold has a
+        //    bottomBar the content's bottom padding is the bottom bar's height, not the IME inset,
+        //    so the composer was laid out behind the navigation bar and the keyboard (build 0.6.84).
+        //  - contentWindowInsets must therefore NOT contain the IME as well, or it is counted twice
+        //    and the composer flies off the top of the screen (build 0.6.83).
+        modifier = Modifier.imePadding(),
+        contentWindowInsets = WindowInsets.safeDrawing.only(
+            WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
+        ),
         topBar = {
             TopAppBar(
                 title = { Text("LAI", fontWeight = FontWeight.Bold) },
@@ -112,7 +125,7 @@ fun LaiApp(viewModel: MainViewModel) {
             )
         },
         bottomBar = {
-            if (!state.settingsVisible) {
+            if (!state.settingsVisible && !imeVisible) {
                 NavigationBar {
                     ModeNavigationItem(UiMode.CHAT, state.mode, stringResource(R.string.chat), viewModel::setMode)
                     ModeNavigationItem(
@@ -241,17 +254,24 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
                 enabled = !state.busy && state.pendingToolProposal == null && state.messages.any { it.contextEligible },
             ) { Text("New chat") }
         }
+        val listState = rememberLazyListState()
+        // Follow the newest text while a reply streams in, so the user never has to chase it.
+        LaunchedEffect(state.messages.size, state.messages.lastOrNull()?.text) {
+            if (state.messages.isNotEmpty()) {
+                listState.animateScrollToItem(state.messages.lastIndex)
+            }
+        }
         LazyColumn(
+            state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(state.messages) { message -> MessageBubble(message) }
+            // Stable keys: only the changed bubble recomposes as tokens stream in.
+            items(state.messages, key = { it.id }) { message -> MessageBubble(message) }
         }
         Row(
-            // No imePadding() here: contentWindowInsets = safeDrawing already includes the IME
-            // inset, so adding it again shifted the composer up by the keyboard height twice and
-            // pushed it off screen (field report, build 0.6.83).
+            // No imePadding() here: the Scaffold already applies it for the whole layout.
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,

@@ -83,7 +83,19 @@ data class ChatMessage(
     val fromUser: Boolean,
     val text: String,
     val contextEligible: Boolean = true,
+    /**
+     * Stable identity for `LazyColumn`'s `key`.
+     *
+     * Without it Compose keys rows by index, so appending a streamed token invalidates every
+     * bubble in the list and the whole conversation recomposes on each token - the main source of
+     * chat jank on device. With a stable id only the row whose text changed is redrawn.
+     */
+    val id: Long = nextChatMessageId(),
 )
+
+private val chatMessageIds = java.util.concurrent.atomic.AtomicLong(0L)
+
+private fun nextChatMessageId(): Long = chatMessageIds.incrementAndGet()
 
 data class PendingToolProposal(
     val call: ToolCall,
@@ -170,10 +182,14 @@ data class MainUiState(
         )
 }
 
+/** Where a generation attempt got to, used to explain a stall in diagnostics. */
+private enum class GenerationStage { IDLE, COUNTING_TOKENS, AWAITING_FIRST_TOKEN, STREAMING, COMPLETED }
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val container = (application as LaiApplication).container
     private var generationJob: Job? = null
     private var cancelWatchdogJob: Job? = null
+    @Volatile private var generationStage = GenerationStage.IDLE
 
     /**
      * Typed-settings session + SAF workspace status (Phase 2A). All decisions live in the pure
@@ -417,7 +433,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 messages = it.messages + ChatMessage(true, prompt) + ChatMessage(false, ""),
                 operation = RuntimeOperation.GENERATING,
                 lastGenerationMetrics = null,
-                notice = null,
+                // First token on a 1.5B CPU model can take several seconds while the prompt is
+                // processed. Say so, instead of showing an empty bubble that looks broken.
+                notice = "Thinking locally… the first words can take a few seconds.",
             )
         }
         // Thermal admission. The scheduler already gates model LOAD on heat, but a long chat can
@@ -444,14 +462,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Consume any armed "Apply once" override here, so it spends itself on exactly one reply.
         val requestConfig = generationConfig(workspace.consumeForRequest())
+        // Three device reports produced "no reply" with no indication of WHERE it stalled.
+        // This records the last stage reached so a diagnostics export names the blocking call
+        // (token counting, waiting for the first token, or mid-stream) instead of guessing.
+        generationStage = GenerationStage.COUNTING_TOKENS
         generationJob = viewModelScope.launch {
             try {
                 val prepared = prepareConversation(requestConfig)
+                generationStage = GenerationStage.AWAITING_FIRST_TOKEN
                 _state.update { it.copy(trimmedConversationTurns = prepared.trimmedTurns) }
                 container.inferenceEngine.generate(prepared.messages, requestConfig).collect { event ->
                     when (event) {
-                        is InferenceEvent.Token -> appendAssistantToken(event.text)
-                        is InferenceEvent.Completed -> completeGeneration(event)
+                        is InferenceEvent.Token -> {
+                            generationStage = GenerationStage.STREAMING
+                            appendAssistantToken(event.text)
+                        }
+                        is InferenceEvent.Completed -> {
+                            generationStage = GenerationStage.COMPLETED
+                            completeGeneration(event)
+                        }
                         is InferenceEvent.Failed -> markGenerationFailed(event.message)
                     }
                 }
@@ -498,7 +527,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // The cancellation flag is already latched, so the decode loop exits on its own
                 // at the next token boundary. Return the UI to a usable state and keep the model.
                 generationJob = null
-                recordGenerationFailure("Generation did not yield within ${CANCEL_GRACE_MS} ms")
+                recordGenerationFailure(
+                    "Stalled at ${generationStage.name} for over ${CANCEL_GRACE_MS} ms",
+                )
                 _state.update {
                     it.copy(
                         operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
@@ -1279,8 +1310,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val MODEL_CONTEXT_TOKENS = 4096
 
-        /** How long Stop waits for a native call to yield before force-releasing the engine. */
-        private const val CANCEL_GRACE_MS = 4_000L
+        /**
+         * How long Stop waits for the native call to yield before returning the UI to the user.
+         *
+         * This must exceed a realistic prompt-prefill time, not just a token gap. On this device
+         * (SM8735, 4 worker threads, Qwen 1.5B Q4_K_M) a prompt of ~400 tokens - which is what a
+         * short message becomes once the bilingual system prompt and, when enabled, the ~314-token
+         * tool instruction are prepended - needs roughly 7-27 s of prefill before the first token
+         * exists. The previous 4 s budget expired during normal prefill, so the watchdog reported a
+         * stall and abandoned a perfectly healthy generation (device reports 0.6.83 / 0.6.84).
+         */
+        private const val CANCEL_GRACE_MS = 45_000L
         private const val MAX_PERFORMANCE_SAMPLES = 20
         private const val MAX_FAILURE_REASON_CHARS = 200
         private const val MAX_TOOL_AUDIT_RECORDS = 50
