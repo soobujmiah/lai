@@ -1,16 +1,16 @@
 # LAI Project State
 
-Snapshot date: 2026-08-17
-Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime`
+Snapshot date: 2026-08-17 (end of session)
+Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime` · Public repo
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
-Latest release: **`v0.9.1`** (`6206199`) — **green, production-signed, device-validated** (chat replies + IME close animation)
-Graph: **16 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **169** unit tests · WorkManager 2.10.1
+Latest release: **`v0.9.7`** (`5921f1b`) — **green, production-signed** · Releases `v0.9.0`–`v0.9.7` all carry signed APKs
+Graph: **16 Gradle modules** · Source footprint ~0.9 MB (limit 128 MB) · **169 unit tests** · WorkManager 2.10.1 · Actions majors current (checkout v7, upload-artifact v7, setup-java v5, setup-android v4, gradle/actions v6)
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
 
 **Status vocabulary.** **Implemented** = source exists · **Build verified** = CI compiles/tests it · **Device validated** = named behaviour observed on physical hardware · **Scaffold** = compiling boundary with honest unavailable behaviour · **Pending/Planned** = not built.
 
-> ✅ **P0 closed 2026-08-17.** Build `0.9.0` (signed) produced **6 completed generations on the device** in English and Bangla — the first replies in project history. Root cause confirmed: prefill runs at ~25–31 tok/s, so the old ~407-token prompt needed ~14 s and the former 4 s watchdog killed every healthy generation. Evidence in §4.
+> ✅ **Milestones this cycle:** first chat replies ever (P0 closed, en+bn) → KV-prefix reuse **device-validated at ~25× faster steady-state TTFT (17 s → ~0.6 s)** → production signing key + 8 signed releases → rolling context window → Bangla quality pass → background downloads → persistent chat history → closed-loop thermal governor.
 
 ---
 
@@ -20,74 +20,65 @@ Graph: **16 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **
 
 | Area | Status | Result | Remaining |
 |---|---|---|---|
-| Inference contract | Build verified | `InferenceEngine`, opaque `BackendId`/`BackendDescriptor`, streaming events, metrics | — |
-| llama.cpp CPU adapter | **Device validated (load + generation)** | arm64 JNI/C++, pinned llama.cpp, mmap GGUF, model chat template, cancel, metrics. Load **721 ms**; decode **15–19 tok/s**; prefill **25–31 tok/s** (0.9.0, six generations) | KV-prefix reuse: TTFT grows linearly with history (6.2 s → 17 s by turn 6) because every generate re-prefills the whole conversation |
-| Reviewed model | Device validated (load) | Qwen 2.5 1.5B Instruct Q4_K_M, exact 1,117,320,736 bytes + SHA-256 | Bangla quality pack |
-| Backend scheduler | Device validated (CPU) | Compatibility, memory preflight (1.93 GB est. peak), battery/thermal admission, evidence-based selection | Closed-loop throttling |
-| Token streaming | **Device validated** | `trySendBlocking` + `buffer(256)` — six streamed replies observed (0.9.0) | — |
-| Thermal governor | Build pending CI | Closed loop: live thermal flow → pure policy (hysteresis) → per-decode-step thread budget via JNI atomic; admission at `SEVERE`+ retained | Device validation under sustained load |
-| CPU thread policy | Build verified | Half the cores (2–4) for decode *and* batch | Device heat retest |
+| Inference contract | Build verified | `InferenceEngine`, opaque `BackendId`/`BackendDescriptor`, streaming events, honest metrics incl. `evaluatedPromptTokens` | — |
+| llama.cpp CPU adapter | **Device validated (load + generation)** | arm64 JNI/C++, pinned llama.cpp, mmap GGUF, chat template, cancel, metrics. Load 0.7–1.5 s; decode 12–19 tok/s; prefill 17–31 tok/s | — |
+| **KV-prefix reuse** | **Device validated (0.9.5)** | `kv_tokens_` mirrors the cache; longest-common-prefix reuse + `llama_memory_seq_rm`; TTFT flat ~0.6 s, `evaluatedPromptTokens` as low as 1; exceptions invalidate wholesale | — |
+| Reviewed model | Device validated | Qwen 2.5 1.5B Instruct Q4_K_M, exact 1,117,320,736 bytes + SHA-256 | Bangla-stronger model decision |
+| Bangla quality pass | Build verified (0.9.4) | Tuned bilingual system prompt (short simple Bangla, no literal translation, admit ignorance) + repetition penalty 1.1/64 after top-p | Qualitative device check — several 3-token replies observed |
+| Backend scheduler | Device validated (CPU) | Compatibility, memory preflight, battery/thermal admission, evidence-based selection | — |
+| Token streaming | Device validated | `trySendBlocking` + `buffer(256)`; 14+ streamed replies observed | — |
+| **Thermal governor** | Build verified (0.9.7) | Closed loop: `PowerManager` callback flow → `ThermalGovernorPolicy` (hysteresis, 9 tests) → JNI atomic → threads changed only between `llama_decode` calls; plain-language notices; `LAI-llama` trace | Device validation under sustained warm load |
+| Native stall tracing | Device proven useful | µs logs: mutex wait, template, tokenize, per-chunk prefill, first token, thermal thread changes | — |
+| Rolling context window | Build verified (0.9.3) | `ContextWindowPolicy` applies `keepLastTurns` before token counting; `windowedConversationTurns` in diagnostics, separate from overflow trims | Exercise on device (slider low → windowed > 0) |
 | Vulkan backend | Planned | `llama-vulkan` descriptor reserved | Compile ggml Vulkan, Adreno qualification |
-| Qualcomm QNN/HTP (NPU) | **Planned — no code** | Boundary documented only | Licensed QAIRT CI, model conversion, dedicated `runtime:qnn` |
+| Qualcomm QNN/HTP (NPU) | Planned — no code | Boundary documented only | Licensed QAIRT CI + model conversion |
 
 ### 1.2 Accessibility Service & Android control
 
 | Area | Status | Result | Remaining |
 |---|---|---|---|
 | Service lifecycle | Device validated (connects) | Weak service ref, connection state, `AccessibilityGateway` | Service-death/rebind tests |
-| Screen snapshot | Device validated | Flattened tree, ≤400 nodes / depth 24, password text omitted | Foreground-screen binding |
-| Actions | Build verified | Click/type/scroll/global/launch; selectors by viewId/text/contentDescription/path | Physical per-action harness |
+| Screen snapshot | Device validated | Flattened tree ≤400 nodes/depth 24, password text omitted | Foreground-screen binding |
+| Actions (click/type/scroll/global/launch) | Build verified | Selectors by viewId/text/contentDescription/path | Physical per-action harness |
 | Screenshot | Capability observed | Android 11+ accessibility screenshot → in-memory ARGB | OCR + redaction |
-| Shizuku | Device validated (UID 2000) | Binder state, dedicated UserService, argv allowlist, time/output bounds | Recipe orchestration |
-| One-shot tool proposals | Build verified | Bounded JSON parser, canonical schemas, trusted Compose review, second-dispatch validation; **`ToolInstructionGate` relevance gate + compressed instruction (this session)** | ❗ Physical retest blocked by §1.1 |
-| Persistent tool audit | Build verified | App-private no-backup JSONL hash chain, approval-before-authority fsync, replay guard | Restart/replay device test |
+| Shizuku | Device validated (UID 2000, READY) | Binder state, dedicated UserService, argv allowlist, bounds | Recipe orchestration |
+| One-shot tool proposals | Device validated (parse path) | Bounded JSON parser; 6 responses examined on device, all correctly `NOT_TOOL_CALL`; `ToolInstructionGate` relevance gate + compressed instruction | Physical action-dispatch test |
+| Persistent tool audit | Build verified | App-private no-backup JSONL hash chain, approval-before-authority, replay guard | Restart/replay device test |
 
 ### 1.3 Bangla OCR
 
 | Area | Status | Result | Remaining |
 |---|---|---|---|
-| OCR contracts | Build verified | `OcrEngine`, bilingual `OcrRequest`, versioned `OcrResult` (blocks, language, confidence, polygon, handwriting flag) | Preserve schema |
+| OCR contracts | Build verified | `OcrEngine`, bilingual `OcrRequest`, versioned `OcrResult` (blocks, language, confidence, polygon, handwriting flag) — structured JSON for the LLM runtime | Preserve schema |
 | Screenshot→OCR pipeline | Implemented scaffold | Capture, background dispatch, bitmap recycle, typed unavailable error | Integrate real model |
-| Printed Bangla OCR | **Pending — placeholder only** | `PlaceholderBanglaOcrEngine` honestly fails with `OcrModelRequiredException` | ❗ **Blocked on your dataset/licence decision** |
+| Printed Bangla OCR | **Pending — placeholder only** | `PlaceholderBanglaOcrEngine` honestly fails with `OcrModelRequiredException` | ❗ **Blocked on owner's dataset/licence decision** |
 | Handwritten Bangla OCR | Planned | Schema seam only | Dataset/model/licence |
-| QNN OCR acceleration | Planned | — | After CPU baseline |
 
-### 1.4 GitHub Actions, catalog & delivery
-
-| Area | Status | Result |
-|---|---|---|
-| Source policy | Ready | 128 MB cap; no binaries/models/SDKs/keystores; token scan — **verified clean** |
-| Architecture policy | Ready | Network, Accessibility, Shizuku, JNI, vendor-term and dependency-direction checks |
-| Android build | Ready | JDK 17, API 35, NDK 27, CMake, Gradle 8.13, pinned llama.cpp; tests + lint + APK |
-| Tests / coverage | Ready | 142 tests; JaCoCo ratchets (contracts .15 / policy .55 / scheduler .70 / model .50 / plugins .50) |
-| Catalog publish | Ready | Validates/signs/verifies `catalog-v1` (revision 3) |
-| Releases | **Production-signed (v0.9.0)** | Tag-triggered APK; `v0.9.0` (run 88) signed with the permanent `lai-release` RSA-4096 key (V1–V4), cert SHA-256 `80:03:8D:3E…7E:8E`, verified against the published asset |
-| Production supply chain | **Partial** | ✅ Permanent key (PKCS12, secrets `ANDROID_KEYSTORE_*`; owner holds offline copy — never commit it) · still pending: SBOM, provenance, reproducible builds |
-
-### 1.5 Tool configuration & SAF workspace (Phase 2A — complete)
+### 1.4 GitHub Actions, delivery & supply chain
 
 | Area | Status | Result |
 |---|---|---|
-| Typed settings contracts | Build verified | `SettingsDocumentV1` (Llm/ImageGen/Voice/Search), bounded ranges, Qwen defaults |
-| Settings validation/migration | Build verified | `SettingsPolicy` validate/sanitize/migrate; unknown-field warnings |
-| Session semantics | Build verified | `SettingsSession` — saved defaults vs one-request override; validate-before-transition |
-| Workspace decision layer | Build verified | `WorkspacePolicy.classify` + `WorkspaceSettingsCodec` |
-| Pure ports | Build verified | `WorkspaceGrantPort` / `SettingsStorePort` / `ModelDiscoveryPort` — no Android type crosses |
-| SAF adapter | Build verified; **device pending** | Grant, persistable permission, temp-write-then-replace, bounded SHA-256 discovery |
-| Composition | Build verified | `WorkspaceSettingsCoordinator` over pure ports; `MainViewModel` binds |
-| Chat ⚙ quick settings | **Device validated (renders)** | Bottom sheet: creativity/focus/reply-length/memory; Apply once · Save default · Reset |
+| Source policy | Ready | 128 MB cap; no binaries/models/SDKs/keystores; history scanned clean |
+| Architecture policy | Ready | Network only in `platform:download`; audit bytes only in `platform:audit`; module direction enforced |
+| Android build | Ready | JDK 17, API 35, NDK 27, CMake, Gradle 8.13, pinned llama.cpp; tests + lint + APK; action majors current |
+| Tests / coverage | Ready | 169 tests incl. `platform:history`; JaCoCo ratchets (contracts .15 / policy .55 / scheduler .70 / model .50 / plugins .50) |
+| **Releases** | **Production-signed** | Tag-triggered; `v0.9.0`–`v0.9.7` signed with the permanent `lai-release` RSA-4096 key (V1–V4), cert SHA-256 `80:03:8D:3E…7E:8E`, verified against published assets |
+| Signing key custody | Done | PKCS12 in Actions secrets (`ANDROID_KEYSTORE_*`) + owner's offline copy — **never in the repo** |
+| Dependabot | Curated | 5 action bumps merged & combination-verified; **#4/#9/#10/#11 open and failing** (androidx, okhttp 5, AGP 9.3.1, Kotlin group) — need one coordinated Gradle 9 + AGP 9 + Kotlin upgrade session |
+| Production supply chain | Partial | Still pending: SBOM, provenance, reproducible builds |
 
-### 1.6 UI & product surfaces
+### 1.5 Product surfaces (UI)
 
 | Area | Status | Result | Remaining |
 |---|---|---|---|
 | Compose three-mode shell | Device validated | Chat, Screen Reader, Automator; Developer Mode hidden | — |
-| Chat | **Device validated (0.9.0)** | Six replies, en + bn, streaming and metrics captured | Bangla output quality is weak (base-model limitation) — Bangla quality pack |
-| Keyboard/IME insets | **Device validated (0.9.1)** | Composer above keyboard; mode bar keyed on `imeAnimationTarget` — close animation confirmed smooth on device, no layout displacement | — |
-| High refresh rate | Build verified; **device pending** | Highest display mode requested at current resolution (90/120 Hz) | Confirm |
-| List performance | Build verified | Stable `ChatMessage.id` keys; only changed bubble recomposes; auto-scroll | Confirm |
-| Settings back navigation | Device validated | Back arrow + `BackHandler` | — |
-| Tools Dashboard / Attach Tools | Planned | Spec only | — |
+| Chat | **Device validated** | Streaming, Stop watchdog, metrics; en+bn replies observed | Bangla reply-quality judgement |
+| Keyboard/IME | **Device validated (0.9.1)** | Composer above keyboard; mode bar keyed on `imeAnimationTarget` — close animation confirmed smooth | — |
+| **Chat history** | Build verified (0.9.6) | History sheet: restore/continue/delete; auto-save every reply; New chat archives | Device walkthrough |
+| **Background downloads** | Build verified (0.9.5) | WorkManager; survives app exit; Pause/Cancel; reattach on relaunch | Device walkthrough (close app mid-download) |
+| Model management | Build verified (0.9.7) | Catalog one-tap install, Load/Unload, **Delete** (active-guarded), storage summary, Keep copy export | — |
+| Quick settings ⚙ | Device validated (renders) | Creativity/focus/reply-length/memory; Apply once · Save default · Reset | Exercise memory slider on device |
+| Tools Dashboard | Planned | Spec only | — |
 
 ---
 
@@ -99,7 +90,7 @@ lai/
 ├── README · CHANGELOG · CONTRIBUTING · SECURITY · LICENSE
 ├── THIRD_PARTY_NOTICES · THIRD_PARTY_LICENSES · MODEL_LICENSES
 ├── build.gradle.kts                     # root plugins + JaCoCo coverage ratchets
-├── settings.gradle.kts                  # 15-module graph
+├── settings.gradle.kts                  # 16-module graph
 ├── gradle.properties · gradle/libs.versions.toml
 ├── .github/
 │   ├── dependabot.yml · pull_request_template.md
@@ -107,44 +98,47 @@ lai/
 ├── catalog/{catalog-public-key.pem, models-v1.json}      # signed catalog revision 3
 ├── app/                                                   # composition root + Compose shell
 │   ├── src/main/java/dev/lai/runtime/
-│   │   ├── LaiApplication.kt · MainActivity.kt            # MainActivity: high-refresh-rate opt-in
+│   │   ├── LaiApplication.kt · MainActivity.kt            # high-refresh-rate opt-in
 │   │   ├── core/AppContainer.kt                           # single composition root
 │   │   └── ui/{LaiApp.kt, MainViewModel.kt, QuickSettingsSheet.kt,
 │   │           WorkspaceSettingsCoordinator.kt, theme/Theme.kt}
-│   ├── src/main/res/{drawable, values, values-bn}         # full en/bn string parity (62 each)
-│   └── src/test/java/dev/lai/runtime/ui/WorkspaceSettingsCoordinatorTest.kt
+│   ├── src/main/res/{drawable, values, values-bn}         # en/bn string parity (68 each)
+│   └── src/test/…/WorkspaceSettingsCoordinatorTest.kt
 ├── core/                                                  # pure JVM: no Android/network/JNI/vendor
 │   ├── contracts/ → agent · audit · automation · core/JsonConfig · diagnostics
-│   │                inference{InferenceEngine,InferenceModels,ModelModels}
-│   │                ocr · settings/ToolSettings · shell
-│   │                workspace/{WorkspaceContracts, WorkspacePorts}
+│   │                history/ChatHistoryModels · inference (incl. BackgroundDownloadStatus,
+│   │                GenerationMetrics.evaluatedPromptTokens) · ocr · settings · shell · workspace
 │   ├── model/    → ReviewedModelCatalog
-│   ├── policy/   → agent{AgentPolicy,BuiltInToolCatalog,ToolAuditLedger,ToolProposalTelemetry}
-│   │               privacy · settings/{SettingsPolicy,SettingsSession}
+│   ├── policy/   → agent{AgentPolicy,BuiltInToolCatalog,ToolAuditLedger,ToolInstructionGate,…}
+│   │               privacy · settings/{SettingsPolicy,SettingsSession,ContextWindowPolicy}
 │   │               shell · workspace/WorkspacePolicy
-│   └── scheduler/→ InferenceScheduler · ModelMemoryEstimator
+│   └── scheduler/→ InferenceScheduler · ModelMemoryEstimator · ThermalGovernorPolicy
 ├── platform/                                              # Android authority boundaries
 │   ├── accessibility/→ AccessibilityAutomationService · AccessibilityGateway · NodeSnapshotter
 │   ├── audit/        → ToolAuditRepository                # only module writing audit bytes
-│   ├── device/       → AndroidRuntimeEnvironmentProvider
-│   ├── download/     → ModelRepository · RemoteModelCatalogRepository   # ONLY network owner
+│   ├── device/       → AndroidRuntimeEnvironmentProvider  # + thermalStates() callback flow
+│   ├── download/     → ModelRepository · ModelDownloadWorker · ModelDownloadCoordinator
+│   │                   RemoteModelCatalogRepository       # ONLY network owner; WorkManager here
+│   ├── history/      → ChatHistoryRepository              # ONLY content-bearing store; no-backup
 │   ├── shizuku/      → ElevatedShell · PrivilegedUserService · ShizukuController (+AIDL)
 │   └── workspace/    → WorkspaceRepository · WorkspaceSettingsStore · WorkspaceDiscovery
 │                       WorkspaceSaf · ModelFormatDetector
 ├── runtime/                                               # replaceable adapters
-│   ├── llama/    → NativeInferenceEngine.kt
-│   │               cpp/{native_inference, llama_cpu_backend, backend_registry, include/lai/backend.h}
+│   ├── llama/    → NativeInferenceEngine.kt (setDecodeThreadLimit)
+│   │               cpp/{native_inference, llama_cpu_backend (KV reuse, tracing, thermal atomic),
+│   │                    backend_registry, include/lai/backend.h}
 │   ├── ocr/      → BanglaOcrService (placeholder engine)
 │   └── orchestrator/ → AgentRuntime
 ├── plugins/api/  → LaiPlugin
-├── docs/         → 42 files: ARCHITECTURE · MODULES · STATUS · ROADMAP · BANGLA_OCR
-│                   VENDOR_BACKEND_STRATEGY · PRIVACY_INVARIANTS · adr/0002-0007
-│                   architecture/ · implementation/ · product/ · device-results/ · legal/
+├── docs/         → 45+ files: ARCHITECTURE · MODULES · STATUS · ROADMAP · BANGLA_OCR
+│                   VENDOR_BACKEND_STRATEGY · PRIVACY_INVARIANTS · adr/ · architecture/
+│                   implementation/ · product/ · legal/
+│                   device-results/ (6 reports incl. first-replies and kv-reuse-validated)
 └── scripts/      → validate_repo.sh · check_architecture_boundaries.py
                     validate_documentation.py · validate_model_catalog.py · ci/fetch_llama_cpp.sh
 ```
 
-**Verified clean:** no APK/AAB/AAR/SO, GGUF/ONNX/TFLite/QNN model, SDK, keystore, build output, or Gradle wrapper JAR is tracked.
+**Verified clean:** no APK/AAB/AAR/SO, GGUF/ONNX/TFLite/QNN model, SDK, keystore, or Gradle wrapper JAR is tracked — checked across full history.
 
 ---
 
@@ -155,12 +149,12 @@ lai/
 ```text
 app (composition + Compose)
 ├── core:contracts · core:policy · core:scheduler · core:model · plugins:api
-├── platform:download · platform:audit · platform:device
+├── platform:download · platform:audit · platform:device · platform:history
 ├── platform:accessibility · platform:workspace · platform:shizuku
 └── runtime:llama · runtime:ocr · runtime:orchestrator
 ```
 
-**Enforced by `scripts/check_architecture_boundaries.py`:** core imports no Android/platform/runtime/vendor; platform never depends upward; runtime owns no UI; `app` is the only composition root; **network only in `platform:download`**; **audit bytes only in `platform:audit`**; Qualcomm/QNN terms never in generic inference/scheduler.
+**Enforced by `scripts/check_architecture_boundaries.py`:** core imports no Android/platform/runtime/vendor; platform never depends upward; runtime owns no UI; `app` is the only composition root; **network only in `platform:download`** (WorkManager also lives there; the app never imports androidx.work); **audit bytes only in `platform:audit`**; chat content only in `platform:history`.
 
 ### 3.2 LLM / inference
 
@@ -174,113 +168,91 @@ interface InferenceEngine : AutoCloseable {
     suspend fun countTokens(conversation: List<ConversationMessage>): Result<Int>
     override fun close()
 }
+// NativeInferenceEngine additionally: fun setDecodeThreadLimit(decodeThreads: Int)  // thermal hook
+
+data class GenerationMetrics(promptTokens, generatedTokens, promptEvaluationMs,
+    timeToFirstTokenMs, decodeMs, totalMs,
+    evaluatedPromptTokens /* = promptTokens when no KV prefix was reused */)
+// promptTokensPerSecond divides by evaluatedPromptTokens — never the inflated total.
 ```
 
-`BackendId` (validated, namespaced — only `llama-cpu` is real) · `GenerationConfig(maxNewTokens, temperature, topP, seed)` · `ConversationMessage(SYSTEM|USER|ASSISTANT, content)` · `InferenceEvent { Token | Completed | Failed }` · `GenerationMetrics(promptTokens, generatedTokens, promptEvaluationMs, timeToFirstTokenMs, decodeMs, totalMs)`.
-
-**JNI boundary:** `runtimeInfo / createSession / countTokens / generate / destroySession / lastError`.
-**C++ boundary:** `Backend { name, available, open() }` + `BackendSession { count_tokens, generate() }`.
-**Streaming:** `callbackFlow` + `trySendBlocking` + `.buffer(256)` — never `trySend` (drops on a rendezvous channel).
-**Native concurrency:** `count_tokens` and `generate` share `generation_mutex_`; cancellation polled every 8 tokens and latched.
+**JNI boundary:** `runtimeInfo / createSession / countTokens / generate / setThreadLimit / destroySession / lastError` (metrics array = 7 slots).
+**C++ boundary:** `BackendSession { count_tokens, generate, set_thread_limit }` — thread budget is an atomic applied only **between** `llama_decode` calls.
+**KV reuse:** `kv_tokens_` mirrors the cache token-for-token after every successful decode; longest common prefix kept via `llama_memory_seq_rm(0, reused, -1)`; ≥1 prompt token always re-decoded for fresh logits; any exception clears cache + bookkeeping.
+**Sampling:** top-p → repetition penalty (1.1/64) → temperature → dist; greedy path untouched.
+**Streaming:** `callbackFlow` + `trySendBlocking` + `.buffer(256)` — never `trySend`.
 
 ### 3.3 Tools & policy
 
 15 built-in tools: `screen.snapshot` `screen.click` `screen.type` `screen.scroll` `system.global_action` `app.launch` `ocr.current_screen` `shell.operation` `device.info` `settings.get` `settings.put` `package.list_user` `package.install_existing` `package.force_stop` `input.keyevent`.
 
 ```kotlin
-ToolCall(id, name, arguments: JsonObject)
-ToolCallParseResult { Accepted(call, definition, confirmationSummary) | Rejected(code, message) | NotToolCall }
-AgentRuntime.parseToolProposal(modelOutput): ToolCallParseResult
+AgentRuntime.parseToolProposal(modelOutput): ToolCallParseResult   // Accepted | Rejected | NotToolCall
 AgentRuntime.execute(call, userConfirmed=false): ToolResult
+ToolInstructionGate.shouldIncludeInstruction(latestUserText): Boolean
+    // EN word-boundary regex + inflection-tolerant Bangla stems; recall-biased;
+    // "hi" carries ZERO tool tokens even with proposals enabled.
 ```
 
-Invariants: exactly one proposal per response; validated twice (parse + dispatch); approval recorded **before** authority is invoked; exact-call replay blocked; sensitive text entry forbidden; model text can never self-approve.
+Invariants: one proposal per response; validated twice; approval recorded **before** authority; replay blocked; sensitive text entry forbidden; model text can never self-approve.
 
-### 3.4 Settings & workspace
+### 3.4 Settings, history & downloads
 
 ```kotlin
-// core:contracts — pure ports, no Android type crosses them
-interface WorkspaceGrantPort { val state: WorkspaceGrantState }
-interface SettingsStorePort {
-    suspend fun load(): SettingsLoadOutcome                       // never throws
-    suspend fun save(document: SettingsDocumentV1): Result<Unit>  // exact-v1-schema verified
-}
-interface ModelDiscoveryPort {
-    suspend fun discoverModels(reviewedBySha256: Map<String,String>,
-                               limits: DiscoveryLimits = DiscoveryLimits()): Result<List<DiscoveredModel>>
-}
-
 // core:policy
-class SettingsSessionPolicy {
-    fun applyOnce(session, llm): SettingsSessionResult            // Applied | Rejected(issues)
-    fun prepareSave(session, document): SettingsSessionResult     // validates before any write
-    fun resolveForRequest(session): ResolvedRequestSettings       // consumes the override
-    fun maxNewTokensCeiling(session, runtimeContextTokens: Int?): Int   // ≤ half the context
-}
+SettingsSessionPolicy { applyOnce / prepareSave / resolveForRequest / maxNewTokensCeiling }
+ContextWindowPolicy.applyTurnWindow(history, keepLastTurns): WindowedConversation
+    // keeps last N completed turns + in-flight request; drops from the front; droppedTurns reported
+ThermalGovernorPolicy.decide(state, previous, baselineThreads): Decision
+    // Decision(decodeThreads, admitNewGeneration, reason); threads fall instantly,
+    // rise only at fully NOMINAL (hysteresis)
+
+// core:contracts (history) — platform:history is the storage authority
+StoredChatSession(schemaVersion=1, id, title, createdAt, updatedAt, messages)
+ChatHistoryRepository { list / load / save / delete }   // ≤100 sessions, ≤512 msgs, atomic writes
+
+// core:contracts (downloads) — platform:download is the authority
+BackgroundDownloadStatus(modelId, state ∈ {ENQUEUED,RUNNING,SUCCEEDED,FAILED,CANCELLED}, progress, failureReason)
+ModelDownloadCoordinator { enqueue(spec) / stop(id) / observe(id) / observeAll() }
+    // pause = stop (keeps .part, HTTP-Range resume); cancel = stop + discardPartial(id)
 ```
 
-**Privacy invariants:** the settings schema has **no free-text field**, so it can never absorb a prompt, document, or credential; writes reject unknown fields; SAF uses `ACTION_OPEN_DOCUMENT_TREE` with persistable permission — **no `MANAGE_EXTERNAL_STORAGE`, no raw path translation**; discovery registers metadata only and never auto-loads; diagnostics expose coarse counts only — never filenames or digests.
+**Privacy invariants:** settings schema has no free-text field; chat content lives ONLY in `platform:history` (no-backup, never SAF/network/diagnostics); diagnostics exclude prompts, replies, filenames, digests; SAF is grant-based (`ACTION_OPEN_DOCUMENT_TREE`), no `MANAGE_EXTERNAL_STORAGE`.
 
 ### 3.5 UI
 
-`UiMode { CHAT | SCREEN_READER | AUTOMATOR }` · `RuntimeOperation { NO_MODEL, IDLE, DOWNLOADING, IMPORTING, EXPORTING, LOADING, READY, GENERATING, CANCELLING, READING_SCREEN, AUTOMATING, ERROR }` · `MainUiState` immutable aggregate exposed as `StateFlow` · `ChatMessage(fromUser, text, contextEligible, id)` — **`id` is required for LazyColumn keying**.
-
-**Diagnostics v1** adds `lastGenerationFailure` (LAI-authored reason, never model output) and `emptyGenerationCount`, plus an internal `GenerationStage { IDLE, COUNTING_TOKENS, AWAITING_FIRST_TOKEN, STREAMING, COMPLETED }` reported on stall.
+`UiMode { CHAT | SCREEN_READER | AUTOMATOR }` · `RuntimeOperation { NO_MODEL … ERROR }` · `MainUiState` immutable `StateFlow` aggregate — now also `chatSessions`, `chatHistoryVisible`, `downloadingModelId`, `windowedConversationTurns`, `thermalGovernorDetail`. `ChatMessage.id` keys `LazyColumn`. Mode-bar visibility keys on `WindowInsets.imeAnimationTarget` (never the current inset). Diagnostics v1 additionally reports `evaluatedPromptTokens` and `windowedConversationTurns`.
 
 ---
 
 ## 4. Next Logical Implementation Phase
 
-### ✅ Priority 0 CLOSED — chat replies on device (0.9.0, 2026-08-17)
+### Priority 1 — Device walkthrough of the 0.9.6/0.9.7 features (needs the phone, ~10 minutes)
 
-Six completed generations exported from the Redmi Turbo 4 Pro, English and Bangla, thermal `NOMINAL` throughout:
+1. **Chat history:** chat → New chat → History → tap old session → continues in context; force-close app → History intact.
+2. **Background download:** start a model download → close the app → reopen → progress reattached; try Pause → Download (resumes) and Cancel.
+3. **Thermal governor:** long generation while the device is warm → expect the "Reduced CPU threads…" notice; `adb logcat -s LAI-llama` shows `thermal: decode threads X -> Y`.
+4. **Memory slider:** set conversation memory to 1–2, chat 4+ turns, export diagnostics → `windowedConversationTurns > 0`.
+5. **Bangla reply quality:** judge whether 0.9.4's short replies read as appropriately concise or over-trimmed (several 3-token replies were observed). If over-trimmed: soften the brevity instruction and/or drop the penalty to 1.05.
 
-| Turn | Prompt tokens | TTFT | Prefill tok/s | Decode tok/s |
-|---|---|---|---|---|
-| 1 ("hi") | 159 | 6.2 s | 25.6 | 17.6 |
-| 4 | 268 | 9.6 s | 28.1 | 15.7 |
-| 6 | 470 | 17.0 s | 27.6 | 15.7 |
+### Priority 2 — Printed Bangla OCR CPU baseline ⚠️ blocked on the owner
 
-**Root cause, confirmed by measurement:** prefill runs at ~25–31 tok/s, so the pre-fix ~407-token prompt needed ~14 s — the former 4 s cancel watchdog aborted every healthy generation. The 45 s grace + the prefill cut (`ToolInstructionGate` kept "hi" at 159 tokens; all 6 proposal examinations correctly `NOT_TOOL_CALL`) fixed it. Model load also improved to **721 ms**. `productionSigned: true` — validated on the signed release.
+The single biggest unbuilt feature. Requires the owner's dataset/licence decision (see `docs/BANGLA_OCR.md`). Once decided: integrate the model behind the existing `OcrEngine` contract → structured `OcrResult` JSON feeds the LLM runtime → wire `ocr.current_screen` end-to-end with redaction.
 
-### ✅ Priority 0 (TTFT growth) — KV-prefix reuse DEVICE VALIDATED (0.9.5): steady-state TTFT ~0.6 s flat (was 17 s and climbing), evaluatedPromptTokens as low as 1, bounded re-prefill on prefix shifts, new-chat reuses the system-prompt prefix. Full table in docs/device-results/2026-08-17-redmi-turbo-4-pro-kv-reuse-validated.md
+### Priority 3 — Coordinated dependency upgrade session (pure code, one PR)
 
-`LlamaCpuSession` now keeps `kv_tokens_` — the exact token sequence resident in the KV cache, maintained strictly after each successful `llama_decode`. Each `generate()` computes the longest common prefix between the cached sequence and the new templated prompt, drops only the divergent tail (`llama_memory_seq_rm(mem, 0, reused, -1)`), and prefills only the suffix. At least one prompt token is always re-decoded so the sampler has fresh logits. Any exception clears both the memory and the bookkeeping (full re-prefill is always correct). Expected: turn-N TTFT drops from O(whole conversation) to O(new turn) — roughly constant ~2–4 s instead of 17 s and climbing.
-
-Metrics stay honest: `GenerationResult`/`GenerationMetrics`/diagnostics gained `evaluatedPromptTokens` (total minus reused prefix); `promptTokensPerSecond` divides by evaluated tokens, never the inflated total. The `LAI-llama` trace logs `reusing X of Y prompt tokens`.
-
-**Verified 2026-08-17.** Remaining follow-ups: (a) qualitative check of reply text — several 3-token replies in the run could be over-terse output from the brevity-biased prompt + repetition penalty; (b) the rolling window path (`windowedConversationTurns`) has not been exercised on device yet.
-
-### ✅ Priority 1 CLOSED — IME close animation device-validated (0.9.1)
-
-User confirmed on device: keyboard close is smooth, no bar displacement. `imeAnimationTarget` keying is the pattern to keep — never gate bottom-bar visibility on the current IME inset.
-
-### ✅ Priority 2 — Closed-loop thermal governor SHIPPED (device verify pending)
-
-`ThermalGovernorPolicy` (`core:scheduler`, pure, 9 tests, hysteresis: threads fall immediately, rise only at fully NOMINAL) maps live thermal status → decode-thread budget. `AndroidRuntimeEnvironmentProvider.thermalStates()` (PowerManager callback flow, <Q emits UNKNOWN once) feeds it; the budget crosses JNI (`setThreadLimit`) into an atomic the native decode loop applies **between** `llama_decode` calls — never concurrently with one. Reason strings surface as UI notices; `LAI-llama` logs `thermal: decode threads X -> Y`. Verify on device with a long generation while the device is warm.
+Dependabot #10 (AGP 9.3.1) requires Gradle 9; #11 (Kotlin group), #4 (androidx), #9 (okhttp 5) fail against the current matrix. Do all together: bump `GRADLE_VERSION` in the workflow + AGP + Kotlin + androidx in one branch, fix API breaks (okhttp 5 changes in `platform:download`), verify on CI, then close the four PRs.
 
 ### Then, in order
 
-1. **Bangla output quality** — cheap levers SHIPPED (tuned bilingual system prompt: short simple sentences, no literal translation, admit ignorance; + repetition penalty 1.1/64 after top-p). **Device-compare Bangla replies against the 0.9.0 screenshot.** If still weak, the remaining lever is a reviewed Bangla-stronger small model in the signed catalog — a model-selection decision for the owner.
-2. **Phase 2A device acceptance** — SAF grant/revoke, settings persist across restart, malformed `settings.json` falls back, scan registers without loading.
-3. **WorkManager downloader — DONE (device verify pending)**: `ModelDownloadWorker` + `ModelDownloadCoordinator` (`platform:download`; the app module never imports androidx.work). Downloads survive app exit/process death; interruptions resume from the last byte via the existing HTTP-Range `.part` path, so no foreground service is needed. Transient transport errors retry with backoff (max 8); policy/integrity failures are final. UI: Pause (keeps partial; Download resumes), Cancel (discards partial), background hint, reattach-on-launch via `adoptBackgroundDownloads()`. Remaining for a full Model Center: a dedicated screen listing catalog + installed models with per-model actions.
-4. **Rolling Context Window** — `keepLastTurns` is typed and user-editable but does nothing yet; pairs naturally with the KV-prefix work.
-5. **Printed Bangla OCR CPU baseline** — ⚠️ blocked on the dataset/licence decision.
-6. **Vulkan qualification** (no licence needed, GGUF works directly) — evaluate before QNN.
-7. **QNN/HTP NPU** — requires licensed QAIRT in CI **and** model conversion. Furthest out.
-8. Production supply chain: ✅ permanent signing key (v0.9.0); still pending SBOM, provenance, reproducible builds.
-
-### Chat history (2026-08-17)
-
-New `platform:history` module (16th): `ChatHistoryRepository` stores one JSON file per session in app-private no-backup storage — never SAF, never network, never diagnostics (which exclude content by schema). Bounded: ≤100 sessions (oldest pruned), ≤512 messages/session, atomic temp+rename writes, corrupt files skipped. 7 JVM tests. UI: History button beside New chat opens a bottom sheet (title + date + Delete); tapping restores the conversation and it continues in place (KV reuse re-prefills it once). Persistence hooks: every completed/failed reply and canned notice; New chat rotates the session id, deleting the open chat rotates it too so the deleted session cannot reappear.
-
-### Dependency audit (2026-08-17)
-
-**Merged 2026-08-17** (each CI-green individually AND combined on main, run #107): #1 `setup-android` 3→4, #2 `checkout` 4→7, #3 `upload-artifact` 4→7, #5 `gradle/actions` 4→6, #6 `setup-java` 4→5. **Still open, failing CI — do not merge as-is**: #4 androidx group, #9 okhttp 4→5 (major API break), #10 AGP 8.11→9.3.1 (needs Gradle 9; workflow pins 8.13), #11 Kotlin group — these four need one coordinated Gradle+AGP+Kotlin+deps upgrade session. History scan is clean: no keystore, password, or binary was ever committed; the repo is public — the signing key lives only in Actions secrets and the owner's offline copy.
+1. **Tools Dashboard / physical tool-dispatch harness** — the proposal parse path is device-validated; actual click/type dispatch is not.
+2. **Vulkan qualification** (no licence needed; GGUF works directly) — evaluate before QNN.
+3. **Production supply chain** — SBOM, provenance attestation, reproducible builds.
+4. **QNN/HTP NPU** — licensed QAIRT CI + model conversion; furthest out.
 
 ### Process notes for the next session
 
-- **CI is the only compile gate.** `scripts/validate_repo.sh` checks size/architecture/docs but **does not compile Kotlin**. Push, then confirm "Unit tests and lint" is green before claiming anything.
-- **Auth:** `gh` CLI device-flow login works and credentials persist in `~/.config/gh/hosts.yml`. The `/tmp` gh binary and the git remote are cleared between sessions — re-add `origin` and re-download `gh` if needed.
-- **Trust the diagnostics export over intuition.** Each report narrowed the cause materially; `performance: []` plus a loaded model is the signature of a pre-first-token stall.
-- **Regressions to avoid** (all were introduced and fixed here): reply budget must never equal the full context; `safeDrawing` already contains the IME — never apply `imePadding()` twice; the Stop watchdog must not unload the model; never use `trySend` for streamed tokens.
+- **CI is the only compile gate.** `scripts/validate_repo.sh` checks size/architecture/docs but does not compile Kotlin. Push, watch "Compile Kotlin, C++ and APK", then claim.
+- **Auth:** git remote + identity are wiped between sessions — re-add `origin` and `git config user.*`. Tokens do not persist; ask the owner (device-flow needs no secret in chat; a classic PAT needs `repo, workflow` to touch workflow files). The owner was advised to revoke the tokens used this session.
+- **Release ritual:** merge to main → CI green → annotated tag `v0.9.x` → tag run builds + signs + publishes the APK automatically. Signing needs no per-release action.
+- **Regressions to avoid:** never `trySend` for streamed tokens; never `imePadding()` twice; never gate the bottom bar on the current IME inset; the Stop watchdog must not unload the model; reply budget < full context; `kv_tokens_` must only be appended after a *successful* decode; thread changes only between decodes.
