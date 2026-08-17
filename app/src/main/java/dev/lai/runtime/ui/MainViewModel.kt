@@ -29,6 +29,9 @@ import dev.lai.runtime.diagnostics.ModelDiagnostics
 import dev.lai.runtime.diagnostics.RuntimeDiagnostics
 import dev.lai.runtime.diagnostics.ToolAuditDiagnostics
 import dev.lai.runtime.automation.AccessibilityGateway
+import dev.lai.runtime.history.ChatSessionSummary
+import dev.lai.runtime.history.StoredChatMessage
+import dev.lai.runtime.history.StoredChatSession
 import dev.lai.runtime.inference.BackgroundDownloadState
 import dev.lai.runtime.inference.ConversationMessage
 import dev.lai.runtime.inference.ConversationRole
@@ -163,6 +166,8 @@ data class MainUiState(
     val lastModelLoadMs: Long? = null,
     val lastGenerationMetrics: GenerationMetrics? = null,
     val performanceHistory: List<GenerationMetrics> = emptyList(),
+    val chatSessions: List<ChatSessionSummary> = emptyList(),
+    val chatHistoryVisible: Boolean = false,
     val trimmedConversationTurns: Int = 0,
     val windowedConversationTurns: Int = 0,
     val diagnosticsStatus: String = "No diagnostics exported",
@@ -198,6 +203,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var generationJob: Job? = null
     private var cancelWatchdogJob: Job? = null
     private var downloadWatchJob: Job? = null
+    private var currentChatId: String = UUID.randomUUID().toString()
+    private var currentChatCreatedAtEpochMs: Long = System.currentTimeMillis()
     @Volatile private var generationStage = GenerationStage.IDLE
 
     /**
@@ -219,6 +226,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         adoptBackgroundDownloads()
+        refreshChatSessions()
         viewModelScope.launch {
             combine(AccessibilityGateway.connected, container.shizukuController.state) { accessibility, shizuku ->
                 accessibility to shizuku
@@ -434,6 +442,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ChatMessage(false, immediateMessage, contextEligible = false),
                 )
             }
+            persistChat()
             return
         }
 
@@ -641,6 +650,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+        persistChat()
     }
 
     fun approvePendingTool() {
@@ -765,6 +775,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (state.value.busy || state.value.pendingToolProposal != null) return
         // An unspent "Apply once" override belongs to the conversation the user just discarded.
         workspace.discardOverride()
+        // Every completed exchange was already persisted, so "New chat" only has to rotate the
+        // session identity: the old conversation stays in history, the screen starts fresh.
+        currentChatId = UUID.randomUUID().toString()
+        currentChatCreatedAtEpochMs = System.currentTimeMillis()
         _state.update {
             it.copy(
                 messages = it.messages.take(1),
@@ -773,6 +787,79 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 lastGenerationMetrics = null,
                 notice = "Conversation cleared locally",
             )
+        }
+    }
+
+    /**
+     * Persists the on-screen conversation into app-private no-backup history. Called after every
+     * event that changes the transcript (reply completed, reply failed, canned notices), so a
+     * process death never loses more than the message currently streaming.
+     */
+    private fun persistChat() {
+        val current = state.value
+        val stored = current.messages.drop(1) // the greeting is UI furniture, not conversation
+            .filter { it.text.isNotBlank() }
+            .map { StoredChatMessage(it.fromUser, it.text, System.currentTimeMillis()) }
+        if (stored.none { it.fromUser }) return
+        val session = StoredChatSession(
+            id = currentChatId,
+            title = stored.first { it.fromUser }.text.take(48),
+            createdAtEpochMs = currentChatCreatedAtEpochMs,
+            updatedAtEpochMs = System.currentTimeMillis(),
+            messages = stored,
+        )
+        viewModelScope.launch {
+            container.chatHistoryRepository.save(session)
+            _state.update { it.copy(chatSessions = container.chatHistoryRepository.list()) }
+        }
+    }
+
+    fun toggleChatHistory() {
+        _state.update { it.copy(chatHistoryVisible = !it.chatHistoryVisible) }
+        if (state.value.chatHistoryVisible) refreshChatSessions()
+    }
+
+    fun loadChatSession(id: String) {
+        if (state.value.busy || state.value.pendingToolProposal != null) return
+        viewModelScope.launch {
+            val session = container.chatHistoryRepository.load(id)
+            if (session == null) {
+                _state.update { it.copy(notice = "Saved chat could not be opened", chatHistoryVisible = false) }
+                return@launch
+            }
+            currentChatId = session.id
+            currentChatCreatedAtEpochMs = session.createdAtEpochMs
+            workspace.discardOverride()
+            _state.update {
+                it.copy(
+                    messages = listOf(it.messages.first()) +
+                        session.messages.map { message -> ChatMessage(message.fromUser, message.text) },
+                    chatHistoryVisible = false,
+                    trimmedConversationTurns = 0,
+                    windowedConversationTurns = 0,
+                    lastGenerationMetrics = null,
+                    notice = "Chat restored — it continues locally from where it stopped",
+                )
+            }
+        }
+    }
+
+    fun deleteChatSession(id: String) {
+        viewModelScope.launch {
+            container.chatHistoryRepository.delete(id)
+            if (id == currentChatId) {
+                // The on-screen transcript survives, but under a fresh identity so the deleted
+                // session does not silently reappear at the next persisted reply.
+                currentChatId = UUID.randomUUID().toString()
+                currentChatCreatedAtEpochMs = System.currentTimeMillis()
+            }
+            _state.update { it.copy(chatSessions = container.chatHistoryRepository.list()) }
+        }
+    }
+
+    private fun refreshChatSessions() {
+        viewModelScope.launch {
+            _state.update { it.copy(chatSessions = container.chatHistoryRepository.list()) }
         }
     }
 
@@ -862,6 +949,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             it.copy(messages = updated, operation = RuntimeOperation.ERROR, notice = message)
         }
+        persistChat()
     }
 
     /**

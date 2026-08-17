@@ -4,7 +4,7 @@ Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime`
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
 Latest release: **`v0.9.1`** (`6206199`) — **green, production-signed, device-validated** (chat replies + IME close animation)
-Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **153** unit tests · WorkManager 2.10.1
+Graph: **16 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **160** unit tests · WorkManager 2.10.1
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
 
@@ -269,6 +269,10 @@ Current thermal handling only *refuses* at `SEVERE`. Needed: Android thermal cal
 6. **Vulkan qualification** (no licence needed, GGUF works directly) — evaluate before QNN.
 7. **QNN/HTP NPU** — requires licensed QAIRT in CI **and** model conversion. Furthest out.
 8. Production supply chain: ✅ permanent signing key (v0.9.0); still pending SBOM, provenance, reproducible builds.
+
+### Chat history (2026-08-17)
+
+New `platform:history` module (16th): `ChatHistoryRepository` stores one JSON file per session in app-private no-backup storage — never SAF, never network, never diagnostics (which exclude content by schema). Bounded: ≤100 sessions (oldest pruned), ≤512 messages/session, atomic temp+rename writes, corrupt files skipped. 7 JVM tests. UI: History button beside New chat opens a bottom sheet (title + date + Delete); tapping restores the conversation and it continues in place (KV reuse re-prefills it once). Persistence hooks: every completed/failed reply and canned notice; New chat rotates the session id, deleting the open chat rotates it too so the deleted session cannot reappear.
 
 ### Dependency audit (2026-08-17)
 

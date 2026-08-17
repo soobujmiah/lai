@@ -4,6 +4,11 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Chat history
+
+- New `platform:history` module: `ChatHistoryRepository` persists conversations as one JSON file per session in app-private **no-backup** storage — the only content-bearing store in the app, and it never crosses SAF, network, or diagnostics boundaries. Bounded (≤100 sessions, ≤512 messages each, 32 KiB per message), atomic writes, corrupt-file tolerant, id-validated against path escape. 7 pure-JVM tests.
+- Conversations save automatically after every completed or failed reply; "New chat" now archives instead of destroying. The History sheet (bilingual, en/bn 68/68) lists sessions newest-first with delete; tapping one restores it on screen and the chat continues from where it stopped.
+
 ### Background model downloads survive app exit (WorkManager)
 
 - `ModelDownloadWorker` (CoroutineWorker) + `ModelDownloadCoordinator` in `platform:download`; the app module observes typed `BackgroundDownloadStatus` contract states and never imports androidx.work. Unique-per-model work, CONNECTED constraint, exponential backoff.

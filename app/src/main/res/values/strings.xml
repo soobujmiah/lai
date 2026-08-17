@@ -36,6 +36,9 @@
   <string name="download_pause">Pause</string>
   <string name="download_cancel">Cancel</string>
   <string name="download_background_hint">Downloads continue in the background even if you close the app.</string>
+  <string name="chat_history">History</string>
+  <string name="chat_history_empty">No saved chats yet — completed conversations appear here automatically.</string>
+  <string name="chat_history_delete">Delete</string>
   <string name="safety_title">You stay in control</string>
   <string name="safety_body">LAI blocks arbitrary shell commands and sensitive text entry. Review consequential actions before execution.</string>
   <string name="quick_settings_action">⚙</string>

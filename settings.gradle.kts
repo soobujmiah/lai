@@ -33,6 +33,7 @@ include(":platform:device")
 include(":platform:accessibility")
 include(":platform:workspace")
 include(":platform:shizuku")
+include(":platform:history")
 
 // Replaceable intelligence/runtime adapters.
 include(":runtime:llama")

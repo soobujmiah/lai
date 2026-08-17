@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
@@ -40,7 +41,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -67,6 +70,8 @@ import dev.lai.runtime.R
 import dev.lai.runtime.agent.ToolRisk
 import dev.lai.runtime.shell.ShizukuState
 import dev.lai.runtime.workspace.WorkspaceGrantState
+import java.text.DateFormat
+import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -172,6 +177,52 @@ fun LaiApp(viewModel: MainViewModel) {
             }
         }
     }
+    if (state.chatHistoryVisible) {
+        ModalBottomSheet(onDismissRequest = viewModel::toggleChatHistory) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    stringResource(R.string.chat_history),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (state.chatSessions.isEmpty()) {
+                    Text(
+                        stringResource(R.string.chat_history_empty),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(state.chatSessions, key = { it.id }) { session ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = !state.busy) { viewModel.loadChatSession(session.id) }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(session.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                                            .format(Date(session.updatedAtEpochMs)),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                TextButton(onClick = { viewModel.deleteChatSession(session.id) }) {
+                                    Text(stringResource(R.string.chat_history_delete))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     if (state.workspace.quickSettingsVisible) {
         QuickSettingsSheet(
             current = state.workspace.effectiveLlm,
@@ -261,6 +312,10 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
                 )
                 Text(stringResource(R.string.home_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            TextButton(
+                onClick = viewModel::toggleChatHistory,
+                enabled = state.pendingToolProposal == null,
+            ) { Text(stringResource(R.string.chat_history)) }
             TextButton(
                 onClick = viewModel::clearConversation,
                 enabled = !state.busy && state.pendingToolProposal == null && state.messages.any { it.contextEligible },

@@ -5,6 +5,7 @@ import android.content.Context
 import dev.lai.runtime.agent.AgentRuntime
 import dev.lai.runtime.audit.ToolAuditRepository
 import dev.lai.runtime.device.AndroidRuntimeEnvironmentProvider
+import dev.lai.runtime.history.ChatHistoryRepository
 import dev.lai.runtime.inference.ModelDownloadCoordinator
 import dev.lai.runtime.inference.ModelRepository
 import dev.lai.runtime.inference.NativeInferenceEngine
@@ -31,6 +32,7 @@ class AppContainer(context: Context) {
     val modelDownloadCoordinator = ModelDownloadCoordinator(context)
     val modelCatalogRepository = RemoteModelCatalogRepository(context)
     val toolAuditRepository = ToolAuditRepository(context)
+    val chatHistoryRepository = ChatHistoryRepository(context)
     val inferenceEngine = NativeInferenceEngine()
     val inferenceScheduler = InferenceScheduler()
     val memoryEstimator = ModelMemoryEstimator()
