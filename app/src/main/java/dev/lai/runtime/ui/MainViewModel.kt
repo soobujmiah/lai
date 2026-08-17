@@ -491,17 +491,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (exited) {
                 restoreAfterStoppedGeneration("Generation stopped locally")
             } else {
-                // The native call is still running. Releasing the session stops the CPU burn and
-                // the model must be loaded again, which is stated plainly rather than implied.
+                // The native call has not returned yet. Do NOT close the engine: unloading the
+                // model here made every Stop cost a 2.6 s reload and left the next message
+                // answered with "load the model from Settings" (field report, build 0.6.83).
+                //
+                // The cancellation flag is already latched, so the decode loop exits on its own
+                // at the next token boundary. Return the UI to a usable state and keep the model.
                 generationJob = null
-                recordGenerationFailure("Native generation did not yield within ${CANCEL_GRACE_MS} ms")
-                container.inferenceEngine.close()
+                recordGenerationFailure("Generation did not yield within ${CANCEL_GRACE_MS} ms")
                 _state.update {
                     it.copy(
-                        operation = RuntimeOperation.IDLE,
-                        activeModelId = null,
-                        notice = "Generation did not stop in time, so the model was released. " +
-                            "Load it again from Settings to continue.",
+                        operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
+                        notice = "Generation is still finishing in the background; the model stays loaded.",
                     )
                 }
                 markLastAssistantContextIneligible()

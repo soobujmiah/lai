@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.height
@@ -250,9 +249,10 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
             items(state.messages) { message -> MessageBubble(message) }
         }
         Row(
-            // imePadding keeps the composer directly above the keyboard instead of letting the
-            // keyboard shove the whole screen up into the status bar.
-            modifier = Modifier.fillMaxWidth().imePadding().padding(12.dp),
+            // No imePadding() here: contentWindowInsets = safeDrawing already includes the IME
+            // inset, so adding it again shifted the composer up by the keyboard height twice and
+            // pushed it off screen (field report, build 0.6.83).
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

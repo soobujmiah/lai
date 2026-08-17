@@ -4,6 +4,8 @@ import dev.lai.runtime.core.LaiJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.channels.trySendBlocking
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -110,7 +112,18 @@ class NativeInferenceEngine : InferenceEngine {
                 seed = config.seed,
                 callback = object : NativeTokenCallback {
                     override fun onToken(text: String) {
-                        if (!cancelled.get()) trySend(InferenceEvent.Token(text))
+                        if (cancelled.get()) return
+                        // MUST NOT be trySend: this flow is consumed by a collector that does real
+                        // work per token (state copy + recomposition). On the default RENDEZVOUS
+                        // channel trySend fails whenever the collector is mid-frame, and the token
+                        // is silently discarded - which is why replies arrived empty on device.
+                        // The buffered channel below plus a blocking put keeps every token and
+                        // applies natural backpressure to the native decode loop instead.
+                        // A failure here means the collector is gone (flow closed/cancelled);
+                        // latch cancellation so the native decode loop stops promptly.
+                        if (channel.trySendBlocking(InferenceEvent.Token(text)).isFailure) {
+                            cancelled.set(true)
+                        }
                     }
 
                     override fun isCancelled(): Boolean = cancelled.get()
@@ -126,9 +139,11 @@ class NativeInferenceEngine : InferenceEngine {
                         decodeMs = values[4] / 1000,
                         totalMs = values[5] / 1000,
                     )
-                    trySend(InferenceEvent.Completed(metrics.generatedTokens, metrics))
+                    channel.trySendBlocking(InferenceEvent.Completed(metrics.generatedTokens, metrics))
                 } else {
-                    trySend(InferenceEvent.Failed(NativeBindings.lastError().ifBlank { "Native inference failed" }))
+                    channel.trySendBlocking(
+                        InferenceEvent.Failed(NativeBindings.lastError().ifBlank { "Native inference failed" }),
+                    )
                 }
             }
             close()
@@ -138,6 +153,9 @@ class NativeInferenceEngine : InferenceEngine {
             worker.cancel()
         }
     }
+        // Buffer so a brief UI stall never costs a token. Combined with the blocking send above
+        // the native decode loop is throttled by backpressure instead of dropping output.
+        .buffer(TOKEN_BUFFER_CAPACITY)
 
     override suspend fun countTokens(conversation: List<ConversationMessage>): Result<Int> = withContext(Dispatchers.Default) {
         val handle = session
@@ -184,5 +202,8 @@ class NativeInferenceEngine : InferenceEngine {
     companion object {
         private const val DEFAULT_CONTEXT_SIZE = 4096
         private const val METRIC_COUNT = 6
+
+        /** Bounded token backlog before the native decode loop is throttled by backpressure. */
+        private const val TOKEN_BUFFER_CAPACITY = 256
     }
 }
