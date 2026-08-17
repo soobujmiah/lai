@@ -43,7 +43,7 @@ class ThermalGovernorPolicy {
                 reason = "Device is hot: replies are slowed and new ones wait",
             )
             ThermalState.CRITICAL -> Decision(
-                decodeThreads = 1,
+                decodeThreads = 2.coerceAtMost(baseline),
                 admitNewGeneration = false,
                 reason = "Device is very hot: cooling takes priority",
             )

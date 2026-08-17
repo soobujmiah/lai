@@ -234,7 +234,10 @@ public:
         const auto prompt_start = Clock::now();
         // Smaller prompt chunks bound how long a single uninterruptible llama_decode call runs,
         // so Stop is observed promptly instead of after a whole 512-token batch.
-        const int32_t batch_size = std::max(1, std::min(128, context_size));
+        // Hotfix 2026-08-17: 128-token batches stalled >179 sec on SM8735 at 0.7 tok/s (run 28671,
+        // 334-token prompt). Halve to 64 to keep each decode interactively bounded and reduce
+        // peak temp/power on the little cluster.
+        const int32_t batch_size = std::max(1, std::min(64, context_size));
         size_t offset = reused;
         while (offset < prompt_tokens.size()) {
             if (is_cancelled()) throw std::runtime_error("Generation cancelled");

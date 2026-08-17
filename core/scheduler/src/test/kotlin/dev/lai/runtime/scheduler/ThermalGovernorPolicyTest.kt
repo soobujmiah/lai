@@ -41,9 +41,9 @@ class ThermalGovernorPolicyTest {
     }
 
     @Test
-    fun `critical cuts to a single thread`() {
+    fun `critical cuts to two threads minimum`() {
         val decision = policy.decide(ThermalState.CRITICAL, previous = null, baselineThreads = 4)
-        assertEquals(1, decision.decodeThreads)
+        assertEquals(2, decision.decodeThreads)
         assertFalse(decision.admitNewGeneration)
     }
 
@@ -51,7 +51,7 @@ class ThermalGovernorPolicyTest {
     fun `threads fall immediately when heat rises`() {
         val hot = policy.decide(ThermalState.SEVERE, previous = null, baselineThreads = 4)
         val hotter = policy.decide(ThermalState.CRITICAL, previous = hot, baselineThreads = 4)
-        assertEquals(1, hotter.decodeThreads)
+        assertEquals(2, hotter.decodeThreads)
     }
 
     @Test
