@@ -243,13 +243,13 @@ Six completed generations exported from the Redmi Turbo 4 Pro, English and Bangl
 
 **Root cause, confirmed by measurement:** prefill runs at ~25–31 tok/s, so the pre-fix ~407-token prompt needed ~14 s — the former 4 s cancel watchdog aborted every healthy generation. The 45 s grace + the prefill cut (`ToolInstructionGate` kept "hi" at 159 tokens; all 6 proposal examinations correctly `NOT_TOOL_CALL`) fixed it. Model load also improved to **721 ms**. `productionSigned: true` — validated on the signed release.
 
-### ✅ Priority 0 (TTFT growth) — KV-prefix reuse implemented, device verification pending
+### ✅ Priority 0 (TTFT growth) — KV-prefix reuse DEVICE VALIDATED (0.9.5): steady-state TTFT ~0.6 s flat (was 17 s and climbing), evaluatedPromptTokens as low as 1, bounded re-prefill on prefix shifts, new-chat reuses the system-prompt prefix. Full table in docs/device-results/2026-08-17-redmi-turbo-4-pro-kv-reuse-validated.md
 
 `LlamaCpuSession` now keeps `kv_tokens_` — the exact token sequence resident in the KV cache, maintained strictly after each successful `llama_decode`. Each `generate()` computes the longest common prefix between the cached sequence and the new templated prompt, drops only the divergent tail (`llama_memory_seq_rm(mem, 0, reused, -1)`), and prefills only the suffix. At least one prompt token is always re-decoded so the sampler has fresh logits. Any exception clears both the memory and the bookkeeping (full re-prefill is always correct). Expected: turn-N TTFT drops from O(whole conversation) to O(new turn) — roughly constant ~2–4 s instead of 17 s and climbing.
 
 Metrics stay honest: `GenerationResult`/`GenerationMetrics`/diagnostics gained `evaluatedPromptTokens` (total minus reused prefix); `promptTokensPerSecond` divides by evaluated tokens, never the inflated total. The `LAI-llama` trace logs `reusing X of Y prompt tokens`.
 
-**Device verify next session:** multi-turn chat — TTFT should stay roughly flat; diagnostics `performance[]` entries should show `evaluatedPromptTokens` ≪ `promptTokens` from turn 2 onward.
+**Verified 2026-08-17.** Remaining follow-ups: (a) qualitative check of reply text — several 3-token replies in the run could be over-terse output from the brevity-biased prompt + repetition penalty; (b) the rolling window path (`windowedConversationTurns`) has not been exercised on device yet.
 
 ### ✅ Priority 1 CLOSED — IME close animation device-validated (0.9.1)
 
