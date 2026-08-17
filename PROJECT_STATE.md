@@ -272,7 +272,7 @@ Current thermal handling only *refuses* at `SEVERE`. Needed: Android thermal cal
 
 ### Dependency audit (2026-08-17)
 
-Nine dependabot PRs are open. **Safe, CI-green, mergeable from the UI** (blocked for the CLI token, which lacks the `workflow` OAuth scope): **#2** `actions/checkout` 4→7, **#3** `actions/upload-artifact` 4→7. **Re-testing** (rebase triggered, check CI before merging): #1 `setup-android` 3→4, #5 `gradle/actions` 4→6, #6 `setup-java` 4→5. **Failing CI — do not merge as-is**: #4 androidx group, #9 okhttp 4→5 (major API break), #10 AGP 8.11→9.3.1 (needs Gradle 9; workflow pins 8.13 — a coordinated Gradle+AGP+Kotlin upgrade session), #11 Kotlin group. History scan is clean: no keystore, password, or binary was ever committed; the repo is public — the signing key lives only in Actions secrets and the owner's offline copy.
+**Merged 2026-08-17** (each CI-green individually AND combined on main, run #107): #1 `setup-android` 3→4, #2 `checkout` 4→7, #3 `upload-artifact` 4→7, #5 `gradle/actions` 4→6, #6 `setup-java` 4→5. **Still open, failing CI — do not merge as-is**: #4 androidx group, #9 okhttp 4→5 (major API break), #10 AGP 8.11→9.3.1 (needs Gradle 9; workflow pins 8.13), #11 Kotlin group — these four need one coordinated Gradle+AGP+Kotlin+deps upgrade session. History scan is clean: no keystore, password, or binary was ever committed; the repo is public — the signing key lives only in Actions secrets and the owner's offline copy.
 
 ### Process notes for the next session
 
