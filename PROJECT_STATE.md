@@ -4,7 +4,7 @@ Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime`
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
 Latest release: **`v0.9.1`** (`6206199`) — **green, production-signed, device-validated** (chat replies + IME close animation)
-Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **146** unit tests
+Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **147** unit tests
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
 
@@ -269,6 +269,10 @@ Current thermal handling only *refuses* at `SEVERE`. Needed: Android thermal cal
 6. **Vulkan qualification** (no licence needed, GGUF works directly) — evaluate before QNN.
 7. **QNN/HTP NPU** — requires licensed QAIRT in CI **and** model conversion. Furthest out.
 8. Production supply chain: ✅ permanent signing key (v0.9.0); still pending SBOM, provenance, reproducible builds.
+
+### Dependency audit (2026-08-17)
+
+Nine dependabot PRs are open. **Safe, CI-green, mergeable from the UI** (blocked for the CLI token, which lacks the `workflow` OAuth scope): **#2** `actions/checkout` 4→7, **#3** `actions/upload-artifact` 4→7. **Re-testing** (rebase triggered, check CI before merging): #1 `setup-android` 3→4, #5 `gradle/actions` 4→6, #6 `setup-java` 4→5. **Failing CI — do not merge as-is**: #4 androidx group, #9 okhttp 4→5 (major API break), #10 AGP 8.11→9.3.1 (needs Gradle 9; workflow pins 8.13 — a coordinated Gradle+AGP+Kotlin upgrade session), #11 Kotlin group. History scan is clean: no keystore, password, or binary was ever committed; the repo is public — the signing key lives only in Actions secrets and the owner's offline copy.
 
 ### Process notes for the next session
 
