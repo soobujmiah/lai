@@ -4,6 +4,12 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Background model downloads survive app exit (WorkManager)
+
+- `ModelDownloadWorker` (CoroutineWorker) + `ModelDownloadCoordinator` in `platform:download`; the app module observes typed `BackgroundDownloadStatus` contract states and never imports androidx.work. Unique-per-model work, CONNECTED constraint, exponential backoff.
+- No foreground service needed by design: `ModelRepository.download` already resumes `.part` staging files with HTTP Range, so a stopped worker loses nothing — it retries from the last flushed byte. Transport errors retry (max 8); policy/integrity failures (size ceilings, SHA-256 mismatch) are final and never loop.
+- UI: Pause (keeps the resumable partial; pressing Download continues it), Cancel (also discards the partial via new `ModelRepository.discardPartial`), a bilingual "continues in background" hint (en/bn string parity 65/65), and `adoptBackgroundDownloads()` reattaches the progress UI to a download that kept running while the app was closed.
+
 ### Bangla output quality: tuned system prompt + repetition penalty
 
 - Rewrote the native `kSystemPrompt`: explicit bilingual instruction to answer Bangla in short, simple, everyday sentences, never literal translations or unprompted English mixing, and to admit ignorance directly — the failure modes visible in the 0.9.0 field screenshot. Costs ~40 extra prompt tokens once per conversation (KV-prefix reuse absorbs it afterwards).

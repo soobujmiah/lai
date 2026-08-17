@@ -4,7 +4,7 @@ Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime`
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
 Latest release: **`v0.9.1`** (`6206199`) — **green, production-signed, device-validated** (chat replies + IME close animation)
-Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **153** unit tests
+Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **153** unit tests · WorkManager 2.10.1
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
 
@@ -263,7 +263,7 @@ Current thermal handling only *refuses* at `SEVERE`. Needed: Android thermal cal
 
 1. **Bangla output quality** — cheap levers SHIPPED (tuned bilingual system prompt: short simple sentences, no literal translation, admit ignorance; + repetition penalty 1.1/64 after top-p). **Device-compare Bangla replies against the 0.9.0 screenshot.** If still weak, the remaining lever is a reviewed Bangla-stronger small model in the signed catalog — a model-selection decision for the owner.
 2. **Phase 2A device acceptance** — SAF grant/revoke, settings persist across restart, malformed `settings.json` falls back, scan registers without loading.
-3. **Model Center + WorkManager downloader** — pause/resume/cancel surviving app exit.
+3. **WorkManager downloader — DONE (device verify pending)**: `ModelDownloadWorker` + `ModelDownloadCoordinator` (`platform:download`; the app module never imports androidx.work). Downloads survive app exit/process death; interruptions resume from the last byte via the existing HTTP-Range `.part` path, so no foreground service is needed. Transient transport errors retry with backoff (max 8); policy/integrity failures are final. UI: Pause (keeps partial; Download resumes), Cancel (discards partial), background hint, reattach-on-launch via `adoptBackgroundDownloads()`. Remaining for a full Model Center: a dedicated screen listing catalog + installed models with per-model actions.
 4. **Rolling Context Window** — `keepLastTurns` is typed and user-editable but does nothing yet; pairs naturally with the KV-prefix work.
 5. **Printed Bangla OCR CPU baseline** — ⚠️ blocked on the dataset/licence decision.
 6. **Vulkan qualification** (no licence needed, GGUF works directly) — evaluate before QNN.

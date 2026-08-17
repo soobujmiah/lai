@@ -190,6 +190,15 @@ class ModelRepository private constructor(
         true
     }
 
+    /**
+     * Removes the resumable `.part` staging file for a model that was never installed.
+     * Used when the user CANCELS (not pauses) a background download: pause keeps the partial
+     * so a re-enqueue continues via HTTP Range; cancel must not leave orphaned gigabytes.
+     */
+    suspend fun discardPartial(id: String): Boolean = withContext(Dispatchers.IO) {
+        File(modelDir, "$id.gguf.part").delete()
+    }
+
     private fun ensureStorageAvailable(requiredBytes: Long?) {
         val available = StatFs(modelDir.absolutePath).availableBytes
         val required = requiredBytes?.let {

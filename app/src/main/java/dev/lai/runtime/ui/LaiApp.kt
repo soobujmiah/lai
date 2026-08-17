@@ -758,7 +758,30 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
                 progress.fraction?.let { fraction ->
                     LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
                 } ?: LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                Text("${progress.downloadedBytes / 1_048_576} MB", style = MaterialTheme.typography.labelSmall)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${progress.downloadedBytes / 1_048_576} MB",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // The download runs in WorkManager and continues if the app is closed.
+                    // Pause keeps the partial file (resume = press Download again); Cancel
+                    // discards it.
+                    TextButton(onClick = viewModel::pauseModelDownload) {
+                        Text(stringResource(R.string.download_pause))
+                    }
+                    TextButton(onClick = viewModel::cancelModelDownload) {
+                        Text(stringResource(R.string.download_cancel))
+                    }
+                }
+                Text(
+                    stringResource(R.string.download_background_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

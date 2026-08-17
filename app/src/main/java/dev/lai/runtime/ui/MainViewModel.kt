@@ -29,6 +29,7 @@ import dev.lai.runtime.diagnostics.ModelDiagnostics
 import dev.lai.runtime.diagnostics.RuntimeDiagnostics
 import dev.lai.runtime.diagnostics.ToolAuditDiagnostics
 import dev.lai.runtime.automation.AccessibilityGateway
+import dev.lai.runtime.inference.BackgroundDownloadState
 import dev.lai.runtime.inference.ConversationMessage
 import dev.lai.runtime.inference.ConversationRole
 import dev.lai.runtime.inference.DownloadProgress
@@ -58,6 +59,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -152,6 +154,7 @@ data class MainUiState(
     val modelUrl: String = "",
     val modelSha: String = "",
     val downloadProgress: DownloadProgress? = null,
+    val downloadingModelId: String? = null,
     val notice: String? = null,
     val runtimeDetail: String = "",
     val schedulerDetail: String = "No model has been scheduled",
@@ -194,6 +197,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val container = (application as LaiApplication).container
     private var generationJob: Job? = null
     private var cancelWatchdogJob: Job? = null
+    private var downloadWatchJob: Job? = null
     @Volatile private var generationStage = GenerationStage.IDLE
 
     /**
@@ -214,6 +218,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
     init {
+        adoptBackgroundDownloads()
         viewModelScope.launch {
             combine(AccessibilityGateway.connected, container.shizukuController.state) { accessibility, shizuku ->
                 accessibility to shizuku
@@ -1154,31 +1159,110 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 operation = RuntimeOperation.DOWNLOADING,
                 notice = null,
                 downloadProgress = DownloadProgress(0, spec.expectedBytes),
+                downloadingModelId = spec.id,
             )
         }
+        // The download itself runs in WorkManager, so it survives app exit and process death;
+        // interruptions resume from the last byte via HTTP Range on the .part staging file.
+        // This ViewModel only OBSERVES the work and mirrors it into UI state.
+        container.modelDownloadCoordinator.enqueue(spec)
+        watchDownload(spec.id)
+    }
+
+    /** Pause keeps the resumable .part staging file; pressing Download again continues it. */
+    fun pauseModelDownload() {
+        val id = state.value.downloadingModelId ?: return
+        container.modelDownloadCoordinator.stop(id)
+        val resumedMb = (state.value.downloadProgress?.downloadedBytes ?: 0L) / 1_048_576
+        _state.update {
+            it.copy(notice = "Download paused — Download again resumes from $resumedMb MB")
+        }
+    }
+
+    /** Cancel stops the work AND discards the partial bytes. */
+    fun cancelModelDownload() {
+        val id = state.value.downloadingModelId ?: return
+        container.modelDownloadCoordinator.stop(id)
         viewModelScope.launch {
-            val result = container.modelRepository.download(spec) { progress ->
-                _state.update { it.copy(downloadProgress = progress) }
+            container.modelRepository.discardPartial(id)
+            _state.update { it.copy(notice = "Download cancelled and partial data removed") }
+        }
+    }
+
+    /** Reattaches UI to any download that kept running after the app was last closed. */
+    private fun adoptBackgroundDownloads() {
+        viewModelScope.launch {
+            val active = container.modelDownloadCoordinator.observeAll().first()
+                .firstOrNull {
+                    it.modelId.isNotBlank() &&
+                        (it.state == BackgroundDownloadState.RUNNING || it.state == BackgroundDownloadState.ENQUEUED)
+                } ?: return@launch
+            _state.update {
+                it.copy(
+                    operation = RuntimeOperation.DOWNLOADING,
+                    downloadProgress = active.progress ?: DownloadProgress(0, null),
+                    downloadingModelId = active.modelId,
+                    notice = "Resumed watching a download that continued in the background",
+                )
             }
-            result.onSuccess { model ->
-                _state.update {
-                    it.copy(
-                        operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
-                        notice = "Installed ${model.displayName}",
-                        modelName = "",
-                        modelUrl = "",
-                        modelSha = "",
-                        downloadProgress = null,
-                    )
-                }
-                refreshModels()
-            }.onFailure { error ->
-                _state.update {
-                    it.copy(
-                        operation = RuntimeOperation.ERROR,
-                        notice = error.message ?: "Download failed",
-                        downloadProgress = null,
-                    )
+            watchDownload(active.modelId)
+        }
+    }
+
+    private fun watchDownload(modelId: String) {
+        downloadWatchJob?.cancel()
+        downloadWatchJob = viewModelScope.launch {
+            container.modelDownloadCoordinator.observe(modelId).collect { status ->
+                when (status?.state) {
+                    null -> Unit
+                    BackgroundDownloadState.ENQUEUED -> _state.update {
+                        it.copy(operation = RuntimeOperation.DOWNLOADING, downloadingModelId = modelId)
+                    }
+                    BackgroundDownloadState.RUNNING -> _state.update {
+                        it.copy(
+                            operation = RuntimeOperation.DOWNLOADING,
+                            downloadingModelId = modelId,
+                            downloadProgress = status.progress ?: it.downloadProgress,
+                        )
+                    }
+                    BackgroundDownloadState.SUCCEEDED -> {
+                        _state.update {
+                            it.copy(
+                                operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
+                                notice = "Model installed and verified",
+                                modelName = "",
+                                modelUrl = "",
+                                modelSha = "",
+                                downloadProgress = null,
+                                downloadingModelId = null,
+                            )
+                        }
+                        refreshModels()
+                        downloadWatchJob?.cancel()
+                    }
+                    BackgroundDownloadState.FAILED -> {
+                        _state.update {
+                            it.copy(
+                                operation = RuntimeOperation.ERROR,
+                                notice = status.failureReason ?: "Download failed",
+                                downloadProgress = null,
+                                downloadingModelId = null,
+                            )
+                        }
+                        downloadWatchJob?.cancel()
+                    }
+                    BackgroundDownloadState.CANCELLED -> {
+                        // Paused or cancelled by explicit user action; that action already set
+                        // the explanatory notice, so only the operational state is restored.
+                        _state.update {
+                            it.copy(
+                                operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
+                                downloadProgress = null,
+                                downloadingModelId = null,
+                            )
+                        }
+                        downloadWatchJob?.cancel()
+                    }
                 }
             }
         }

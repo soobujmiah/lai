@@ -38,3 +38,19 @@ data class DownloadProgress(
         (downloadedBytes.toDouble() / it.toDouble()).coerceIn(0.0, 1.0).toFloat()
     }
 }
+
+/**
+ * Lifecycle of a background (process-independent) model download.
+ *
+ * PAUSED is a UI-level notion: the work was cancelled while a resumable partial file remains,
+ * so re-enqueueing the same spec continues from the last byte via an HTTP Range request.
+ */
+enum class BackgroundDownloadState { ENQUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED }
+
+data class BackgroundDownloadStatus(
+    val modelId: String,
+    val state: BackgroundDownloadState,
+    val progress: DownloadProgress? = null,
+    /** LAI-authored short reason; never response bodies or URLs with credentials. */
+    val failureReason: String? = null,
+)

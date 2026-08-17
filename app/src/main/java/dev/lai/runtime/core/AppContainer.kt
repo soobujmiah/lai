@@ -5,6 +5,7 @@ import android.content.Context
 import dev.lai.runtime.agent.AgentRuntime
 import dev.lai.runtime.audit.ToolAuditRepository
 import dev.lai.runtime.device.AndroidRuntimeEnvironmentProvider
+import dev.lai.runtime.inference.ModelDownloadCoordinator
 import dev.lai.runtime.inference.ModelRepository
 import dev.lai.runtime.inference.NativeInferenceEngine
 import dev.lai.runtime.model.RemoteModelCatalogRepository
@@ -27,6 +28,7 @@ class AppContainer(context: Context) {
     val shizukuController = ShizukuController()
     val elevatedShell = ElevatedShell(context, shizukuController)
     val modelRepository = ModelRepository(context)
+    val modelDownloadCoordinator = ModelDownloadCoordinator(context)
     val modelCatalogRepository = RemoteModelCatalogRepository(context)
     val toolAuditRepository = ToolAuditRepository(context)
     val inferenceEngine = NativeInferenceEngine()

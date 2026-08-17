@@ -33,6 +33,9 @@
   <string name="model_url">Hugging Face HTTPS URL</string>
   <string name="model_sha">SHA-256 (required)</string>
   <string name="download">Download</string>
+  <string name="download_pause">Pause</string>
+  <string name="download_cancel">Cancel</string>
+  <string name="download_background_hint">Downloads continue in the background even if you close the app.</string>
   <string name="safety_title">You stay in control</string>
   <string name="safety_body">LAI blocks arbitrary shell commands and sensitive text entry. Review consequential actions before execution.</string>
   <string name="quick_settings_action">⚙</string>

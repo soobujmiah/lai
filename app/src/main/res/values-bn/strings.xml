@@ -33,6 +33,9 @@
   <string name="model_url">Hugging Face HTTPS URL</string>
   <string name="model_sha">SHA-256 (আবশ্যক)</string>
   <string name="download">ডাউনলোড</string>
+  <string name="download_pause">বিরতি</string>
+  <string name="download_cancel">বাতিল</string>
+  <string name="download_background_hint">অ্যাপ বন্ধ করলেও ডাউনলোড ব্যাকগ্রাউন্ডে চলতে থাকবে।</string>
   <string name="safety_title">নিয়ন্ত্রণ আপনার হাতে</string>
   <string name="safety_body">এলএআই ইচ্ছামতো শেল কমান্ড ও সংবেদনশীল লেখা ব্লক করে। গুরুত্বপূর্ণ কাজ চালানোর আগে যাচাই করুন।</string>
   <string name="quick_settings_action">⚙</string>
