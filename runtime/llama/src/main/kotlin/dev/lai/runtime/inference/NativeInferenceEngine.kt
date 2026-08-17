@@ -138,6 +138,7 @@ class NativeInferenceEngine : InferenceEngine {
                         timeToFirstTokenMs = values[3] / 1000,
                         decodeMs = values[4] / 1000,
                         totalMs = values[5] / 1000,
+                        evaluatedPromptTokens = values[6].toInt(),
                     )
                     channel.trySendBlocking(InferenceEvent.Completed(metrics.generatedTokens, metrics))
                 } else {
@@ -201,7 +202,7 @@ class NativeInferenceEngine : InferenceEngine {
 
     companion object {
         private const val DEFAULT_CONTEXT_SIZE = 4096
-        private const val METRIC_COUNT = 6
+        private const val METRIC_COUNT = 7
 
         /** Bounded token backlog before the native decode loop is throttled by backpressure. */
         private const val TOKEN_BUFFER_CAPACITY = 256

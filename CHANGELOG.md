@@ -4,6 +4,11 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### KV-cache prefix reuse — flat TTFT across a conversation
+
+- `LlamaCpuSession` now tracks the exact token sequence resident in the KV cache (`kv_tokens_`, updated strictly after each successful `llama_decode`). Each request reuses the longest common prefix between the cache and the new templated prompt, removes only the divergent tail via `llama_memory_seq_rm`, and prefills only the suffix — turn-N TTFT becomes proportional to the new turn, not the whole history (device data showed 6.2 s → 17.0 s growth over six turns at ~28 tok/s prefill). At least one prompt token is always re-decoded for fresh sampler logits; any exception invalidates the cache wholesale so a failed decode can never leave stale bookkeeping.
+- Honest metrics for reuse: `GenerationResult`, JNI array (now 7 slots), `GenerationMetrics`, and diagnostics `performance[]` gained `evaluatedPromptTokens`; `promptTokensPerSecond` divides by tokens actually evaluated, never the inflated total. Both new fields default to the no-reuse value so existing tests and old exports stay valid. New contract test covers both semantics.
+
 ### Fixed
 
 - **Bottom mode bar shoved off-screen when the keyboard closes** (0.9.0 field report): bar visibility was keyed on `WindowInsets.isImeVisible`, the *current* IME inset, which only reaches zero at the very end of the close animation — the composer had already slid to the bottom, then the bar popped in and displaced the layout for a frame. Visibility now keys on `WindowInsets.imeAnimationTarget`, which flips at animation start in both directions, so the bar rides the animation smoothly. Steady-state behaviour is unchanged.

@@ -243,9 +243,13 @@ Six completed generations exported from the Redmi Turbo 4 Pro, English and Bangl
 
 **Root cause, confirmed by measurement:** prefill runs at ~25–31 tok/s, so the pre-fix ~407-token prompt needed ~14 s — the former 4 s cancel watchdog aborted every healthy generation. The 45 s grace + the prefill cut (`ToolInstructionGate` kept "hi" at 159 tokens; all 6 proposal examinations correctly `NOT_TOOL_CALL`) fixed it. Model load also improved to **721 ms**. `productionSigned: true` — validated on the signed release.
 
-### 🔴 New Priority 0 — TTFT grows linearly with conversation length
+### ✅ Priority 0 (TTFT growth) — KV-prefix reuse implemented, device verification pending
 
-Every `generate()` calls `llama_memory_clear` and re-prefills the **entire** conversation: TTFT went 6.2 s → 17.0 s in six turns and will pass 60 s within a long chat. Fix: reuse the KV cache for the unchanged conversation prefix (track the previously prefilled token sequence; only decode the suffix after the longest common prefix; clear only on New chat / model reload / trim). This is the single largest remaining UX cost in chat.
+`LlamaCpuSession` now keeps `kv_tokens_` — the exact token sequence resident in the KV cache, maintained strictly after each successful `llama_decode`. Each `generate()` computes the longest common prefix between the cached sequence and the new templated prompt, drops only the divergent tail (`llama_memory_seq_rm(mem, 0, reused, -1)`), and prefills only the suffix. At least one prompt token is always re-decoded so the sampler has fresh logits. Any exception clears both the memory and the bookkeeping (full re-prefill is always correct). Expected: turn-N TTFT drops from O(whole conversation) to O(new turn) — roughly constant ~2–4 s instead of 17 s and climbing.
+
+Metrics stay honest: `GenerationResult`/`GenerationMetrics`/diagnostics gained `evaluatedPromptTokens` (total minus reused prefix); `promptTokensPerSecond` divides by evaluated tokens, never the inflated total. The `LAI-llama` trace logs `reusing X of Y prompt tokens`.
+
+**Device verify next session:** multi-turn chat — TTFT should stay roughly flat; diagnostics `performance[]` entries should show `evaluatedPromptTokens` ≪ `promptTokens` from turn 2 onward.
 
 ### ✅ Priority 1 CLOSED — IME close animation device-validated (0.9.1)
 

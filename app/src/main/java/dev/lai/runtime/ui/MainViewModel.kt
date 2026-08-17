@@ -1292,6 +1292,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         totalMs = totalMs,
         promptTokensPerSecond = promptTokensPerSecond,
         decodeTokensPerSecond = decodeTokensPerSecond,
+        evaluatedPromptTokens = evaluatedPromptTokens,
     )
 
     private fun refreshModels() {

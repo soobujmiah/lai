@@ -82,6 +82,8 @@ data class GenerationPerformanceDiagnostics(
     val totalMs: Long,
     val promptTokensPerSecond: Double,
     val decodeTokensPerSecond: Double,
+    /** Prompt tokens actually evaluated (total minus reused KV prefix). Default = no reuse. */
+    val evaluatedPromptTokens: Int = promptTokens,
 )
 
 @Serializable

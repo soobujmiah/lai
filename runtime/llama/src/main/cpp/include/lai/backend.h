@@ -27,6 +27,9 @@ struct GenerationResult {
     long long time_to_first_token_us = 0;
     long long decode_us = 0;
     long long total_us = 0;
+    // Prompt tokens actually decoded this request (total minus the KV-cache prefix that was
+    // reused). prompt_eval_us measures ONLY these, so tok/s must divide by this count.
+    int evaluated_prompt_tokens = 0;
 };
 
 using TokenCallback = std::function<bool(std::string_view)>;

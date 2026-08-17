@@ -58,9 +58,13 @@ data class GenerationMetrics(
     val timeToFirstTokenMs: Long,
     val decodeMs: Long,
     val totalMs: Long,
+    // Prompt tokens actually evaluated this request. With KV-prefix reuse this is usually far
+    // smaller than promptTokens, and promptEvaluationMs measures only these — so throughput
+    // must divide by this count or it overstates. Defaults to promptTokens (no reuse).
+    val evaluatedPromptTokens: Int = promptTokens,
 ) {
     val promptTokensPerSecond: Double =
-        if (promptEvaluationMs > 0) promptTokens * 1000.0 / promptEvaluationMs else 0.0
+        if (promptEvaluationMs > 0) evaluatedPromptTokens * 1000.0 / promptEvaluationMs else 0.0
     val decodeTokensPerSecond: Double =
         if (decodeMs > 0) generatedTokens * 1000.0 / decodeMs else 0.0
 }

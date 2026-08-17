@@ -331,9 +331,10 @@ Java_dev_lai_runtime_inference_NativeBindings_generate(
             generated.time_to_first_token_us,
             generated.decode_us,
             generated.total_us,
+            generated.evaluated_prompt_tokens,
         };
-        jlongArray result = env->NewLongArray(6);
-        env->SetLongArrayRegion(result, 0, 6, values);
+        jlongArray result = env->NewLongArray(7);
+        env->SetLongArrayRegion(result, 0, 7, values);
         set_error("");
         return result;
     } catch (const std::exception& exception) {

@@ -174,7 +174,6 @@ public:
             ANDROID_LOG_INFO, kLogTag,
             "generate: lock acquired after %lld us", elapsed_us(lock_wait_start, total_start)
         );
-        llama_memory_clear(llama_get_memory(context_), true);
         const std::string templated = apply_chat_template(model_, conversation);
         const auto template_end = Clock::now();
         std::vector<llama_token> prompt_tokens = tokenize(vocab_, templated);
@@ -190,11 +189,45 @@ public:
             throw std::runtime_error("Conversation and requested response exceed the loaded context size");
         }
 
+        // Any exception below leaves the KV cache in an uncertain state relative to kv_tokens_,
+        // so the reuse bookkeeping is invalidated wholesale rather than guessed at.
+        try {
+
+        // KV-prefix reuse. Device evidence (0.9.0, six generations): TTFT grew linearly from
+        // 6.2 s to 17.0 s because every request cleared the memory and re-prefilled the whole
+        // conversation at ~28 tok/s. A chat conversation only ever grows at the tail, so the
+        // tokens already decoded for the previous request are byte-identical up to the point
+        // where the new turn begins. Keep the longest common prefix, drop everything after it
+        // ([reused, inf) via llama_memory_seq_rm), and prefill only the suffix.
+        //
+        // The reuse ceiling is prompt-size minus one: at least one prompt token must always be
+        // decoded so the sampler has fresh logits for position -1.
+        llama_memory_t memory = llama_get_memory(context_);
+        size_t reused = 0;
+        const size_t reuse_ceiling = std::min(kv_tokens_.size(), prompt_tokens.size() - 1U);
+        while (reused < reuse_ceiling && kv_tokens_[reused] == prompt_tokens[reused]) ++reused;
+        if (reused == 0) {
+            llama_memory_clear(memory, true);
+            kv_tokens_.clear();
+        } else if (llama_memory_seq_rm(memory, 0, static_cast<llama_pos>(reused), -1)) {
+            kv_tokens_.resize(reused);
+        } else {
+            // The memory backend refused a partial removal; fall back to a full re-prefill.
+            llama_memory_clear(memory, true);
+            kv_tokens_.clear();
+            reused = 0;
+        }
+        __android_log_print(
+            ANDROID_LOG_INFO, kLogTag,
+            "generate: reusing %zu of %zu prompt tokens from the KV cache",
+            reused, prompt_tokens.size()
+        );
+
         const auto prompt_start = Clock::now();
         // Smaller prompt chunks bound how long a single uninterruptible llama_decode call runs,
         // so Stop is observed promptly instead of after a whole 512-token batch.
         const int32_t batch_size = std::max(1, std::min(128, context_size));
-        size_t offset = 0;
+        size_t offset = reused;
         while (offset < prompt_tokens.size()) {
             if (is_cancelled()) throw std::runtime_error("Generation cancelled");
             const int32_t count = static_cast<int32_t>(
@@ -202,6 +235,13 @@ public:
             );
             llama_batch batch = llama_batch_get_one(prompt_tokens.data() + offset, count);
             if (llama_decode(context_, batch) != 0) throw std::runtime_error("Prompt evaluation failed");
+            // kv_tokens_ mirrors exactly what has entered the KV cache, chunk by chunk, so a
+            // cancellation between chunks still leaves the bookkeeping truthful.
+            kv_tokens_.insert(
+                kv_tokens_.end(),
+                prompt_tokens.begin() + static_cast<std::ptrdiff_t>(offset),
+                prompt_tokens.begin() + static_cast<std::ptrdiff_t>(offset + static_cast<size_t>(count))
+            );
             offset += static_cast<size_t>(count);
             // Per-chunk progress: four device reports could not distinguish "prefill is slow"
             // from "prefill is wedged". This names the exact chunk where progress stops.
@@ -213,11 +253,12 @@ public:
         }
         const auto prompt_end = Clock::now();
         const long long prefill_us = elapsed_us(prompt_start, prompt_end);
+        const size_t evaluated = prompt_tokens.size() - reused;
         __android_log_print(
             ANDROID_LOG_INFO, kLogTag,
-            "generate: prefill done, %zu tokens in %lld us (%.1f tok/s)",
-            prompt_tokens.size(), prefill_us,
-            prefill_us > 0 ? static_cast<double>(prompt_tokens.size()) * 1e6 / static_cast<double>(prefill_us) : 0.0
+            "generate: prefill done, %zu new of %zu total tokens in %lld us (%.1f tok/s)",
+            evaluated, prompt_tokens.size(), prefill_us,
+            prefill_us > 0 ? static_cast<double>(evaluated) * 1e6 / static_cast<double>(prefill_us) : 0.0
         );
 
         llama_sampler* sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
@@ -258,6 +299,10 @@ public:
             ++generated;
             llama_batch batch = llama_batch_get_one(&token, 1);
             if (llama_decode(context_, batch) != 0) throw std::runtime_error("Generated-token evaluation failed");
+            // The generated token is now part of the KV cache; recording it means the NEXT
+            // request's templated prompt (which embeds this reply as assistant text) can match
+            // it in the common-prefix scan instead of re-prefilling the whole reply.
+            kv_tokens_.push_back(token);
         }
         const auto end = Clock::now();
         __android_log_print(
@@ -272,7 +317,16 @@ public:
             generated > 0 ? elapsed_us(total_start, first_token_time) : elapsed_us(total_start, end),
             elapsed_us(decode_start, end),
             elapsed_us(total_start, end),
+            static_cast<int>(evaluated),
         };
+
+        } catch (...) {
+            // The KV cache may hold a partial or failed decode; never let kv_tokens_ overstate
+            // what is actually cached. Next request pays a full prefill, which is always correct.
+            llama_memory_clear(llama_get_memory(context_), true);
+            kv_tokens_.clear();
+            throw;
+        }
     }
 
 private:
@@ -280,6 +334,9 @@ private:
     llama_context* context_;
     const llama_vocab* vocab_;
     std::mutex generation_mutex_;
+    // Exact token sequence currently resident in the KV cache (prompt + generated tokens),
+    // maintained strictly after each successful llama_decode. Guarded by generation_mutex_.
+    std::vector<llama_token> kv_tokens_;
 };
 
 class LlamaCpuBackend final : public Backend {

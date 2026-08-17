@@ -52,4 +52,16 @@ class InferenceContractsTest {
         assertEquals(ConversationRole.ASSISTANT, conversation.last().role)
         assertEquals("failed", failure.message)
     }
+
+    @Test
+    fun `prompt throughput divides by evaluated tokens when a KV prefix was reused`() {
+        // 470-token prompt of which only 100 were evaluated (370 reused from the KV cache) in 1 s:
+        // honest prefill speed is 100 tok/s, not an inflated 470 tok/s.
+        val reused = GenerationMetrics(470, 26, 1000, 1100, 1653, 2753, evaluatedPromptTokens = 100)
+        assertEquals(100.0, reused.promptTokensPerSecond, 0.001)
+        // Without reuse the default keeps the original semantics: all prompt tokens evaluated.
+        val noReuse = GenerationMetrics(12, 7, 100, 120, 350, 470)
+        assertEquals(12, noReuse.evaluatedPromptTokens)
+        assertEquals(120.0, noReuse.promptTokensPerSecond, 0.001)
+    }
 }
