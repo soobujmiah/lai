@@ -17,4 +17,5 @@ android {
 dependencies {
     api(project(":core:scheduler"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.kotlinx.coroutines.android)
 }

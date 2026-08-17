@@ -741,6 +741,11 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
             if (state.installedModels.isNotEmpty()) {
                 Text("Installed", fontWeight = FontWeight.SemiBold)
                 Text(
+                    "${state.installedModels.sumOf { it.bytes } / 1_048_576} MB of model data on this device",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
                     "Use Keep copy to save a verified GGUF in Documents/Downloads. That copy survives app uninstall and can be imported after reinstall.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -774,6 +779,10 @@ private fun ModelSetup(state: MainUiState, viewModel: MainViewModel) {
                                 Button(onClick = { viewModel.loadModel(model.id) }, enabled = !state.busy) {
                                     Text("Load")
                                 }
+                                OutlinedButton(
+                                    onClick = { viewModel.deleteModel(model.id) },
+                                    enabled = !state.busy,
+                                ) { Text("Delete") }
                             }
                         }
                     }

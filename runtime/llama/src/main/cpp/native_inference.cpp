@@ -367,6 +367,21 @@ Java_dev_lai_runtime_inference_NativeBindings_countTokens(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_dev_lai_runtime_inference_NativeBindings_setThreadLimit(
+    JNIEnv*,
+    jclass,
+    jlong session_handle,
+    jint decode_threads
+) {
+    // Thermal governor path. Missing/closed sessions are a silent no-op on purpose: a thermal
+    // callback racing a model unload must never surface as an error.
+    const auto session = find_session(static_cast<long long>(session_handle));
+    if (session != nullptr) {
+        session->set_thread_limit(static_cast<int>(decode_threads));
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_dev_lai_runtime_inference_NativeBindings_destroySession(JNIEnv*, jclass, jlong session_handle) {
     std::lock_guard<std::mutex> lock(g_mutex);
     g_sessions.erase(static_cast<long long>(session_handle));

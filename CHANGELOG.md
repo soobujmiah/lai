@@ -4,6 +4,11 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Closed-loop thermal governor + model management
+
+- `ThermalGovernorPolicy` (`core:scheduler`, 9 tests): live thermal status → decode-thread budget with hysteresis (threads fall immediately at MODERATE/SEVERE/CRITICAL, rise again only at fully NOMINAL, so a status boundary cannot flap speeds). Wired end-to-end: `PowerManager` thermal callback flow in `platform:device` → ViewModel → JNI `setThreadLimit` → atomic consumed by the native decode loop between `llama_decode` calls, never concurrently with one. Intervention reasons surface as plain-language notices.
+- Installed models can finally be **deleted** from Settings (guarded: the active model must be unloaded first), and the Installed section shows total on-device model storage.
+
 ### Chat history
 
 - New `platform:history` module: `ChatHistoryRepository` persists conversations as one JSON file per session in app-private **no-backup** storage — the only content-bearing store in the app, and it never crosses SAF, network, or diagnostics boundaries. Bounded (≤100 sessions, ≤512 messages each, 32 KiB per message), atomic writes, corrupt-file tolerant, id-validated against path escape. 7 pure-JVM tests.

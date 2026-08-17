@@ -35,6 +35,7 @@ internal class NativeBindings private constructor() {
             callback: NativeTokenCallback,
         ): LongArray?
         @JvmStatic external fun countTokens(session: Long, roles: Array<String>, contents: Array<String>): Int
+        @JvmStatic external fun setThreadLimit(session: Long, decodeThreads: Int)
         @JvmStatic external fun destroySession(session: Long)
         @JvmStatic external fun lastError(): String
     }
@@ -45,6 +46,18 @@ private data class NativeRuntimeInfo(val backends: List<String> = emptyList(), v
 
 class NativeInferenceEngine : InferenceEngine {
     @Volatile private var session: Long = 0
+
+    /**
+     * Thermal governor hook: records a decode-thread budget that the native decode loop applies
+     * at its next safe point (between llama_decode calls). Safe to call from any thread at any
+     * time; a no-op when no model is loaded.
+     */
+    fun setDecodeThreadLimit(decodeThreads: Int) {
+        val handle = session
+        if (handle != 0L && NativeBindings.loaded && decodeThreads > 0) {
+            NativeBindings.setThreadLimit(handle, decodeThreads)
+        }
+    }
 
     override val contextSize: Int = DEFAULT_CONTEXT_SIZE
 

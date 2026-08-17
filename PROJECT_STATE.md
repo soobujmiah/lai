@@ -4,7 +4,7 @@ Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime`
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
 Latest release: **`v0.9.1`** (`6206199`) — **green, production-signed, device-validated** (chat replies + IME close animation)
-Graph: **16 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **160** unit tests · WorkManager 2.10.1
+Graph: **16 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **169** unit tests · WorkManager 2.10.1
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
 
@@ -25,7 +25,7 @@ Graph: **16 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **
 | Reviewed model | Device validated (load) | Qwen 2.5 1.5B Instruct Q4_K_M, exact 1,117,320,736 bytes + SHA-256 | Bangla quality pack |
 | Backend scheduler | Device validated (CPU) | Compatibility, memory preflight (1.93 GB est. peak), battery/thermal admission, evidence-based selection | Closed-loop throttling |
 | Token streaming | **Device validated** | `trySendBlocking` + `buffer(256)` — six streamed replies observed (0.9.0) | — |
-| Thermal admission | Build verified | Refuses new generation at `SEVERE`+ | **Reactive only**; no closed-loop governor |
+| Thermal governor | Build pending CI | Closed loop: live thermal flow → pure policy (hysteresis) → per-decode-step thread budget via JNI atomic; admission at `SEVERE`+ retained | Device validation under sustained load |
 | CPU thread policy | Build verified | Half the cores (2–4) for decode *and* batch | Device heat retest |
 | Vulkan backend | Planned | `llama-vulkan` descriptor reserved | Compile ggml Vulkan, Adreno qualification |
 | Qualcomm QNN/HTP (NPU) | **Planned — no code** | Boundary documented only | Licensed QAIRT CI, model conversion, dedicated `runtime:qnn` |
@@ -255,9 +255,9 @@ Metrics stay honest: `GenerationResult`/`GenerationMetrics`/diagnostics gained `
 
 User confirmed on device: keyboard close is smooth, no bar displacement. `imeAnimationTarget` keying is the pattern to keep — never gate bottom-bar visibility on the current IME inset.
 
-### Priority 2 — Closed-loop thermal governor
+### ✅ Priority 2 — Closed-loop thermal governor SHIPPED (device verify pending)
 
-Current thermal handling only *refuses* at `SEVERE`. Needed: Android thermal callbacks, dynamic thread/batch reduction, cooldown hysteresis, and a visible reason in the UI. (Note: the 0.9.0 run stayed `NOMINAL` at 99% battery while charging — heat may already be acceptable after the thread-policy fix; re-measure during a long chat before building this.)
+`ThermalGovernorPolicy` (`core:scheduler`, pure, 9 tests, hysteresis: threads fall immediately, rise only at fully NOMINAL) maps live thermal status → decode-thread budget. `AndroidRuntimeEnvironmentProvider.thermalStates()` (PowerManager callback flow, <Q emits UNKNOWN once) feeds it; the budget crosses JNI (`setThreadLimit`) into an atomic the native decode loop applies **between** `llama_decode` calls — never concurrently with one. Reason strings surface as UI notices; `LAI-llama` logs `thermal: decode threads X -> Y`. Verify on device with a long generation while the device is warm.
 
 ### Then, in order
 

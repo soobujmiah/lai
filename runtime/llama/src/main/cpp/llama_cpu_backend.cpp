@@ -5,6 +5,7 @@
 #include <android/log.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -135,8 +136,11 @@ std::string token_piece(const llama_vocab* vocab, llama_token token) {
 
 class LlamaCpuSession final : public BackendSession {
 public:
-    LlamaCpuSession(llama_model* model, llama_context* context)
-        : model_(model), context_(context), vocab_(llama_model_get_vocab(model)) {}
+    LlamaCpuSession(llama_model* model, llama_context* context, int baseline_threads)
+        : model_(model),
+          context_(context),
+          vocab_(llama_model_get_vocab(model)),
+          applied_threads_(baseline_threads) {}
 
     ~LlamaCpuSession() override {
         if (context_ != nullptr) llama_free(context_);
@@ -234,6 +238,7 @@ public:
         size_t offset = reused;
         while (offset < prompt_tokens.size()) {
             if (is_cancelled()) throw std::runtime_error("Generation cancelled");
+            apply_thread_limit_locked();
             const int32_t count = static_cast<int32_t>(
                 std::min(prompt_tokens.size() - offset, static_cast<size_t>(batch_size))
             );
@@ -297,6 +302,7 @@ public:
         int generated = 0;
         while (generated < options.max_new_tokens) {
             if (is_cancelled()) break;
+            apply_thread_limit_locked();
             llama_token token = llama_sampler_sample(sampler, context_, -1);
             if (llama_vocab_is_eog(vocab_, token)) break;
             const std::string piece = token_piece(vocab_, token);
@@ -342,11 +348,31 @@ public:
         }
     }
 
+    void set_thread_limit(int decode_threads) override {
+        // Recorded from the UI thread; consumed by the decode loop at its next safe point.
+        requested_threads_.store(decode_threads, std::memory_order_relaxed);
+    }
+
 private:
+    /** Applies a pending thermal thread budget between llama_decode calls; never during one. */
+    void apply_thread_limit_locked() {
+        const int requested = requested_threads_.load(std::memory_order_relaxed);
+        if (requested > 0 && requested != applied_threads_) {
+            llama_set_n_threads(context_, requested, requested);
+            __android_log_print(
+                ANDROID_LOG_INFO, kLogTag,
+                "thermal: decode threads %d -> %d", applied_threads_, requested
+            );
+            applied_threads_ = requested;
+        }
+    }
+
     llama_model* model_;
     llama_context* context_;
     const llama_vocab* vocab_;
     std::mutex generation_mutex_;
+    std::atomic<int> requested_threads_{0};
+    int applied_threads_;
     // Exact token sequence currently resident in the KV cache (prompt + generated tokens),
     // maintained strictly after each successful llama_decode. Guarded by generation_mutex_.
     std::vector<llama_token> kv_tokens_;
@@ -399,7 +425,7 @@ public:
             error = "llama.cpp could not allocate the inference context";
             return nullptr;
         }
-        return std::make_unique<LlamaCpuSession>(model, context);
+        return std::make_unique<LlamaCpuSession>(model, context, static_cast<int>(worker_threads));
     }
 };
 

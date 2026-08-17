@@ -49,6 +49,7 @@ import dev.lai.runtime.scheduler.BackendCapability
 import dev.lai.runtime.scheduler.CapabilityEvidence
 import dev.lai.runtime.scheduler.InferenceWorkload
 import dev.lai.runtime.scheduler.RuntimeEnvironment
+import dev.lai.runtime.scheduler.ThermalGovernorPolicy
 import dev.lai.runtime.scheduler.ThermalState
 import dev.lai.runtime.settings.LlmSettings
 import dev.lai.runtime.settings.SettingsDocumentV1
@@ -166,6 +167,7 @@ data class MainUiState(
     val lastModelLoadMs: Long? = null,
     val lastGenerationMetrics: GenerationMetrics? = null,
     val performanceHistory: List<GenerationMetrics> = emptyList(),
+    val thermalGovernorDetail: String? = null,
     val chatSessions: List<ChatSessionSummary> = emptyList(),
     val chatHistoryVisible: Boolean = false,
     val trimmedConversationTurns: Int = 0,
@@ -203,6 +205,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var generationJob: Job? = null
     private var cancelWatchdogJob: Job? = null
     private var downloadWatchJob: Job? = null
+    private val thermalGovernor = ThermalGovernorPolicy()
+    private var thermalDecision: ThermalGovernorPolicy.Decision? = null
     private var currentChatId: String = UUID.randomUUID().toString()
     private var currentChatCreatedAtEpochMs: Long = System.currentTimeMillis()
     @Volatile private var generationStage = GenerationStage.IDLE
@@ -227,6 +231,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         adoptBackgroundDownloads()
         refreshChatSessions()
+        // Closed-loop thermal governor. Previously heat only REFUSED new work at SEVERE while an
+        // in-flight reply kept burning all four threads. Now every thermal status change maps to
+        // a decode-thread budget (pure ThermalGovernorPolicy, hysteresis included) that the
+        // native decode loop applies between llama_decode calls.
+        viewModelScope.launch {
+            container.runtimeEnvironment.thermalStates().collect { thermal ->
+                val baseline = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4)
+                val previous = thermalDecision
+                val decision = thermalGovernor.decide(thermal, previous, baseline)
+                thermalDecision = decision
+                container.inferenceEngine.setDecodeThreadLimit(decision.decodeThreads)
+                _state.update {
+                    it.copy(
+                        thermalGovernorDetail = decision.reason,
+                        notice = if (decision.reason != null && decision.reason != previous?.reason) {
+                            decision.reason
+                        } else {
+                            it.notice
+                        },
+                    )
+                }
+            }
+        }
         viewModelScope.launch {
             combine(AccessibilityGateway.connected, container.shizukuController.state) { accessibility, shizuku ->
                 accessibility to shizuku
@@ -1116,6 +1143,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
+        }
+    }
+
+    fun deleteModel(modelId: String) {
+        if (state.value.busy) return
+        if (state.value.activeModelId == modelId) {
+            _state.update { it.copy(notice = "Unload the model before deleting it") }
+            return
+        }
+        viewModelScope.launch {
+            val removed = container.modelRepository.delete(modelId)
+            _state.update {
+                it.copy(notice = if (removed) "Model deleted from this device" else "Model was not found")
+            }
+            refreshModels()
         }
     }
 

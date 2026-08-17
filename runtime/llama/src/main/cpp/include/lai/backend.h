@@ -45,6 +45,10 @@ public:
         const TokenCallback& on_token,
         const CancelCallback& is_cancelled
     ) = 0;
+    // Thermal governor hook. Thread-safe and asynchronous: the new budget is recorded
+    // immediately from any thread and applied by the decode loop at its next safe point
+    // (between llama_decode calls), never concurrently with one. <= 0 means "no limit change".
+    virtual void set_thread_limit(int decode_threads) { (void) decode_threads; }
 };
 
 class Backend {
