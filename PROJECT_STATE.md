@@ -337,7 +337,12 @@ source/architecture/catalog/documentation policy, the pure-JVM coverage ratchets
 `:platform:audit` / `:platform:download` / `:platform:workspace` / `:app` unit tests and lint, the
 native llama.cpp arm64 build, and debug APK assembly.
 
-**Open device regression (2026-08-17, build `0.6.78-debug`).** A physical chat run on the Redmi
+**Chat could never reply (root cause found, fixed in `03de2f5`, build `0.6.82`).** A Phase 2A
+regression let the quick sheet set the reply budget to the entire context window, which makes
+`promptTokens + maxNewTokens <= contextSize` unsatisfiable — every send stripped the conversation
+and threw. This explains `performance: []` in both device reports. Awaiting device retest.
+
+**Earlier device regression (2026-08-17, build `0.6.78-debug`).** A physical chat run on the Redmi
 Turbo 4 Pro reported device heating, an empty reply, and a permanently stuck **Stop**. Root causes
 for the heat, the stuck cancel, the empty bubble, the IME/status-bar overlap and the missing
 Settings back affordance were fixed in `e4ad398` (CI

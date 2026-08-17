@@ -54,6 +54,66 @@ model was released some time between the screenshot and the export.
 | 5 | Edge-to-edge `Scaffold` kept reserving the status-bar inset while the IME was up. | `contentWindowInsets`/top-bar insets set to `safeDrawing`; composer gets `imePadding()`. |
 | 6 | Settings had no exit affordance. | Real back arrow (`material-icons-core`, already on the classpath), redundant action hidden, `BackHandler` wired for system back. |
 
+---
+
+# Second run — build `0.6.80-debug` (= run 80 = `e4ad398`, fixes already installed)
+
+Symptoms persisted: heat, no reply, and an IME flicker that briefly overlaps the status bar.
+**This export identified the root cause.** Fixed in `03de2f5` (CI run
+[`31980573041`](https://github.com/soobujmiah/lai/actions/runs/31980573041) — green, build `0.6.82`).
+
+## What changed between the two exports
+
+| Field | Run 1 (`0.6.78`) | Run 2 (`0.6.80`) | Meaning |
+|---|---|---|---|
+| `activeBackendDecision` | "No model has been scheduled" | **"LLAMA-CPU: Selected…"** | the model **did** load this time |
+| `modelLoadMs` | absent | **2736** | loaded in 2.7 s |
+| `estimatedPeakBytes` | absent | 1.93 GB (vs 4.25 GB free) | **not** an out-of-memory problem |
+| `performance` | `[]` | `[]` | still **zero completed generations** |
+| `accessibilityConnected` | false | **true** | newly enabled |
+| `toolProposalsEnabled` | false | **true** | newly enabled |
+
+A successful load plus zero completions rules out OOM, a load failure, and a native-library
+problem. The failure is therefore *between* a healthy loaded model and the first token.
+
+## Root cause — a regression introduced in Phase 2A (`c150eb0`)
+
+`SettingsSessionPolicy.maxNewTokensCeiling` returned `min(4096, configured, runtime)`. With the
+runtime context at 4096 the quick sheet allowed **Reply length = 4096 = the entire context**.
+
+`prepareConversation` enforces:
+
+```
+promptTokens + maxNewTokens <= contextSize
+```
+
+With `maxNewTokens == contextSize` that requires `promptTokens <= 0` — unsatisfiable. The trim loop
+strips every message and then throws. The user sees an empty bubble and no reply, and no metrics
+are ever recorded, which is exactly `performance: []` in both exports.
+
+Enabling **tool proposals** makes this far easier to hit: it prepends a ~1100-character
+(~300-token) instruction to every request, growing the prompt side precisely when the reply budget
+is permitted to claim the whole window.
+
+The ceiling now reserves half the context for the prompt, with a regression test asserting the
+ceiling is strictly less than the context for every supported size.
+
+## Other fixes in `03de2f5`
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Keyboard flicker over the status bar | The activity declared **no** `windowSoftInputMode`, so the system default fought the edge-to-edge Compose insets — the layout jumped, overlapped, then settled | Declared `adjustResize`; added `configChanges` so a keyboard/rotation change cannot recreate the activity mid-generation |
+| Heat / latency | `isCancelled()` performed a **JNI upcall on every decode step** | Polled every 8 tokens and latched once set |
+| No evidence for silent failures | Nothing recorded *why* an attempt produced no tokens | `RuntimeDiagnostics.lastGenerationFailure` + `emptyGenerationCount` (short, LAI-authored strings — never prompts or model output) |
+
+## Honest note on heat
+
+Items above remove wasted work (an impossible configuration retried on every send, plus a JNI
+round-trip per token) on top of the thread reduction in `e4ad398`. But **sustained CPU inference on
+a 1.5B model will always warm this device.** A genuine solution is the closed-loop thermal governor
+already on the roadmap — throttling thread count and decode rate as temperature climbs, rather than
+only refusing at `SEVERE`.
+
 ## Still unresolved — for the next device run
 
 **Why the generation produced zero tokens, and why the model was unloaded.** Two candidates, not
@@ -74,7 +134,14 @@ Fix 2 makes both cases recoverable and visible, but the underlying cause needs c
 3. Note whether the assistant bubble stays empty or shows an "Inference failed: …" message — with
    fix 3 in place, a failure now surfaces text instead of a blank bubble.
 
-## Retest checklist for `e4ad398`
+## Retest checklist for `03de2f5` (build `0.6.82`)
+
+- [ ] Chat **replies** — the primary fix. Try it with tool proposals both on and off.
+- [ ] Open the ⚙ sheet: **Reply length** can no longer be dragged to the full context.
+- [ ] Tapping the text box no longer flashes the UI over the status bar.
+- [ ] If a reply still fails, export diagnostics — `lastGenerationFailure` now states the reason.
+
+## Earlier checklist for `e4ad398`
 
 - [ ] Sustained chat no longer heats the device to the same degree.
 - [ ] **Stop** always returns to a usable chat within ~4 s, worst case with an explicit
