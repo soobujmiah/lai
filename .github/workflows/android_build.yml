@@ -54,7 +54,7 @@ jobs:
           java-version: '17'
 
       - name: Set up Android command-line tools
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install remote Android toolchain
         shell: bash
