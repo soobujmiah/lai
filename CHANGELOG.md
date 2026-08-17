@@ -4,6 +4,10 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Rolling Context Window — `keepLastTurns` is now real
+
+- `ContextWindowPolicy` (`core:policy`, pure JVM, 6 tests incl. Bangla content): keeps the last N completed turns plus the in-flight request, dropping oldest turns from the front so the kept history always starts at a USER message. Applied in `prepareConversation` before token counting; the quick-settings "conversation memory" slider now actually bounds the prompt. Reported honestly as `windowedConversationTurns` in state and diagnostics (default 0), distinct from token-overflow `trimmedConversationTurns`. Interaction with KV-prefix reuse documented: stable prefix (maximal reuse) under the window; bounded re-prefill once it slides.
+
 ### KV-cache prefix reuse — flat TTFT across a conversation
 
 - `LlamaCpuSession` now tracks the exact token sequence resident in the KV cache (`kv_tokens_`, updated strictly after each successful `llama_decode`). Each request reuses the longest common prefix between the cache and the new templated prompt, removes only the divergent tail via `llama_memory_seq_rm`, and prefills only the suffix — turn-N TTFT becomes proportional to the new turn, not the whole history (device data showed 6.2 s → 17.0 s growth over six turns at ~28 tok/s prefill). At least one prompt token is always re-decoded for fresh sampler logits; any exception invalidates the cache wholesale so a failed decode can never leave stale bookkeeping.

@@ -4,7 +4,7 @@ Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime`
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
 Latest release: **`v0.9.1`** (`6206199`) — **green, production-signed, device-validated** (chat replies + IME close animation)
-Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **147** unit tests
+Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **153** unit tests
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
 

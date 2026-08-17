@@ -51,6 +51,8 @@ data class RuntimeDiagnostics(
     val accessibilityConnected: Boolean,
     val shizukuState: String,
     val trimmedConversationTurns: Int,
+    /** Completed turns dropped by the user's rolling context window this request. Default = none. */
+    val windowedConversationTurns: Int = 0,
     /**
      * Why the most recent generation attempt ended without producing tokens, if it did.
      *

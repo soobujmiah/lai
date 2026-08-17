@@ -12,6 +12,7 @@ import dev.lai.runtime.LaiApplication
 import dev.lai.runtime.agent.ToolCall
 import dev.lai.runtime.agent.ToolCallParseResult
 import dev.lai.runtime.agent.ToolInstructionGate
+import dev.lai.runtime.settings.ContextWindowPolicy
 import dev.lai.runtime.agent.ToolProposalCounters
 import dev.lai.runtime.agent.ToolRisk
 import dev.lai.runtime.audit.ToolAuditOutcome
@@ -115,6 +116,8 @@ private data class ScheduledLoad(
 private data class PreparedConversation(
     val messages: List<ConversationMessage>,
     val trimmedTurns: Int,
+    /** Completed turns dropped by the user's rolling context window (not overflow trims). */
+    val windowedTurns: Int,
 )
 
 private fun environmentSummary(environment: RuntimeEnvironment): String {
@@ -158,6 +161,7 @@ data class MainUiState(
     val lastGenerationMetrics: GenerationMetrics? = null,
     val performanceHistory: List<GenerationMetrics> = emptyList(),
     val trimmedConversationTurns: Int = 0,
+    val windowedConversationTurns: Int = 0,
     val diagnosticsStatus: String = "No diagnostics exported",
     val toolProposalsEnabled: Boolean = false,
     val pendingToolProposal: PendingToolProposal? = null,
@@ -462,16 +466,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Consume any armed "Apply once" override here, so it spends itself on exactly one reply.
-        val requestConfig = generationConfig(workspace.consumeForRequest())
+        val requestSettings = workspace.consumeForRequest()
+        val requestConfig = generationConfig(requestSettings)
         // Three device reports produced "no reply" with no indication of WHERE it stalled.
         // This records the last stage reached so a diagnostics export names the blocking call
         // (token counting, waiting for the first token, or mid-stream) instead of guessing.
         generationStage = GenerationStage.COUNTING_TOKENS
         generationJob = viewModelScope.launch {
             try {
-                val prepared = prepareConversation(requestConfig)
+                val prepared = prepareConversation(requestConfig, requestSettings.context.keepLastTurns)
                 generationStage = GenerationStage.AWAITING_FIRST_TOKEN
-                _state.update { it.copy(trimmedConversationTurns = prepared.trimmedTurns) }
+                _state.update {
+                    it.copy(
+                        trimmedConversationTurns = prepared.trimmedTurns,
+                        windowedConversationTurns = prepared.windowedTurns,
+                    )
+                }
                 container.inferenceEngine.generate(prepared.messages, requestConfig).collect { event ->
                     when (event) {
                         is InferenceEvent.Token -> {
@@ -754,13 +764,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 messages = it.messages.take(1),
                 trimmedConversationTurns = 0,
+                windowedConversationTurns = 0,
                 lastGenerationMetrics = null,
                 notice = "Conversation cleared locally",
             )
         }
     }
 
-    private suspend fun prepareConversation(config: GenerationConfig): PreparedConversation {
+    private suspend fun prepareConversation(config: GenerationConfig, keepLastTurns: Int): PreparedConversation {
         val current = state.value
         // Prefill is the dominant pre-first-token cost on the 4-thread CPU path, and the tool
         // instruction is its single biggest line item. It is only prepended when the latest user
@@ -770,18 +781,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val latestUserText = current.messages.lastOrNull { it.fromUser && it.contextEligible }?.text.orEmpty()
         val includeToolInstruction = current.toolProposalsEnabled &&
             ToolInstructionGate.shouldIncludeInstruction(latestUserText)
+        // The user's rolling context window (⚙ "conversation memory") is applied to the history
+        // BEFORE token counting: it is a deliberate bound the user chose, distinct from the
+        // token-overflow trimming below, and both are reported separately in diagnostics.
+        val history = current.messages
+            .filter { it.contextEligible && it.text.isNotBlank() }
+            .map {
+                ConversationMessage(
+                    role = if (it.fromUser) ConversationRole.USER else ConversationRole.ASSISTANT,
+                    content = it.text,
+                )
+            }
+        val windowed = ContextWindowPolicy.applyTurnWindow(history, keepLastTurns)
         val all = buildList {
             if (includeToolInstruction) {
                 add(ConversationMessage(ConversationRole.SYSTEM, container.agentRuntime.modelToolInstruction))
             }
-            current.messages
-                .filter { it.contextEligible && it.text.isNotBlank() }
-                .mapTo(this) {
-                    ConversationMessage(
-                        role = if (it.fromUser) ConversationRole.USER else ConversationRole.ASSISTANT,
-                        content = it.text,
-                    )
-                }
+            addAll(windowed.messages)
         }.toMutableList()
         val protectedPrefix = if (includeToolInstruction) 1 else 0
         require(all.size > protectedPrefix) { "Conversation is empty" }
@@ -789,7 +805,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         while (true) {
             val tokenCount = container.inferenceEngine.countTokens(all).getOrThrow()
             if (tokenCount + config.maxNewTokens <= container.inferenceEngine.contextSize) {
-                return PreparedConversation(all.toList(), trimmed)
+                return PreparedConversation(all.toList(), trimmed, windowed.droppedTurns)
             }
             if (all.size <= protectedPrefix + 1) error("Current message is too large for the model context")
             all.removeAt(protectedPrefix)
@@ -1242,6 +1258,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 accessibilityConnected = current.accessibilityConnected,
                 shizukuState = shizuku,
                 trimmedConversationTurns = current.trimmedConversationTurns,
+                windowedConversationTurns = current.windowedConversationTurns,
                 lastGenerationFailure = current.lastGenerationFailure,
                 emptyGenerationCount = current.emptyGenerationCount,
             ),
