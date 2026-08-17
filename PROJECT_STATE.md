@@ -4,7 +4,7 @@ Snapshot date: 2026-08-17 (in-flight: coordinated dependency upgrade)
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime` · Public repo
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
 Latest release: **`v0.9.7`** (`5921f1b`) — **green, production-signed** · Releases `v0.9.0`–`v0.9.7` all carry signed APKs
-Graph: **16 Gradle modules** · Source footprint ~0.9 MB (limit 128 MB) · **169 unit tests** · WorkManager 2.10.1 · Actions majors current (checkout v7, upload-artifact v7, setup-java v5, setup-android v4, gradle/actions v6) · **Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10 in-flight (this commit, awaiting CI)**
+Graph: **16 Gradle modules** · Source footprint ~0.9 MB (limit 128 MB) · **169 unit tests** · WorkManager 2.10.1 · Actions majors current (checkout v7, upload-artifact v7, setup-java v5, setup-android v4, gradle/actions v6) · **Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10 ✅ verified (run 32018545745 green)**
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
 
@@ -60,11 +60,11 @@ Graph: **16 Gradle modules** · Source footprint ~0.9 MB (limit 128 MB) · **169
 |---|---|---|
 | Source policy | Ready | 128 MB cap; no binaries/models/SDKs/keystores; history scanned clean |
 | Architecture policy | Ready | Network only in `platform:download`; audit bytes only in `platform:audit`; module direction enforced |
-| Android build | **In-flight** | JDK 17, API 35, NDK 27, CMake, **Gradle 9.5.0 → AGP 9.3.1**, pinned llama.cpp; tests + lint + APK; action majors current · **This commit merges #4/#9/#10/#11; CI is gate** |
+| Android build | **Verified (124)** | JDK 17, **API 36**, NDK 27, CMake, **Gradle 9.5.0 + AGP 9.3.1**, pinned llama.cpp; tests + lint + APK; action majors current · **Run 32018545745 green after kotlinOptions removal + SDK 36 bump** |
 | Tests / coverage | Ready | 169 tests incl. `platform:history`; JaCoCo ratchets (contracts .15 / policy .55 / scheduler .70 / model .50 / plugins .50) |
 | **Releases** | **Production-signed** | Tag-triggered; `v0.9.0`–`v0.9.7` signed with the permanent `lai-release` RSA-4096 key (V1–V4), cert SHA-256 `80:03:8D:3E…7E:8E`, verified against published assets |
 | Signing key custody | Done | PKCS12 in Actions secrets (`ANDROID_KEYSTORE_*`) + owner's offline copy — **never in the repo** |
-| Dependabot | **In-flight** | 5 action bumps merged; **#4/#9/#10/#11 merged in this coordinated upgrade** (androidx `2026.08.00`/`1.19.0`/`1.13.0`, okhttp `5.4.0`, AGP `9.3.1`, Kotlin `2.4.10`/coroutines `1.11.0`/serialization `1.11.0`) + `GRADLE_VERSION 9.5.0`; awaiting CI green before closing |
+| Dependabot | **Partially merged** | 5 action bumps merged; **#9 (okhttp 5.4.0), #10 (AGP 9.3.1), #11 (Kotlin 2.4.10 + coroutines 1.11.0 + serialization 1.11.0) merged ✅**; **#4 deferred** (androidx 2026.08.00/1.19.0 requires API 37 not yet on CI — stays 2025.05.01/1.16.0/1.10.1) + `GRADLE_VERSION 9.5.0` |
 | Production supply chain | Partial | Still pending: SBOM, provenance, reproducible builds |
 
 ### 1.5 Product surfaces (UI)
@@ -239,9 +239,9 @@ ModelDownloadCoordinator { enqueue(spec) / stop(id) / observe(id) / observeAll()
 
 The single biggest unbuilt feature. Requires the owner's dataset/licence decision (see `docs/BANGLA_OCR.md`). Once decided: integrate the model behind the existing `OcrEngine` contract → structured `OcrResult` JSON feeds the LLM runtime → wire `ocr.current_screen` end-to-end with redaction.
 
-### Priority 3 — Coordinated dependency upgrade session ✅ Pushed this session (awaiting CI)
+### Priority 3 — Coordinated dependency upgrade session ✅ Verified green (run 32018545745)
 
-Merged in one commit: `GRADLE_VERSION 9.5.0` (workflow) + AGP `9.3.1` + Kotlin `2.4.10` / coroutines `1.11.0` / serialization `1.11.0` + androidx `2026.08.00`/`1.19.0`/`1.13.0` + okhttp `5.4.0`. CI is the only compile gate — watch `Android build` on `main`; on green, close #4/#9/#10/#11 with a comment linking the run.
+Merged across 5 commits: `GRADLE_VERSION 9.5.0` + AGP `9.3.1` (removed `kotlin.android` + `kotlinOptions` per AGP 9.3 built-in Kotlin) + Kotlin `2.4.10`/coroutines `1.11.0`/serialization `1.11.0` + okhttp `5.4.0` (+ compileSdk 36 for okhttp, deferred androidx #4). Close #9/#10/#11.
 
 ### Then, in order
 
