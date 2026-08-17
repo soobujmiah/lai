@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace = "dev.lai.runtime.platform.shizuku"
-    compileSdk = 37
+    compileSdk = 35
     defaultConfig {
         minSdk = 28
         consumerProguardFiles("consumer-rules.pro")

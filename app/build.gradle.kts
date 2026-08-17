@@ -17,12 +17,12 @@ val hasReleaseSigning = listOf(
 
 android {
     namespace = "dev.lai.runtime"
-    compileSdk = 37
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "dev.lai.runtime"
         minSdk = 28
-        targetSdk = 37
+        targetSdk = 35
         versionCode = (providers.gradleProperty("lai.versionCode").orNull ?: "1").toInt()
         versionName = providers.gradleProperty("lai.versionName").orNull ?: "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
