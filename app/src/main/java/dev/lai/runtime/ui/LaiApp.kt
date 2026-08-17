@@ -437,6 +437,7 @@ private fun AutomatorScreen(state: MainUiState, viewModel: MainViewModel) {
             OutlinedButton(onClick = viewModel::requestShizuku) { Text(stringResource(R.string.connect_shizuku)) }
         }
         StatusCard(stringResource(R.string.safety_title), stringResource(R.string.safety_body))
+        ToolsDashboard(state, viewModel)
     }
 }
 

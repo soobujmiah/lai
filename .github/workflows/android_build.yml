@@ -135,6 +135,15 @@ jobs:
         run: |
           find app runtime -type f \( -name '*.apk' -o -name 'liblai_runtime.so' \) -print 2>/dev/null || true
 
+      - name: Generate dependency SBOM (lightweight)
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p app/build/sbom
+          gradle --no-daemon :app:dependencies --configuration releaseRuntimeClasspath > app/build/sbom/sbom-releaseRuntimeClasspath.txt || echo "sbom generation skipped"
+          gradle --no-daemon dependencies > app/build/sbom/sbom-all.txt || true
+          ls -lh app/build/sbom/ 2>/dev/null || true
+
       - name: Upload debug APK
         if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
         uses: actions/upload-artifact@v7
@@ -152,6 +161,15 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-${{ github.run_number }}
+          path: app/build/sbom/sbom*.txt
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload lint report
         if: always()
