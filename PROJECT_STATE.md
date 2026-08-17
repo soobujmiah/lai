@@ -10,7 +10,7 @@ Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **
 
 **Status vocabulary.** **Implemented** = source exists · **Build verified** = CI compiles/tests it · **Device validated** = named behaviour observed on physical hardware · **Scaffold** = compiling boundary with honest unavailable behaviour · **Pending/Planned** = not built.
 
-> ⚠️ **Read this first.** The app **builds, installs, loads a model, and is CI-green — but has never produced a chat reply on the device.** Four field reports (`0.6.78` → `0.6.84`) all show `performance: []`. Nothing below should be read as "chat works". See §1.1 and §4.
+> ✅ **P0 closed 2026-08-17.** Build `0.9.0` (signed) produced **6 completed generations on the device** in English and Bangla — the first replies in project history. Root cause confirmed: prefill runs at ~25–31 tok/s, so the old ~407-token prompt needed ~14 s and the former 4 s watchdog killed every healthy generation. Evidence in §4.
 
 ---
 
@@ -21,10 +21,10 @@ Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **
 | Area | Status | Result | Remaining |
 |---|---|---|---|
 | Inference contract | Build verified | `InferenceEngine`, opaque `BackendId`/`BackendDescriptor`, streaming events, metrics | — |
-| llama.cpp CPU adapter | **Device validated for LOAD only** | arm64 JNI/C++, pinned llama.cpp, mmap GGUF, model chat template, cancel, metrics. **Load: 2.6–2.7 s measured.** | ❗ **No successful generation on device yet** |
+| llama.cpp CPU adapter | **Device validated (load + generation)** | arm64 JNI/C++, pinned llama.cpp, mmap GGUF, model chat template, cancel, metrics. Load **721 ms**; decode **15–19 tok/s**; prefill **25–31 tok/s** (0.9.0, six generations) | KV-prefix reuse: TTFT grows linearly with history (6.2 s → 17 s by turn 6) because every generate re-prefills the whole conversation |
 | Reviewed model | Device validated (load) | Qwen 2.5 1.5B Instruct Q4_K_M, exact 1,117,320,736 bytes + SHA-256 | Bangla quality pack |
 | Backend scheduler | Device validated (CPU) | Compatibility, memory preflight (1.93 GB est. peak), battery/thermal admission, evidence-based selection | Closed-loop throttling |
-| Token streaming | Build verified | `trySendBlocking` + `buffer(256)` — backpressure, no dropped tokens | Verify on device |
+| Token streaming | **Device validated** | `trySendBlocking` + `buffer(256)` — six streamed replies observed (0.9.0) | — |
 | Thermal admission | Build verified | Refuses new generation at `SEVERE`+ | **Reactive only**; no closed-loop governor |
 | CPU thread policy | Build verified | Half the cores (2–4) for decode *and* batch | Device heat retest |
 | Vulkan backend | Planned | `llama-vulkan` descriptor reserved | Compile ggml Vulkan, Adreno qualification |
@@ -82,8 +82,8 @@ Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **
 | Area | Status | Result | Remaining |
 |---|---|---|---|
 | Compose three-mode shell | Device validated | Chat, Screen Reader, Automator; Developer Mode hidden | — |
-| Chat | ❗ **Broken on device** | Streaming, Stop, New chat, metrics wired | **Never produced a reply** |
-| Keyboard/IME insets | Build verified; **device pending** | `imePadding()` on Scaffold; IME excluded from `contentWindowInsets`; mode bar hides while typing | Confirm after 3 failed attempts |
+| Chat | **Device validated (0.9.0)** | Six replies, en + bn, streaming and metrics captured | Bangla output quality is weak (base-model limitation) — Bangla quality pack |
+| Keyboard/IME insets | Device validated, one fix in flight | Composer sits above keyboard (0.9.0 ✓). New: mode-bar visibility now keys on `imeAnimationTarget` so closing the keyboard no longer shoves the bar off-screen for a frame | Device-verify the close animation |
 | High refresh rate | Build verified; **device pending** | Highest display mode requested at current resolution (90/120 Hz) | Confirm |
 | List performance | Build verified | Stable `ChatMessage.id` keys; only changed bubble recomposes; auto-scroll | Confirm |
 | Settings back navigation | Device validated | Back arrow + `BackHandler` | — |
@@ -231,43 +231,40 @@ class SettingsSessionPolicy {
 
 ## 4. Next Logical Implementation Phase
 
-### 🔴 Priority 0 — Make chat reply. Nothing else matters until this passes.
+### ✅ Priority 0 CLOSED — chat replies on device (0.9.0, 2026-08-17)
 
-Four device reports, zero replies. **Do not add features until a reply is observed.**
+Six completed generations exported from the Redmi Turbo 4 Pro, English and Bangla, thermal `NOMINAL` throughout:
 
-**Current hypothesis (untested):** the 4 s cancel watchdog was aborting healthy prompt prefill. A "hi" becomes ~407 prompt tokens (≈90 bilingual system prompt + ≈314 tool instruction when proposals are on), which needs **7–27 s** at a realistic 15–60 tok/s on 4 CPU threads. `CANCEL_GRACE_MS` is now **45 s** in `0.6.85`.
+| Turn | Prompt tokens | TTFT | Prefill tok/s | Decode tok/s |
+|---|---|---|---|---|
+| 1 ("hi") | 159 | 6.2 s | 25.6 | 17.6 |
+| 4 | 268 | 9.6 s | 28.1 | 15.7 |
+| 6 | 470 | 17.0 s | 27.6 | 15.7 |
 
-**Done this session (build pending CI):**
+**Root cause, confirmed by measurement:** prefill runs at ~25–31 tok/s, so the pre-fix ~407-token prompt needed ~14 s — the former 4 s cancel watchdog aborted every healthy generation. The 45 s grace + the prefill cut (`ToolInstructionGate` kept "hi" at 159 tokens; all 6 proposal examinations correctly `NOT_TOOL_CALL`) fixed it. Model load also improved to **721 ms**. `productionSigned: true` — validated on the signed release.
 
-- **Prefill cut shipped.** `ToolInstructionGate` (`core:policy`, pure JVM, 4 tests) now includes the tool instruction only when the latest user message plausibly requests an Android action (English word-boundary regex + Bangla verb stems). A plain "hi" carries **zero** tool tokens even with proposals enabled. `modelInstruction` itself was also compressed to roughly half its former token count with all schemas intact. Expected 2–4× faster first token on non-action messages.
-- **Native stall tracing shipped.** `llama_cpu_backend.cpp` now logs µs timings to `LAI-llama`: mutex-acquisition wait (both `count_tokens` and `generate` — the suspected `COUNTING_TOKENS` stall), template chars, tokenize count, per-chunk prefill progress, prefill tok/s, first-token latency, total. Capture with `adb logcat -s LAI-llama` during the next failure.
+### 🔴 New Priority 0 — TTFT grows linearly with conversation length
 
-**Next session must, in order:**
+Every `generate()` calls `llama_memory_clear` and re-prefills the **entire** conversation: TTFT went 6.2 s → 17.0 s in six turns and will pass 60 s within a long chat. Fix: reuse the KV cache for the unchanged conversation prefix (track the previously prefilled token sequence; only decode the suffix after the longest common prefix; clear only on New chat / model reload / trim). This is the single largest remaining UX cost in chat.
 
-1. **Get the device result for the new build.** Send "hi", wait ~30 s. Watchdog fix (45 s) + prefill cut are now both in; if `performance[]` gains an entry, P0 closes.
-2. **If it still fails,** read `lastGenerationFailure` (names the stage) **and** capture `adb logcat -s LAI-llama` — the trace now shows exactly which native call stalls and for how long:
-   - `COUNTING_TOKENS` → look for a large "lock acquired after" value: the shared `generation_mutex_`.
-   - `AWAITING_FIRST_TOKEN` → per-chunk prefill lines show whether prefill progresses slowly or stops dead.
-   - `STREAMING` → the channel/collector path.
-3. **Add a closed-loop thermal governor** once a reply is observed (Priority 2 below).
+### Priority 1 — IME close animation fix (in this commit) needs device verify
 
-### Priority 1 — Confirm the `0.6.85` UI fixes on device
-
-Composer above the keyboard · no status-bar overlap · 90/120 Hz smoothness · no jank while streaming. All are build-verified but **device-pending after three failed IME attempts** — verify before trusting.
+The mode bar now keys its visibility on `WindowInsets.imeAnimationTarget` instead of the current inset, so closing the keyboard restores the bar at animation start (riding down smoothly) instead of popping it in at the end and shoving the layout ("navigation tab pushed off screen, then comes back" — 0.9.0 field report). Verify: open keyboard, close it, watch the bottom bar.
 
 ### Priority 2 — Closed-loop thermal governor
 
-Current thermal handling only *refuses* at `SEVERE`. Needed: Android thermal callbacks, dynamic thread/batch reduction, cooldown hysteresis, and a visible reason in the UI. This — not NPU — is the realistic answer to device heating.
+Current thermal handling only *refuses* at `SEVERE`. Needed: Android thermal callbacks, dynamic thread/batch reduction, cooldown hysteresis, and a visible reason in the UI. (Note: the 0.9.0 run stayed `NOMINAL` at 99% battery while charging — heat may already be acceptable after the thread-policy fix; re-measure during a long chat before building this.)
 
 ### Then, in order
 
-1. **Phase 2A device acceptance** — SAF grant/revoke, settings persist across restart, malformed `settings.json` falls back, scan registers without loading.
-2. **Model Center + WorkManager downloader** — pause/resume/cancel surviving app exit.
-3. **Rolling Context Window** — `keepLastTurns` is typed and user-editable but does nothing yet.
-4. **Printed Bangla OCR CPU baseline** — ⚠️ blocked on *your* dataset/licence decision.
-5. **Vulkan qualification** (no licence needed, GGUF works directly) — evaluate before QNN.
-6. **QNN/HTP NPU** — requires licensed QAIRT in CI **and** model conversion; GGUF cannot run on the NPU. Furthest out.
-7. Production supply chain: permanent signing key, SBOM, provenance.
+1. **Bangla output quality** — replies are fluent in English but partly incoherent in Bangla (Qwen 2.5 1.5B base limitation). Options: Bangla-tuned system prompt, a reviewed Bangla-stronger small model in the catalog, or a quality pack. Decide before investing in OCR→LLM flows.
+2. **Phase 2A device acceptance** — SAF grant/revoke, settings persist across restart, malformed `settings.json` falls back, scan registers without loading.
+3. **Model Center + WorkManager downloader** — pause/resume/cancel surviving app exit.
+4. **Rolling Context Window** — `keepLastTurns` is typed and user-editable but does nothing yet; pairs naturally with the KV-prefix work.
+5. **Printed Bangla OCR CPU baseline** — ⚠️ blocked on the dataset/licence decision.
+6. **Vulkan qualification** (no licence needed, GGUF works directly) — evaluate before QNN.
+7. **QNN/HTP NPU** — requires licensed QAIRT in CI **and** model conversion. Furthest out.
+8. Production supply chain: ✅ permanent signing key (v0.9.0); still pending SBOM, provenance, reproducible builds.
 
 ### Process notes for the next session
 

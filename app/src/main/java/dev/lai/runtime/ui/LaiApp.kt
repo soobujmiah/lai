@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.height
@@ -57,6 +57,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -75,7 +76,18 @@ fun LaiApp(viewModel: MainViewModel) {
     // Hardware/gesture back must leave Settings as well; otherwise back exits the whole app from
     // a screen the user thinks of as "inside" something.
     BackHandler(enabled = state.settingsVisible) { viewModel.toggleSettings() }
-    val imeVisible = WindowInsets.isImeVisible
+    // Mode-bar visibility must follow where the IME is GOING, not where it currently is.
+    //
+    // Field report (0.9.0): with WindowInsets.isImeVisible (the *current* inset), the bar only
+    // reappeared at the very END of the keyboard's close animation — the composer had already
+    // slid to the screen bottom, then the bar popped in underneath and shoved the whole layout
+    // for a frame ("navigation tab pushed off screen, then comes back").
+    //
+    // imeAnimationTarget flips at the START of the animation in both directions: opening hides
+    // the bar immediately (the keyboard covers its space anyway), closing restores it immediately
+    // so it rides down smoothly with the shrinking imePadding() instead of popping in at the end.
+    // When no animation is running it equals the current inset, so steady-state is unchanged.
+    val imeVisible = WindowInsets.imeAnimationTarget.getBottom(LocalDensity.current) > 0
     Scaffold(
         // Keyboard handling, arrived at over three device reports:
         //  - imePadding() on the Scaffold lifts the ENTIRE scaffold (content + bottom bar) above the

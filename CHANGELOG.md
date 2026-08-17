@@ -4,6 +4,14 @@ All notable changes are documented here. The project follows semantic versioning
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bottom mode bar shoved off-screen when the keyboard closes** (0.9.0 field report): bar visibility was keyed on `WindowInsets.isImeVisible`, the *current* IME inset, which only reaches zero at the very end of the close animation — the composer had already slid to the bottom, then the bar popped in and displaced the layout for a frame. Visibility now keys on `WindowInsets.imeAnimationTarget`, which flips at animation start in both directions, so the bar rides the animation smoothly. Steady-state behaviour is unchanged.
+
+### Device milestone — first chat replies ever (v0.9.0, 2026-08-17)
+
+- Six completed generations on the Redmi Turbo 4 Pro, English and Bangla, on the production-signed `v0.9.0` build: prefill 25–31 tok/s, decode 15–19 tok/s, model load 721 ms, thermal `NOMINAL`. Root cause of the five failed reports confirmed: prefill genuinely needs ~14 s for a ~407-token prompt, so the former 4 s cancel watchdog aborted every healthy generation. `ToolInstructionGate` held "hi" to 159 prompt tokens and all six proposal examinations were correctly `NOT_TOOL_CALL`. New top priority: TTFT grows linearly with history (6.2 s → 17.0 s in six turns) because each generate re-prefills the whole conversation — KV-prefix reuse is next.
+
 ### Prefill cost cut + native stall tracing (P0: chat has never replied on device)
 
 - **First production-signed release `v0.9.0`** (run 88, green): a permanent `lai-release` RSA-4096 PKCS12 keystore was generated, stored only in GitHub Actions secrets (`ANDROID_KEYSTORE_BASE64/_PASSWORD`, `ANDROID_KEY_ALIAS/_PASSWORD`) and in the owner's offline copy. The published `app-release.apk` (8.6 MB, minified + shrunk, V1–V4 signed) was downloaded and its certificate verified byte-for-byte against the keystore (SHA-256 `80:03:8D:3E…7E:8E`). No keystore byte is tracked in the repository.
