@@ -3,7 +3,7 @@
 Snapshot date: 2026-08-17
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime`
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
-Latest CI: run [`31987089883`](https://github.com/soobujmiah/lai/actions/runs/31987089883) → **release `0.9.0`** (`ae2ebd8`, tag `v0.9.0`) — **green, production-signed**
+Latest release: **`v0.9.1`** (`6206199`) — **green, production-signed, device-validated** (chat replies + IME close animation)
 Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **146** unit tests
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
@@ -83,7 +83,7 @@ Graph: **15 Gradle modules** · Source footprint **823 KB** (limit 128 MB) · **
 |---|---|---|---|
 | Compose three-mode shell | Device validated | Chat, Screen Reader, Automator; Developer Mode hidden | — |
 | Chat | **Device validated (0.9.0)** | Six replies, en + bn, streaming and metrics captured | Bangla output quality is weak (base-model limitation) — Bangla quality pack |
-| Keyboard/IME insets | Device validated, one fix in flight | Composer sits above keyboard (0.9.0 ✓). New: mode-bar visibility now keys on `imeAnimationTarget` so closing the keyboard no longer shoves the bar off-screen for a frame | Device-verify the close animation |
+| Keyboard/IME insets | **Device validated (0.9.1)** | Composer above keyboard; mode bar keyed on `imeAnimationTarget` — close animation confirmed smooth on device, no layout displacement | — |
 | High refresh rate | Build verified; **device pending** | Highest display mode requested at current resolution (90/120 Hz) | Confirm |
 | List performance | Build verified | Stable `ChatMessage.id` keys; only changed bubble recomposes; auto-scroll | Confirm |
 | Settings back navigation | Device validated | Back arrow + `BackHandler` | — |
@@ -247,9 +247,9 @@ Six completed generations exported from the Redmi Turbo 4 Pro, English and Bangl
 
 Every `generate()` calls `llama_memory_clear` and re-prefills the **entire** conversation: TTFT went 6.2 s → 17.0 s in six turns and will pass 60 s within a long chat. Fix: reuse the KV cache for the unchanged conversation prefix (track the previously prefilled token sequence; only decode the suffix after the longest common prefix; clear only on New chat / model reload / trim). This is the single largest remaining UX cost in chat.
 
-### Priority 1 — IME close animation fix (in this commit) needs device verify
+### ✅ Priority 1 CLOSED — IME close animation device-validated (0.9.1)
 
-The mode bar now keys its visibility on `WindowInsets.imeAnimationTarget` instead of the current inset, so closing the keyboard restores the bar at animation start (riding down smoothly) instead of popping it in at the end and shoving the layout ("navigation tab pushed off screen, then comes back" — 0.9.0 field report). Verify: open keyboard, close it, watch the bottom bar.
+User confirmed on device: keyboard close is smooth, no bar displacement. `imeAnimationTarget` keying is the pattern to keep — never gate bottom-bar visibility on the current IME inset.
 
 ### Priority 2 — Closed-loop thermal governor
 
