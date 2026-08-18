@@ -73,19 +73,6 @@ android {
     }
     // AGP 9.3 provides Kotlin via its built-in integration; kotlinOptions is removed.
     // JVM target is inferred from compileOptions (17) and the bundled Kotlin toolchain.
-    // Prebundled models: if a local `model/` or `models/` folder contains *.gguf at build time,
-    // bundle them into assets/models/ so a signed APK can ship with the model offline.
-    // The folder is gitignored (*.gguf forbidden in repo) — CI bundles only when you put the
-    // file there before dispatch. Empty folder = no bundle, no size impact.
-    sourceSets {
-        getByName("main") {
-            assets.srcDirs(
-                "src/main/assets",
-                "${rootProject.projectDir}/model",
-                "${rootProject.projectDir}/models",
-            )
-        }
-    }
     packaging {
         resources.excludes += setOf(
             "META-INF/AL2.0",

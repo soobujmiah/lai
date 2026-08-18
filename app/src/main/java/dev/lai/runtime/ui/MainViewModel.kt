@@ -284,10 +284,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         loadToolAudit()
-        importBundledModels()
         refreshModels()
         loadCachedCatalog()
         refreshWorkspace()
+        autoImportWorkspaceModels()
     }
 
     // ---------------------------------------------------------------------------------------
@@ -417,12 +417,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun importBundledModels() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                dev.lai.runtime.inference.BundledModelImporter.importIfNeeded(getApplication())
-                refreshModels()
-            } catch (_: Exception) { }
+    private fun autoImportWorkspaceModels() {
+        viewModelScope.launch {
+            // Give workspace refresh a moment to load persisted grant, then auto-scan
+            // storage/LAI/models so a signed `install -r` immediately shows the workspace model.
+            kotlinx.coroutines.delay(1200)
+            val granted = workspace.state.first().granted
+            if (granted) scanWorkspaceModels()
         }
     }
 

@@ -1,42 +1,22 @@
-# Model prebundle folder — signed APK with offline model
+# Workspace model folder — `storage/LAI/models`
 
-This folder is **local-only and never committed** (`*.gguf` is gitignored and `validate_repo.sh` forbids it).
+This repo stays **source-only (<128 MB)** — `*.gguf` is gitignored.
 
-**How to build a signed APK that already contains the model (no import after install):**
+Put your GGUF **in your phone's workspace, not in this repo:**
 
-1. Put your reviewed GGUF here **on your machine or in CI** (do NOT `git add` it):
-   ```
-   model/qwen2.5-1.5b-instruct-q4-k-m.gguf   # exact 1,117,320,736 bytes + SHA-256
-   # or any GGUF you want prebundled — name must match an entry in catalog/models-v1.json
-   # or will be imported as `local-` model.
-   ```
-
-2. Build signed APK **without creating a Release**:
-   * **On GitHub:** Actions → Android build → **Run workflow** → `build_type: release`
-     * The workflow checks this folder at build time and bundles everything from `model/` + `models/` into `assets/models/`.
-     * Artifact is `lai-release-*.apk` (production key `lai-release`, `install -r` keeps data).
-   * **Locally** (if you have the model here):
-     ```sh
-     ./gradlew :app:assembleRelease -Plai.versionCode=130 -Plai.versionName=0.6.130
-     ```
-
-3. Install as **update** (no uninstall, no data loss):
-   ```sh
-   adb install -r app/build/outputs/apk/release/app-release.apk
-   ```
-   On first launch LAI copies `assets/models/*.gguf` → `noBackupFilesDir/models/` and registers it — the model appears as **Installed** immediately.
-
-**Why this is source-only safe:**
-* `*.gguf` stays gitignored → `scripts/validate_repo.sh` still PASS, repo stays <128 MB.
-* The APK is built **only on CI** (or your machine) from a local `model/` — the Git repo never contains the 1.1 GB blob.
-* If `model/` is empty, the APK is tiny and model is downloaded/imported normally — no behavior change.
-
-**CI note:** You can also trigger a signed prebundled build via API:
-```sh
-curl -X POST -H "Authorization: token $PAT" \
-  https://api.github.com/repos/soobujmiah/lai/actions/workflows/android_build.yml/dispatches \
-  -d '{"ref":"main","inputs":{"build_type":"release"}}'
 ```
-Put the GGUF in `model/` **before** that dispatch (e.g., via a prior workflow that `curl`s it from Hugging Face).
+/sdcard/LAI/models/qwen2.5-1.5b-instruct-q4-k-m.gguf
+/storage/emulated/0/LAI/models/qwen2.5-1.5b-instruct-q4-k-m.gguf
+```
 
-Tracked files in this folder: only this README and `.gitkeep`. The `*.gguf` are always ignored.
+That is the SAF workspace folder you grant via **LAI → Settings → Workspace → Connect**. It survives `adb install -r` and uninstall (if you keep the `LAI/` folder).
+
+**How the signed APK rebuild works now:**
+
+1. Keep the model in `storage/LAI/models` on your device (once).
+2. Build **signed APK without Release** (so you can `install -r` without losing data):
+   * GitHub: Actions → Android build → Run workflow → `build_type: release` → artifact `lai-release-*.apk` (production key `lai-release`)
+   * Or locally: `./gradlew :app:assembleRelease`
+3. `adb install -r lai-release.apk` → LAI starts → **auto-discovers** `LAI/models/*.gguf` on launch and registers it as Installed (no manual Import, no download). The 1.1 GB blob never enters the Git repo.
+
+If `storage/LAI/models` is empty, LAI behaves as before (download/import via Settings).
