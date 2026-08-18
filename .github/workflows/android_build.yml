@@ -103,10 +103,19 @@ jobs:
           echo "LAI_LLAMA_CPP_DIR=$RUNNER_TEMP/llama.cpp" >> "$GITHUB_ENV"
 
       - name: Install Vulkan build dependencies (SPIRV-Headers, glslang)
+        timeout-minutes: 10
         shell: bash
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq spirv-headers spirv-tools glslang-tools libvulkan-dev 2>&1 | tail -n 20
+          # apt-get update can hang with no output on flaky runner networks and burn the whole
+          # job budget (seen 2026-08-18, run #150: silent 44-minute stall -> job timeout).
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=60 -qq; then
+              break
+            fi
+            echo "apt-get update attempt ${attempt} failed; retrying in 15s" >&2
+            sleep 15
+          done
+          sudo apt-get install -y -qq --no-install-recommends spirv-headers spirv-tools glslang-tools libvulkan-dev 2>&1 | tail -n 20
           pkg-config --modversion vulkan 2>&1 || echo "vulkan pkg-config not found, but headers should be in /usr/include/vulkan"
 
       - name: Unit tests and lint
