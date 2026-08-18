@@ -419,12 +419,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun autoImportWorkspaceModels() {
         viewModelScope.launch {
-            // Give workspace refresh a moment to load persisted grant, then auto-scan
-            // storage/LAI/models so a signed `install -r` immediately shows the workspace model.
-            kotlinx.coroutines.delay(1200)
+            // Give workspace refresh a moment to load persisted grant, then auto-import
+            // storage/LAI/models/*.gguf into app-private models/ so it appears as Installed.
+            kotlinx.coroutines.delay(1500)
             val granted = workspace.state.first().granted
-            if (granted) scanWorkspaceModels()
+            if (!granted) return@launch
+            val reviewedBySha = state.value.supportedModels.associate { it.sha256.lowercase() to it.id }
+            val result = container.workspaceDiscovery.discoverModels(reviewedBySha, dev.lai.runtime.workspace.DiscoveryLimits())
+            val discovered = result.getOrNull() ?: return@launch
+            if (discovered.isEmpty()) return@launch
+            // Filter to gguf files that are not yet installed
+            val installedNames = state.value.installedModels.map { it.fileName }.toSet()
+            val toImport = discovered.filter { it.modelFormat == "gguf" && it.fileName !in installedNames }
+            if (toImport.isEmpty()) return@launch
+            val saf = container.workspaceRepository.saf() ?: return@launch
+            val app = getApplication<Application>()
+            for (d in toImport) {
+                try {
+                    val docId = findWorkspaceDocId(saf, d.relativePath) ?: continue
+                    val treeUri = container.workspaceRepository.grantedTreeUri ?: continue
+                    val uri = android.provider.DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                    // Use the reviewed import spec if this is a reviewed model, otherwise generic
+                    val spec = d.reviewedCatalogId?.let { id ->
+                        state.value.supportedModels.firstOrNull { it.id == id }?.toImportSpec()
+                    } ?: dev.lai.runtime.inference.ModelImportSpec(
+                        id = d.fileName.removeSuffix(".gguf").lowercase().replace(Regex("[^a-z0-9._-]+"), "-"),
+                        displayName = d.fileName.removeSuffix(".gguf"),
+                        expectedBytes = d.sizeBytes,
+                        sha256 = d.sha256,
+                    )
+                    container.modelRepository.importModel(spec, app.contentResolver, uri) { _ -> }
+                    // Small delay between imports to avoid I/O storm for 1.1 GB files
+                    kotlinx.coroutines.delay(200)
+                } catch (_: Exception) { }
+            }
+            refreshModels()
+            // Also refresh workspace counts
+            scanWorkspaceModels()
         }
+    }
+
+    private fun findWorkspaceDocId(saf: dev.lai.runtime.workspace.WorkspaceSaf, relativePath: String): String? {
+        var docId = saf.rootDocumentId
+        for (part in relativePath.split("/")) {
+            if (part.isEmpty()) continue
+            val children = saf.listChildren(docId)
+            val next = children.firstOrNull { it.name == part } ?: return null
+            docId = next.documentId
+        }
+        return docId
     }
 
     private fun loadToolAudit() {

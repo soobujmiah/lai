@@ -31,7 +31,7 @@ class WorkspaceRepository(private val context: Context) : WorkspaceGrantPort {
      * SAF handle for the granted tree, or null when not granted / permission revoked. Internal so only
      * workspace adapters ([WorkspaceSettingsStore], [WorkspaceDiscovery]) touch SAF directly.
      */
-    internal fun saf(): WorkspaceSaf? {
+    fun saf(): WorkspaceSaf? {
         val tree = grantedTreeUri ?: return null
         return if (context.contentResolver.persistedUriPermissions.any { it.uri == tree }) {
             WorkspaceSaf(context.contentResolver, tree)

@@ -7,7 +7,7 @@ import java.io.InputStream
 import java.io.OutputStream
 
 /** A child entry returned by [WorkspaceSaf.listChildren]. */
-internal data class SafEntry(
+data class SafEntry(
     val documentId: String,
     val name: String?,
     val mimeType: String?,
@@ -21,7 +21,7 @@ internal data class SafEntry(
  * through document IDs relative to the tree; a `content://` URI is never translated into a raw
  * filesystem path, and no `MANAGE_EXTERNAL_STORAGE` permission is ever requested.
  */
-internal class WorkspaceSaf(
+class WorkspaceSaf(
     private val resolver: ContentResolver,
     private val treeUri: Uri,
 ) {
