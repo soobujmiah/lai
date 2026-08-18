@@ -9,6 +9,15 @@
 -keep interface dev.lai.runtime.shell.IPrivilegedService { *; }
 -dontwarn rikka.shizuku.**
 
+# androidx.work + Room — WorkDatabase_Impl is instantiated via reflection; R8 was stripping its <init>.
+-keep class androidx.work.** { *; }
+-keep class androidx.room.** { *; }
+-keep class * extends androidx.work.impl.WorkDatabase { <init>(...); *; }
+-keepclassmembers class * extends androidx.room.RoomDatabase { *; }
+-keep class androidx.work.impl.WorkDatabase_Impl { <init>(...); *; }
+-dontwarn androidx.work.**
+-dontwarn androidx.room.**
+
 # kotlinx.serialization generated serializers.
 -if @kotlinx.serialization.Serializable class **
 -keepclassmembers class <1> {
