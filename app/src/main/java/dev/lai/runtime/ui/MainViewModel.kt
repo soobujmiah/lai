@@ -33,6 +33,7 @@ import dev.lai.runtime.history.ChatSessionSummary
 import dev.lai.runtime.history.StoredChatMessage
 import dev.lai.runtime.history.StoredChatSession
 import dev.lai.runtime.inference.BackgroundDownloadState
+import dev.lai.runtime.inference.ComputeClass
 import dev.lai.runtime.inference.ConversationMessage
 import dev.lai.runtime.inference.ConversationRole
 import dev.lai.runtime.inference.DownloadProgress
@@ -1136,12 +1137,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (runtime.nativeLibraryLoaded) add(CapabilityEvidence.COMPILED)
                     if (runtime.nativeLibraryLoaded) add(CapabilityEvidence.RUNTIME_PROBED)
                 }
+                // DEVICE_VALIDATED is granted only to accelerators that have passed physical-device
+                // qualification (see docs/device-results). The scheduler refuses every non-CPU
+                // backend lacking this evidence, so GPU stays disabled until validated on hardware.
+                // Enabled per build via -Plai.validatedAccelerators=llama-vulkan.
+                val validatedAccelerators: Set<String> = BuildConfig.VALIDATED_ACCELERATORS
+                    .split(',')
+                    .map(String::trim)
+                    .filter(String::isNotEmpty)
+                    .toSet()
                 val capabilities = runtime.compiledBackends.map { descriptor ->
+                    val isAccelerator = descriptor.computeClass != ComputeClass.CPU
                     BackendCapability(
                         backend = descriptor.id,
                         computeClass = descriptor.computeClass,
                         supported = true,
-                        evidence = evidence,
+                        evidence = if (isAccelerator && descriptor.id.value in validatedAccelerators) {
+                            evidence + CapabilityEvidence.DEVICE_VALIDATED
+                        } else {
+                            evidence
+                        },
                         estimatedPeakBytes = estimate.estimatedPeakBytes,
                         supportedModelFormats = descriptor.supportedModelFormats,
                         supportedQuantizations = descriptor.supportedQuantizations,

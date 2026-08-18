@@ -28,6 +28,15 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("boolean", "PRODUCTION_SIGNED", hasReleaseSigning.toString())
+        // Accelerators that have passed physical-device qualification (device-results evidence),
+        // comma-separated. Defaults to empty — no accelerator is ever selected by the scheduler
+        // without DEVICE_VALIDATED evidence, so GPU remains disabled until on-device validation.
+        // Enable with: -Plai.validatedAccelerators=llama-vulkan
+        buildConfigField(
+            "String",
+            "VALIDATED_ACCELERATORS",
+            "\"${providers.gradleProperty("lai.validatedAccelerators").orNull?.trim().orEmpty()}\"",
+        )
     }
 
     signingConfigs {

@@ -42,7 +42,7 @@ if(LAI_ENABLE_LLAMA_CPP)
     set(GGML_VULKAN ON CACHE BOOL "" FORCE)
     # Proper way: SPIRV-Headers + glslang are now installed on CI via workflow apt-get.
     add_subdirectory("${LAI_LLAMA_CPP_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/llama.cpp" EXCLUDE_FROM_ALL)
-    target_sources(lai_runtime PRIVATE llama_cpu_backend.cpp)
+    target_sources(lai_runtime PRIVATE llama_cpu_backend.cpp llama_session.cpp)
     target_compile_definitions(lai_runtime PRIVATE LAI_HAS_LLAMA_CPP=1 LAI_HAS_VULKAN=1)
     target_link_libraries(lai_runtime PRIVATE llama)
 endif()
