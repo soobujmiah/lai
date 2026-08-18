@@ -248,7 +248,7 @@ The proposal parse path is device-validated; actual `screen.click/type/scroll/gl
 ### Process notes for the next session
 
 - **CI is the only compile gate.** `scripts/validate_repo.sh` checks size/architecture/docs but does not compile Kotlin. Push, watch "Compile Kotlin, C++ and APK", then claim. Current head `f7a0db0` is the gate.
-- **Auth:** git remote + identity are wiped between sessions — re-add `origin` and `git config user.*`. Tokens do not persist; ask the owner (classic PAT needs `repo, workflow` to touch workflow files). The owner was advised to revoke the tokens used this session (`ghp_EvAO…` auto-revoked, `ghp_2Eo…` in use).
+- **Auth:** git remote + identity are wiped between sessions — re-add `origin` and `git config user.*`. Tokens must never be pasted into chat, committed, or stored in this file. Revoke any token that has been exposed.
 - **Release ritual:** merge to main → CI green → annotated tag `v0.9.x` → tag run builds + signs + publishes the APK automatically. Signing needs no per-release action.
 - **Regressions to avoid:** never `trySend` for streamed tokens; never `imePadding()` twice; never gate the bottom bar on the current IME inset; the Stop watchdog must not unload the model; reply budget < full context; `kv_tokens_` must only be appended after a *successful* decode; thread changes only between decodes; **CRITICAL threads never below 2 on SM8735**.
 

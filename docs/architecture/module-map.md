@@ -1,6 +1,6 @@
 # Module map and dependency graph
 
-Last audited: 2026-08-17 · 15 Gradle modules
+Last audited: 2026-08-18 · 16 Gradle modules
 
 ## Purpose
 
@@ -41,6 +41,7 @@ graph TD
   app --> accessibility[platform:accessibility]
   app --> workspace[platform:workspace]
   app --> shizuku[platform:shizuku]
+  app --> history[platform:history]
   app --> llama[runtime:llama]
   app --> ocr[runtime:ocr]
   app --> orchestrator[runtime:orchestrator]
@@ -58,6 +59,7 @@ graph TD
   accessibility --> contracts
   workspace --> contracts
   workspace --> policy
+  history --> contracts
   shizuku --> contracts
   shizuku --> policy
   llama --> contracts
@@ -83,7 +85,8 @@ Android components are application/activity/Accessibility service/Shizuku provid
 - Inference: app → `InferenceEngine` → JNI → C++ backend → llama.cpp.
 - Automation: app → `AgentRuntime` → policy → Accessibility/Shizuku.
 - Audit: app → `ToolAuditRepository` → no-backup private file.
-- Workspace: app (wiring only today) → SAF repository/store/discovery.
+- Workspace: app → SAF repository/store/discovery (settings via `AtomicNamedDocumentReplace`).
+- Chat content: app → `platform:history` only.
 
 ## Security and failure boundaries
 

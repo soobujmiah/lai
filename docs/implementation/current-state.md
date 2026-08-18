@@ -1,37 +1,38 @@
 # Current implementation state
 
-Audit date: 2026-08-17  
-Source baseline: `c53ec20` on `main`  
+Audit date: 2026-08-18 (M1 alignment)  
+Source baseline: working tree aligned to 16 Gradle modules (`platform:history` present)  
 Audit method: inspected source, tests, Gradle files, native code, manifests, scripts, CI, catalog, existing documentation, and recorded device evidence. The repository source gate was executed and passed. A full Android build was not rerun in this audit environment.
 
 Status vocabulary is restricted to **IMPLEMENTED**, **PARTIAL**, **EXPERIMENTAL**, **PLANNED**, **MISSING**, **DEPRECATED**, and **UNKNOWN**. Status means source state, not device or production validation; evidence is stated separately.
 
 ## Repository and build
 
-- **IMPLEMENTED:** 15-module Gradle graph, Kotlin 2.1.21, AGP 8.11.0, Compose, JDK 17 target, API 35 target, arm64 native runtime.
+- **IMPLEMENTED:** 16-module Gradle graph (`settings.gradle.kts` includes `platform:history`), Kotlin 2.4.10, AGP 9.3.1, Compose BOM 2025.05.01, JDK 17 target, compile/target SDK 36, arm64 native runtime.
 - **IMPLEMENTED:** source-only 128 MiB policy; APK/AAB/AAR/SO/model/keystore/wrapper-JAR and token-pattern rejection.
-- **IMPLEMENTED:** CI installs Gradle 8.13, Android SDK/Build Tools, NDK 27, CMake 3.22.1, and pinned llama.cpp commit; runs unit/coverage/lint/native/APK jobs.
+- **IMPLEMENTED:** CI installs Gradle 9.5.0, Android SDK/Build Tools 36, NDK 27, CMake 3.22.1, and pinned llama.cpp commit; runs unit/coverage/lint/native/APK jobs.
 - **PARTIAL:** release signing supports secrets but falls back to debug signing; SBOM, attestations, dependency verification, immutable action pins, production key operations, and reproducible comparison are missing.
 - **PARTIAL:** local reproducibility is limited by the intentionally omitted Gradle wrapper JAR and external toolchain bootstrap.
 
 ## Modules and boundaries
 
 - **IMPLEMENTED:** `core:contracts`, `core:policy`, `core:scheduler`, `core:model`, `plugins:api`.
-- **IMPLEMENTED:** `platform:download`, `platform:audit`, `platform:device`, `platform:accessibility`, `platform:workspace`, `platform:shizuku`.
+- **IMPLEMENTED:** `platform:download`, `platform:audit`, `platform:device`, `platform:accessibility`, `platform:workspace`, `platform:shizuku`, `platform:history`.
 - **IMPLEMENTED:** `runtime:llama`, `runtime:ocr`, `runtime:orchestrator`, and `app` composition.
 - **IMPLEMENTED:** architecture script checks network ownership, Android authority, JNI/native ownership, analytics patterns, vendor terms, and module direction.
-- **PARTIAL:** `MainViewModel` is a 1,072-line orchestration hotspot; feature UI modules and direct app tests are absent.
+- **PARTIAL:** `MainViewModel` remains a large orchestration hotspot; feature UI modules are not split. An app-module coordinator test exists.
 
 ## Source-verified class and interface inventory
 
 | Module | Principal declarations found in source |
 |---|---|
-| `app` | `LaiApplication`, `MainActivity`, `AppContainer`, `AppRuntimeEvent`, `MainViewModel`, `MainUiState`, `UiMode`, `RuntimeOperation` |
+| `app` | `LaiApplication`, `MainActivity`, `AppContainer`, `AppRuntimeEvent`, `MainViewModel`, `MainUiState`, `UiMode`, `RuntimeOperation`, `QuickSettingsSheet`, `ToolsDashboard`, `WorkspaceSettingsCoordinator` |
 | `core:contracts` | `InferenceEngine`; inference/backend/model events and records; `ToolCall`, `ToolResult`, `ToolDefinition`; audit, automation, OCR, settings, shell, diagnostics, and workspace contracts |
-| `core:policy` | `AgentPolicy`, `BuiltInToolCatalog`, `ToolCallParser`, `ToolAuditLedger`, `LocalFirstPolicy`, `SettingsPolicy`, `ShellCommandPolicy`, `WorkspacePolicy`, `WorkspaceSettingsCodec` |
-| `core:scheduler` | `InferenceScheduler`, `ModelMemoryEstimator`, `DeviceProfile`, `BackendCapability`, `RuntimeEnvironment`, scheduling decisions/evaluations |
+| `core:policy` | `AgentPolicy`, `BuiltInToolCatalog`, `ToolCallParser`, `ToolAuditLedger`, `LocalFirstPolicy`, `SettingsPolicy`, `ContextWindowPolicy`, `ShellCommandPolicy`, `WorkspacePolicy`, `WorkspaceSettingsCodec`, `AtomicNamedDocumentReplace` |
+| `core:scheduler` | `InferenceScheduler`, `ModelMemoryEstimator`, `ThermalGovernorPolicy`, `DeviceProfile`, `BackendCapability`, `RuntimeEnvironment`, scheduling decisions/evaluations |
 | `core:model` | `ReviewedModelCatalog`, `ReviewedModel`, `ReviewedModelCatalogDocument`, artifact review state |
-| `platform:download` | `ModelRepository`, `RemoteModelCatalogRepository`, bounded stream-copy guard |
+| `platform:download` | `ModelRepository`, `RemoteModelCatalogRepository`, `ModelDownloadWorker`, bounded stream-copy guard |
+| `platform:history` | `ChatHistoryRepository` (app-private no-backup sessions) |
 | `platform:audit` | `ToolAuditRepository` |
 | `platform:device` | `AndroidRuntimeEnvironmentProvider` |
 | `platform:accessibility` | `AccessibilityAutomationService`, `AccessibilityGateway`, node snapshot support |
@@ -86,8 +87,8 @@ This inventory records principal public/internal declarations rather than every 
 - **IMPLEMENTED:** typed settings v1, ranges/defaults, validation/sanitize/migration, bounded codec, no free-text setting fields.
 - **IMPLEMENTED:** SAF tree grant/revoke/layout, no broad storage permission, settings store, bounded-depth/count discovery, GGUF magic and SHA-256 classification.
 - **PARTIAL:** discovery enforces the configured file-size policy after hashing rather than during reads and has no time deadline; unknown/lying provider lengths are a resource risk.
-- **PARTIAL:** settings save deletes the old document before rename completion, so SAF rename failure can lose the last valid generation.
-- **PARTIAL:** source exists and was CI build-verified according to project records, but physical SAF and UI integration are pending.
+- **IMPLEMENTED:** settings persist through `AtomicNamedDocumentReplace`: new bytes go to `settings.json.tmp`, the live file is parked as `settings.json.bak`, then the temp is renamed into place. A failed finalize restores the backup. Load recovers a leftover backup if the live file is missing. Last-known-good bytes are not deleted before the new file is finalized.
+- **PARTIAL:** physical SAF grant/discovery on a named device remains pending.
 - **MISSING:** project-centric storage, project trust, snapshots/checkpoints, encrypted backup, generalized recovery manager, secret references.
 
 ## OCR and multimodal
@@ -113,10 +114,10 @@ Declared Android permissions after manifest merge originate from modules: `INTER
 
 ## Tests and evidence
 
-Twenty-three test source files exist: 20 pure-JVM/core/plugin tests and 3 Android-library tests (`platform:audit`, `platform:workspace` format detector). CI additionally invokes `:app:testDebugUnitTest` despite no current app test source.
+Thirty test source files exist: 24 pure-JVM/core/plugin tests, 4 Android-library tests (`platform:audit`, `platform:download` bounds, `platform:history`, `platform:workspace` format detector), and 1 app coordinator test, plus the new `AtomicNamedDocumentReplaceTest`.
 
 - **IMPLEMENTED:** unit coverage ratchets for pure-JVM modules; source/catalog/architecture gates; Android lint and APK/native build workflow.
-- **PARTIAL:** no direct tests for app/ViewModel, model download, catalog network/cache, device provider, Accessibility, Shizuku, orchestrator, OCR adapter, or native runtime behavior.
+- **PARTIAL:** no direct tests for `MainViewModel`, catalog network/cache, device provider, Accessibility, Shizuku, orchestrator, OCR adapter, or native runtime behavior.
 - **PARTIAL:** recorded device evidence names Redmi Turbo 4 Pro / Snapdragon 8s Gen 4 and validates the CPU baseline, retained copy, and diagnostics. It does not prove production readiness or other devices/backends.
 - **UNKNOWN:** current head `c53ec20` was not independently compiled during this documentation audit; project records cite a green CI baseline.
 
@@ -149,7 +150,7 @@ Twenty-three test source files exist: 20 pure-JVM/core/plugin tests and 3 Androi
 
 ## Conflicts resolved by this audit
 
-1. Older docs say 14 modules or workspace “planned”; source has 15 modules and a real `platform:workspace`. This document follows source and marks UI/device validation partial.
+1. Older docs said 14 or 15 modules; source has **16** including `platform:history`. This document follows `settings.gradle.kts`.
 2. Existing status vocabulary (`Ready`, `Build verified`, `Scaffold`) differs from the directive vocabulary. New audit documents use the directive vocabulary while preserving evidence prose.
 3. Existing docs describe download/discovery as bounded, but source does not enforce every byte bound during streaming. The implementation remains partial until bounds are enforced in-loop.
 4. Existing roadmap phase order predates the master directive. `docs/ROADMAP.md` is now the canonical Phase 0–14 roadmap and retains the useful pre-directive implementation backlog as an appendix.

@@ -12,6 +12,7 @@
 | `platform:device` | Android manufacturer/SoC/API/ABI/CPU facts plus memory, battery, charging and thermal observations | scheduler |
 | `platform:accessibility` | Accessibility service, node capture, screenshots and UI actions | contracts |
 | `platform:workspace` | user-granted SAF tree, persistable permission, canonical child resolution, bounded model discovery and non-secret settings store; implements the pure workspace ports | contracts, policy |
+| `platform:history` | app-private no-backup chat session persistence; the only content-bearing store | contracts |
 | `platform:shizuku` | Shizuku binder/UserService and privileged process boundary | contracts, policy |
 | `runtime:llama` | JNI/C++ llama.cpp adapter | contracts |
 | `runtime:ocr` | OCR Android bitmap adapter seam | contracts |

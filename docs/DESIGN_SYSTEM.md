@@ -1,6 +1,8 @@
 # Design System
 
-LAI shall use a **clean, modern, accessible** system — professional, not decorative. Quality bar: polished Google / productivity apps, without copying.
+LAI shall use a **clean, modern, accessible** system — professional, not decorative. Quality bar: polished productivity software, without copying.
+
+This design system is an original LAI product asset. It must not imitate proprietary UI chrome, icon sets, illustrations, or motion from another application. Third-party visual assets require intake under [`legal/THIRD_PARTY_INTAKE.md`](legal/THIRD_PARTY_INTAKE.md). Brand/mark questions are covered by [`legal/TRADEMARK_POLICY.md`](legal/TRADEMARK_POLICY.md).
 
 ## Foundations
 

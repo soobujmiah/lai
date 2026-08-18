@@ -4,26 +4,27 @@ This policy operationalizes the master directive for contributors and engineerin
 
 ## Required workflow
 
-`Inspect source and tests → document current state → design architecture → write ADR when required → plan → implement incrementally → test → update docs → verify`
+`Inspect source and tests → document current state → design architecture → licensing/IP review → write ADR when required → plan → implement incrementally → test → update docs → release review`
 
-Never use “idea → immediate code” for a significant feature. Never refactor a working subsystem merely for aesthetic consistency.
+Never implement a major feature before its purpose, architecture, dependencies, ownership, license, data flow, privacy, security, commercial/free-premium status, extension point, and tests are written. Never use “idea → immediate code” for a significant feature. Licensing problems must not be discovered after merge. See [`../legal/COMMERCIAL_IP_POLICY.md`](../legal/COMMERCIAL_IP_POLICY.md). Never refactor a working subsystem merely for aesthetic consistency.
 
 ## Source-of-truth order
 
 1. Current source code
 2. Current tests
-3. Accepted ADRs
+3. Accepted ADRs and accepted IP decisions (`docs/legal/OWNERSHIP_DECISIONS.md`)
 4. Architecture documentation
-5. Feature specifications
-6. Canonical roadmap
-7. README
-8. Assumptions
+5. Canonical legal/IP policies (`docs/legal/COMMERCIAL_IP_POLICY.md`)
+6. Feature specifications
+7. Canonical roadmap
+8. README
+9. Assumptions
 
 Conflicts must be recorded and resolved explicitly before continuing.
 
 ## Change-management checklist
 
-Before modifying a subsystem: read its docs; inspect implementation and tests; identify dependencies/data/authority; document the proposed change; decide whether an ADR is required; implement; run relevant tests; update current-state/feature/roadmap/user/developer docs; record limitations and rollback.
+Before modifying a subsystem: read its docs; inspect implementation and tests; identify dependencies/data/authority; complete licensing/IP intake when a dependency, model, SDK, or premium boundary is involved; document the proposed change; decide whether an ADR or IP register row is required; implement only after that review; run relevant tests; update current-state/feature/roadmap/legal/user/developer docs; record limitations and rollback.
 
 ## Quality priority
 

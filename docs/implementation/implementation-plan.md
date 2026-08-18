@@ -2,6 +2,8 @@
 
 Last updated: 2026-08-17
 
+**Implementation order overlay (2026-08-18):** [`IMPLEMENTATION_PREPARATION.md`](IMPLEMENTATION_PREPARATION.md). That file is the deterministic next-milestone map. This document remains the 2026-08-17 phase plan and does not authorize code by itself.
+
 ## Governing sequence
 
 `Document → Review → Plan → Implement → Test → Document → Verify`

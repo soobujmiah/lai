@@ -107,8 +107,8 @@ class WorkspacePolicy {
 
 /**
  * Bounded encode/decode of the non-secret `settings.json` document. Pure: the Android store
- * supplies bytes and consumes [DecodeOutcome]; it owns the temp-write-then-replace strategy and
- * the persistable SAF permission.
+ * supplies bytes and consumes [DecodeOutcome]; it owns SAF transfer. Last-known-good replacement
+ * is [AtomicNamedDocumentReplace] (backup, then rename; never delete the live file first).
  */
 class WorkspaceSettingsCodec(private val policy: SettingsPolicy = SettingsPolicy()) {
 

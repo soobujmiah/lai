@@ -66,3 +66,14 @@ docs(qnn): document HTP context compatibility key
 - safety review for authority changes;
 - license review for a new dependency/model/runtime;
 - device evidence when platform behavior is involved.
+
+## Inbound license and commercial documentation
+
+Engineering rules in this file are unchanged. Inbound copyright and future commercial licensing are documented separately and are not implemented as CLA or DCO gates:
+
+- [`docs/legal/CONTRIBUTOR_RIGHTS.md`](docs/legal/CONTRIBUTOR_RIGHTS.md)
+- [`docs/legal/AI_CODE_PROVENANCE.md`](docs/legal/AI_CODE_PROVENANCE.md)
+- [`docs/legal/COMMERCIAL_IP_POLICY.md`](docs/legal/COMMERCIAL_IP_POLICY.md)
+- [`docs/legal/README.md`](docs/legal/README.md)
+
+Until an owner-approved inbound agreement exists, Apache License 2.0 section 5 in [`LICENSE`](LICENSE) remains the inbound default for intentional submissions. Do not add a second project license or a CLA/DCO check in a routine contribution.

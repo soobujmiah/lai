@@ -60,3 +60,72 @@
 *   **FUTURE.md** — additive `Vulkan → QNN → tokenization → RAG → agent → workstation → OCR → graph → hardening`
 
 **Writing style:** `LAI provides/shall/is` — not `I recommend/You should`. No ownership mention, no AI author, no conversational commentary. **No unnecessary code changes, no feature implementation in this phase.**
+
+---
+
+## Product, architecture, legal, and governance navigation
+
+This section is the entry map for a future engineering agent. Existing topical documents above remain the product and implementation reference. Legal and commercial documents are an added layer; they do not replace [`ROADMAP.md`](ROADMAP.md), [`product/feature-matrix.md`](product/feature-matrix.md), or [`LEGAL_AND_LICENSING.md`](LEGAL_AND_LICENSING.md).
+
+### PRODUCT
+
+*   **Vision / principles** — [`DESIGN_PHILOSOPHY.md`](DESIGN_PHILOSOPHY.md)
+*   **Roadmap** — [`ROADMAP.md`](ROADMAP.md) (canonical Phase 0–14); pointer [`product/roadmap.md`](product/roadmap.md)
+*   **Feature matrix** — [`product/feature-matrix.md`](product/feature-matrix.md)
+*   **Commercial feature matrix** — [`product/COMMERCIAL_FEATURE_MATRIX.md`](product/COMMERCIAL_FEATURE_MATRIX.md)
+*   **Product structure options** — [`product/COMMERCIAL_PRODUCT_STRUCTURE.md`](product/COMMERCIAL_PRODUCT_STRUCTURE.md)
+*   **Product boundaries** — [`legal/PUBLIC_VS_COMMERCIAL_BOUNDARY.md`](legal/PUBLIC_VS_COMMERCIAL_BOUNDARY.md), [`PRIVACY_INVARIANTS.md`](PRIVACY_INVARIANTS.md)
+*   **Current implementation state** — [`implementation/current-state.md`](implementation/current-state.md), [`STATUS.md`](STATUS.md), [`PROJECT_STATE.md`](../PROJECT_STATE.md)
+*   **Implementation preparation / next milestone** — [`implementation/IMPLEMENTATION_PREPARATION.md`](implementation/IMPLEMENTATION_PREPARATION.md)
+
+### ARCHITECTURE
+
+*   **System** — [`architecture/overview.md`](architecture/overview.md), [`architecture/system-architecture.md`](architecture/system-architecture.md), [`ARCHITECTURE.md`](ARCHITECTURE.md)
+*   **Modules** — [`architecture/module-map.md`](architecture/module-map.md), [`MODULES.md`](MODULES.md)
+*   **Agent** — [`architecture/agent-architecture.md`](architecture/agent-architecture.md), [`AGENT.md`](AGENT.md)
+*   **Tool** — [`TOOL_CATALOG.md`](TOOL_CATALOG.md), [`AUTOMATION_TOOLS.md`](AUTOMATION_TOOLS.md)
+*   **Backend** — [`architecture/ai-architecture.md`](architecture/ai-architecture.md), [`VENDOR_BACKEND_STRATEGY.md`](VENDOR_BACKEND_STRATEGY.md), [`AI_RUNTIME.md`](AI_RUNTIME.md)
+*   **RAG / OCR / knowledge** — [`RAG.md`](RAG.md), [`OCR_VISION.md`](OCR_VISION.md), [`KNOWLEDGE_GRAPH.md`](KNOWLEDGE_GRAPH.md)
+*   **UI/UX** — [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md), [`UI_ARCHITECTURE.md`](UI_ARCHITECTURE.md)
+*   **Hybrid / providers** — [`architecture/HYBRID_AND_PROVIDER_ARCHITECTURE.md`](architecture/HYBRID_AND_PROVIDER_ARCHITECTURE.md), [`AI_PROVIDERS.md`](AI_PROVIDERS.md), [`CLOUD.md`](CLOUD.md)
+*   **Commercial module boundaries** — [`architecture/COMMERCIAL_MODULE_BOUNDARIES.md`](architecture/COMMERCIAL_MODULE_BOUNDARIES.md)
+*   **Entitlement architecture** — [`architecture/ENTITLEMENT_ARCHITECTURE.md`](architecture/ENTITLEMENT_ARCHITECTURE.md)
+*   **Plugins** — [`architecture/plugin-architecture.md`](architecture/plugin-architecture.md)
+
+### LEGAL
+
+*   **Index** — [`legal/README.md`](legal/README.md)
+*   **Commercial IP policy** — [`legal/COMMERCIAL_IP_POLICY.md`](legal/COMMERCIAL_IP_POLICY.md)
+*   **Ownership decisions** — [`legal/OWNERSHIP_DECISIONS.md`](legal/OWNERSHIP_DECISIONS.md)
+*   **Licensing audit** — [`LEGAL_AND_LICENSING.md`](LEGAL_AND_LICENSING.md)
+*   **Licensing strategy** — [`legal/LICENSING_STRATEGY.md`](legal/LICENSING_STRATEGY.md)
+*   **Ownership model** — [`legal/OWNERSHIP_MODEL.md`](legal/OWNERSHIP_MODEL.md)
+*   **Contributor rights** — [`legal/CONTRIBUTOR_RIGHTS.md`](legal/CONTRIBUTOR_RIGHTS.md)
+*   **AI code provenance** — [`legal/AI_CODE_PROVENANCE.md`](legal/AI_CODE_PROVENANCE.md)
+*   **Third-party intake / inventory** — [`legal/THIRD_PARTY_INTAKE.md`](legal/THIRD_PARTY_INTAKE.md), [`legal/THIRD_PARTY_COMPLIANCE.md`](legal/THIRD_PARTY_COMPLIANCE.md)
+*   **Model IP** — [`legal/MODEL_IP_POLICY.md`](legal/MODEL_IP_POLICY.md), [`../MODEL_LICENSES.md`](../MODEL_LICENSES.md)
+*   **Vendor licenses** — [`legal/VENDOR_LICENSE_POLICY.md`](legal/VENDOR_LICENSE_POLICY.md)
+*   **Proprietary boundaries** — [`legal/PROPRIETARY_BOUNDARIES.md`](legal/PROPRIETARY_BOUNDARIES.md)
+*   **Trademark** — [`legal/TRADEMARK_POLICY.md`](legal/TRADEMARK_POLICY.md)
+*   **SBOM and provenance** — [`legal/SBOM_AND_PROVENANCE.md`](legal/SBOM_AND_PROVENANCE.md)
+*   **Release compliance** — [`legal/RELEASE_COMPLIANCE.md`](legal/RELEASE_COMPLIANCE.md)
+*   **Project license text** — [`../LICENSE`](../LICENSE) (Apache License 2.0; unchanged)
+
+### GOVERNANCE
+
+*   **Public development policy** — [`governance/PUBLIC_DEVELOPMENT_POLICY.md`](governance/PUBLIC_DEVELOPMENT_POLICY.md)
+*   **Contribution policy** — [`../CONTRIBUTING.md`](../CONTRIBUTING.md), [`development/development-policy.md`](development/development-policy.md)
+*   **Security policy** — [`../SECURITY.md`](../SECURITY.md), [`SECURITY_AND_SAFETY.md`](SECURITY_AND_SAFETY.md), [`security/COMMERCIAL_SECRET_POLICY.md`](security/COMMERCIAL_SECRET_POLICY.md)
+*   **Decision records** — [`decisions/README.md`](decisions/README.md); commercial/legal series ADR-0100–ADR-0109; accepted engineering ADRs remain in [`adr/`](adr/)
+
+### Operating rule for future agents
+
+1. Read this index.
+2. Read the relevant architecture document and current implementation state.
+3. Read accepted ADRs and any Proposed ADR that constrains the task.
+4. Determine the current phase from [`DEVELOPMENT_STATE.md`](DEVELOPMENT_STATE.md) and [`implementation/current-state.md`](implementation/current-state.md).
+5. Identify the next approved implementation task. Documentation of a future item is not authorization to implement it.
+6. Check licensing and commercial constraints in `docs/legal/` before adding dependencies, models, datasets, SDKs, or commercial modules.
+7. Only then modify code.
+
+Required sequence for implementation: documented plan → approved decision → implementation → test → documentation update → audit.

@@ -10,7 +10,7 @@ The master directive says to adapt its recommended documentation tree and **not 
 |---|---|
 | `docs/implementation/current-state.md` | Complete source audit |
 | `docs/architecture/overview.md` | Complete overview |
-| `docs/architecture/module-map.md` | Complete 15-module map/dependency graph |
+| `docs/architecture/module-map.md` | Complete 16-module map/dependency graph |
 | `docs/architecture/ai-architecture.md` | Current AI architecture and explicit missing targets |
 | `docs/architecture/agent-architecture.md` | Current one-shot architecture and multi-step boundary |
 | `docs/architecture/security-architecture.md` | Current trust/security architecture and gaps |
