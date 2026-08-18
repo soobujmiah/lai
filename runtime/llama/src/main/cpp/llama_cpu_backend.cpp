@@ -23,14 +23,9 @@ namespace {
 using Clock = std::chrono::steady_clock;
 constexpr const char* kLogTag = "LAI-llama";
 constexpr const char* kSystemPrompt =
-    "You are LAI, a private on-device assistant. Respond in the user's language. Be concise and "
-    "accurate, and never claim that an Android action happened unless a tool result confirms it. "
-    "When the user writes in Bangla, reply ONLY in natural everyday Bangla: use short simple "
-    "sentences, common words, and correct grammar; do not translate literally, do not mix English "
-    "words unless the user did, and do not add filler. "
-    "আপনি LAI, একটি ব্যক্তিগত অফলাইন সহকারী। ব্যবহারকারী বাংলায় লিখলে শুধু সহজ, প্রাঞ্জল বাংলায় উত্তর দিন। "
-    "ছোট ছোট বাক্য ব্যবহার করুন। কঠিন বা আক্ষরিক অনুবাদের মতো শব্দ ব্যবহার করবেন না। "
-    "যা জানেন না, সরাসরি বলুন যে জানেন না।";
+    "You are LAI, a private on-device assistant. Be concise and accurate. "
+    "When the user writes in Bangla, reply in simple natural Bangla with short sentences. "
+    "আপনি LAI। বাংলায় সহজ, ছোট বাক্যে উত্তর দিন।";
 
 long long elapsed_us(Clock::time_point start, Clock::time_point end) {
     return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -232,12 +227,18 @@ public:
         );
 
         const auto prompt_start = Clock::now();
+        // Hotfix-2 on SM8735 heating: prefill must use big cluster even if governor throttled to 2.
+        if (applied_threads_ < 4) {
+            llama_set_n_threads(context_, 4, 4);
+            __android_log_print(ANDROID_LOG_INFO, kLogTag, "hotfix: force prefill threads %d -> 4", applied_threads_);
+            applied_threads_ = 4;
+            requested_threads_.store(4, std::memory_order_relaxed);
+        }
         // Smaller prompt chunks bound how long a single uninterruptible llama_decode call runs,
         // so Stop is observed promptly instead of after a whole 512-token batch.
-        // Hotfix 2026-08-17: 128-token batches stalled >179 sec on SM8735 at 0.7 tok/s (run 28671,
-        // 334-token prompt). Halve to 64 to keep each decode interactively bounded and reduce
-        // peak temp/power on the little cluster.
-        const int32_t batch_size = std::max(1, std::min(64, context_size));
+        // Hotfix 2026-08-17 (run 28671: 128/334 in 179 sec = 0.7 tok/s, device hot). Halve again to 32
+        // and shorten prompt 334→~180 tokens to keep each decode bounded and cut heat.
+        const int32_t batch_size = std::max(1, std::min(32, context_size));
         size_t offset = reused;
         while (offset < prompt_tokens.size()) {
             if (is_cancelled()) throw std::runtime_error("Generation cancelled");
