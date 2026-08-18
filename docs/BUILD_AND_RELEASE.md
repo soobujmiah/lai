@@ -16,18 +16,18 @@ The build performs:
 
 1. source/docs/secret plus module/network/authority boundary validation;
 2. JDK 17 setup;
-3. API 35, Build Tools 35.0.0, NDK 27.0.12077973, and CMake 3.22.1 install on the runner;
+3. API 36, Build Tools 36.0.0, NDK 27.0.12077973, and CMake 3.22.1 install on the runner;
 4. immutable-SHA llama.cpp fetch into runner-temporary storage;
 5. pure-JVM coverage tests, private-audit Android unit tests, app unit tests, and Android lint;
 6. Kotlin/Compose resources and arm64 C++/llama.cpp JNI compilation;
-7. single local-first APK assembly and artifact upload;
+7. **both** APK variants in a single run — `debug` and `release` (release uses the production keystore on tags, else the debug key) — plus the release R8 `mapping.txt` artifact;
 8. version-tag release.
 
 A separate `catalog_publish.yml` validates `catalog/models-v1.json`, signs its exact bytes with the encrypted `MODEL_CATALOG_SIGNING_KEY`, verifies the committed public key matches, and publishes stable `catalog-v1` assets.
 
 ## Trigger manually
 
-GitHub → **Actions** → **Android build** → **Run workflow**. Debug artifacts are installable and retained for 14 days.
+GitHub → **Actions** → **Android build** → **Run workflow**. The default `build_type` is **`both`**, so one run produces the installable `lai-debug-<run>` and `lai-release-<run>` APKs (debug retained 14 days, release 30 days) plus `lai-release-mapping-<run>`. Every push to `main` also builds both variants; pull requests stay debug-only.
 
 ## Create a release
 

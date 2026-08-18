@@ -99,8 +99,8 @@ Current device-test APK: [LAI v0.9.7](https://github.com/soobujmiah/lai/releases
 ## Remote build: fastest path
 
 1. Open the repository on GitHub and select **Actions → Android build**.
-2. Choose **Run workflow**, leave `debug`, and run it.
-3. When the build finishes, download `lai-debug-<run>` from **Artifacts**.
+2. Choose **Run workflow** and run it — the default builds **both** `debug` and `release` variants in one run (`build_type` input; `both` is the default, and every push also builds both).
+3. When the build finishes, download `lai-debug-<run>` and `lai-release-<run>` (plus `lai-release-mapping-<run>` for the release R8 mapping) from **Artifacts**.
 4. Install on the Snapdragon test phone:
 
    ```bash
