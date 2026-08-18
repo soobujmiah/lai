@@ -35,17 +35,17 @@ long long elapsed_us(Clock::time_point start, Clock::time_point end) {
 
 void pin_to_big_cores() {
     cpu_set_t mask; CPU_ZERO(&mask);
-    for (int c = 4; c < 8; ++c) CPU_SET(c, &mask);
+    for (int c = 0; c < 4; ++c) CPU_SET(c, &mask);
     if (sched_setaffinity(0, sizeof(mask), &mask) == 0) {
-        __android_log_print(ANDROID_LOG_INFO, kLogTag, "core: pinned to big cores 4-7");
+        __android_log_print(ANDROID_LOG_INFO, kLogTag, "core: pinned to big cores 0-3");
     }
 }
 void pin_to_little_cores() {
     cpu_set_t mask; CPU_ZERO(&mask);
-    for (int c = 0; c < 4; ++c) CPU_SET(c, &mask);
+    CPU_SET(7, &mask); // single little core when idle — user requested
     // Best-effort: if pinning fails we keep current affinity.
     if (sched_setaffinity(0, sizeof(mask), &mask) == 0) {
-        __android_log_print(ANDROID_LOG_INFO, kLogTag, "core: pinned to little cores 0-3 (idle)");
+        __android_log_print(ANDROID_LOG_INFO, kLogTag, "core: pinned to little core 7 (idle)");
     }
 }
 
