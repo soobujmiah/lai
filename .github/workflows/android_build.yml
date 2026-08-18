@@ -14,6 +14,14 @@ on:
         default: debug
         type: choice
         options: [debug, release, both]
+      validated_accelerators:
+        description: >-
+          Comma-separated accelerators with DEVICE_VALIDATED evidence (e.g.
+          llama-vulkan). Empty = CPU only. Grants the scheduler permission to
+          select these accelerators; set only after physical-device validation.
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: android-${{ github.ref }}
@@ -157,6 +165,7 @@ jobs:
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
+          -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
 
       - name: Build debug APK and native arm64 library
         if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
@@ -168,6 +177,7 @@ jobs:
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
+          -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
 
       - name: Build release APK and native arm64 library
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
@@ -181,7 +191,8 @@ jobs:
             -Plai.enableLlamaCpp=ON \
             -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR" \
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR" \
-          -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
+          -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR" \
+          -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
 
       - name: Inventory native and APK artifacts
         if: always()
