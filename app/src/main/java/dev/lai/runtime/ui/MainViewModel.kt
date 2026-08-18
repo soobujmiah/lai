@@ -471,10 +471,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Imports storage/LAI/models/*.gguf into app-private storage so discovered files appear as
-     * Installed. Re-runs when the workspace grant becomes active, after a manual grant, and after
-     * a manual scan. Import always requires a verified SHA-256 (ModelRepository.validateIdentity);
-     * files without a digest are skipped and logged rather than failing silently.
+     * Imports GGUF files from the granted workspace models/ folder (storage/LAI/models) into
+     * app-private storage so discovered files appear as Installed. Re-runs when the workspace
+     * grant becomes active, after a manual grant, and after a manual scan. Import always requires
+     * a verified SHA-256 (ModelRepository.validateIdentity); files without a digest are skipped
+     * and logged rather than failing silently.
      */
     private fun importWorkspaceModels() {
         viewModelScope.launch {
