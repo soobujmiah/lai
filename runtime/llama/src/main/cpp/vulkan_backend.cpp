@@ -18,9 +18,11 @@ constexpr const char* kLogTag = "LAI-llama";
 #ifdef LAI_HAS_VULKAN
 
 // Returns the first GPU-class device registered by ggml — on this build that is the
-// Vulkan backend driving the Adreno 825. Prefers a device whose name contains
-// "Vulkan"; otherwise falls back to any GPU-class device. Returns nullptr when no
-// GPU device is registered (loader present but driver/backend failed to initialize).
+// Vulkan backend driving the Adreno 825. ggml-vulkan classifies an integrated GPU
+// (every Android Adreno/Mali) as GGML_BACKEND_DEVICE_TYPE_IGPU, not GPU — both must be
+// accepted or the only accelerator on the device is skipped. Prefers a device whose name
+// contains "Vulkan"; otherwise falls back to any GPU/IGPU-class device. Returns nullptr
+// when no GPU device is registered (loader present but driver/backend failed to init).
 ggml_backend_dev_t find_gpu_device() {
     const size_t count = ggml_backend_dev_count();
     ggml_backend_dev_t fallback = nullptr;
@@ -34,7 +36,9 @@ ggml_backend_dev_t find_gpu_device() {
             index, static_cast<int>(ggml_backend_dev_type(device)),
             name != nullptr ? name : "?"
         );
-        if (ggml_backend_dev_type(device) != GGML_BACKEND_DEVICE_TYPE_GPU) continue;
+        const enum ggml_backend_dev_type type = ggml_backend_dev_type(device);
+        // Integrated GPUs (Adreno 825 included) report IGPU; discrete ones report GPU.
+        if (type != GGML_BACKEND_DEVICE_TYPE_GPU && type != GGML_BACKEND_DEVICE_TYPE_IGPU) continue;
         if (fallback == nullptr) fallback = device;
         if (name != nullptr && std::string(name).find("Vulkan") != std::string::npos) {
             return device;

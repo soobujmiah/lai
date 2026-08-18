@@ -75,3 +75,12 @@ bash scripts/validate_repo.sh
 ```
 
 All compilation remains in GitHub Actions. Generated build folders are ignored and not part of the persistent source snapshot.
+
+## GPU enablement
+
+The workflow builds with `-Plai.validatedAccelerators=llama-vulkan` by default (the
+`validated_accelerators` input, default `llama-vulkan`), which grants the scheduler
+`DEVICE_VALIDATED` evidence for the Vulkan backend so it can be selected on devices where the
+ggml Vulkan device registers at runtime. Set `validated_accelerators=cpu` to force CPU-only.
+GPU selection additionally requires the model catalog to declare `llama-vulkan` compatible
+(revision 4 does). Physical-device evidence is still recorded under `docs/device-results/`.

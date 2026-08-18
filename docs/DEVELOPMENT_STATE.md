@@ -18,7 +18,7 @@
 | Area | State | Evidence |
 |---|---|---|
 | **CPU inference** | **Device validated** (0.1.139) | SM8735 Redri Turbo 4 Pro: `Qwen 1.5B Q4_K_M` 570 ms load, **16–22 tok/s prefill** (93 tok in 5.8s, 11 reuse in 0.54s), `8–12 tok/s` decode, `storage/LAI/models` auto-import, adaptive `little 7 → big 0-3`, batch 32, prompt 180 chars, `20 tok/s` reuse validated |
-| **GPU Vulkan** | **Scaffold — proper build in-flight** | `dlopen libvulkan.so` probe → `Adreno 825` loader found (log 17:39:59), `GGML_VULKAN=OFF` scaffold until `0263d30` (`ON` + `SPIRV-Headers` apt) — `available false` → `true` after that build |
+| **GPU Vulkan** | **Adapter implemented; device qualification in progress** | Real `VulkanBackend::open()` with full layer offload via `llama_session` (build-verified CI #158+); device probe now accepts `GGML_BACKEND_DEVICE_TYPE_IGPU` (Adreno 825 is an integrated GPU — the previous GPU-only check skipped it, which is why `compiledBackends` showed only `llama-cpu`); scheduler enabled by default via `-Plai.validatedAccelerators=llama-vulkan` |
 | **NPU QNN/HTP** | **Planned — no code** | Boundary documented only, licensed QAIRT required |
 | **Model system** | **Verified** | Signed `catalog/models-v1.json` rev3, `ModelRepository` (SHA-256, resume, GGUF validate, `noBackupFilesDir/models`), `WorkspaceDiscovery` (SAF bounded, SHA streaming), `Keep copy` export, `storage/LAI/models` rule |
 | **Tool system** | **One-shot, user-confirmed** | 15 tools, `AgentRuntime.parseToolProposal` (JSON schema, `ToolInstructionGate`), hash-chained `ToolAuditLedger`, `ToolsDashboard` (Vision/Interaction/Elevated) — no multi-step loop |

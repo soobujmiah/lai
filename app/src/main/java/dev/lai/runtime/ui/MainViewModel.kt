@@ -290,7 +290,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
+            var previousGranted = workspace.state.value.granted
             workspace.state.collect { workspaceState ->
+                val granted = workspaceState.granted
+                if (granted && !previousGranted) {
+                    // The user granted (or re-granted) the workspace after startup — import any
+                    // .gguf already sitting in models/ now, not just at the next process start.
+                    LaiLog.i("LAI-workspace", "Workspace grant became active; importing models/")
+                    importWorkspaceModels()
+                }
+                previousGranted = granted
                 _state.update { it.copy(workspace = workspaceState) }
             }
         }
@@ -330,6 +339,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 },
             )
             _state.update { it.copy(notice = notice) }
+            if (granted.isSuccess) {
+                // Import right away so a freshly granted folder's models/ appears as Installed.
+                importWorkspaceModels()
+            }
         }
     }
 
@@ -373,12 +386,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Registers workspace model metadata only; never copies weights and never auto-loads. */
+    /**
+     * Registers workspace model metadata only; never copies weights and never auto-loads. Also
+     * triggers the import pass, so a manual "Scan for models" makes .gguf files appear as
+     * Installed instead of only updating the coarse counts.
+     */
     fun scanWorkspaceModels() {
         viewModelScope.launch {
             val reviewed = state.value.supportedModels.associate { it.sha256.lowercase() to it.id }
             val message = workspace.discoverModels(reviewed)
             _state.update { it.copy(notice = message) }
+            importWorkspaceModels()
         }
     }
 
@@ -440,30 +458,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun autoImportWorkspaceModels() {
         viewModelScope.launch {
-            // Give workspace refresh a moment to load persisted grant, then auto-import
+            // Give workspace refresh a moment to load the persisted grant, then auto-import
             // storage/LAI/models/*.gguf into app-private models/ so it appears as Installed.
+            // Runs again whenever the grant becomes active (see workspace.state.collect).
             kotlinx.coroutines.delay(1500)
-            val granted = workspace.state.first().granted
-            if (!granted) return@launch
+            if (!workspace.state.first().granted) {
+                LaiLog.d("LAI-workspace", "Auto-import: skipped at startup — no workspace grant yet")
+                return@launch
+            }
+            importWorkspaceModels()
+        }
+    }
+
+    /**
+     * Imports storage/LAI/models/*.gguf into app-private storage so discovered files appear as
+     * Installed. Re-runs when the workspace grant becomes active, after a manual grant, and after
+     * a manual scan. Import always requires a verified SHA-256 (ModelRepository.validateIdentity);
+     * files without a digest are skipped and logged rather than failing silently.
+     */
+    private fun importWorkspaceModels() {
+        viewModelScope.launch {
+            if (!workspace.state.value.granted) return@launch
             val reviewedBySha = state.value.supportedModels.associate { it.sha256.lowercase() to it.id }
-            val result = container.workspaceDiscovery.discoverModels(reviewedBySha, dev.lai.runtime.workspace.DiscoveryLimits())
-            val discovered = result.getOrNull() ?: return@launch
-            if (discovered.isEmpty()) return@launch
+            val result = container.workspaceDiscovery.discoverModels(
+                reviewedBySha,
+                dev.lai.runtime.workspace.DiscoveryLimits(),
+            )
+            val discovered = result.getOrNull() ?: run {
+                LaiLog.w("LAI-workspace", "Auto-import: discovery failed: ${result.exceptionOrNull()?.message}")
+                return@launch
+            }
+            if (discovered.isEmpty()) {
+                LaiLog.d("LAI-workspace", "Auto-import: no .gguf found in the granted folder's models/ subdirectory")
+                return@launch
+            }
             // Filter to gguf files that are not yet installed
             val installedNames = state.value.installedModels.map { it.fileName }.toSet()
             val toImport = discovered.filter { it.modelFormat == "gguf" && it.fileName !in installedNames }
-            if (toImport.isEmpty()) return@launch
+            if (toImport.isEmpty()) {
+                LaiLog.d("LAI-workspace", "Auto-import: ${discovered.size} model(s) found, none new")
+                return@launch
+            }
+            LaiLog.i("LAI-workspace", "Auto-import: ${toImport.size} of ${discovered.size} model(s) to import")
             val saf = container.workspaceRepository.saf() ?: return@launch
             val app = getApplication<Application>()
+            var imported = 0
             for (d in toImport) {
                 try {
+                    val sha = d.sha256
+                    if (sha == null) {
+                        LaiLog.w("LAI-workspace", "Auto-import: skipping ${d.fileName} (no SHA-256 available)")
+                        continue
+                    }
                     val docId = findWorkspaceDocId(saf, d.relativePath) ?: continue
                     val treeUri = container.workspaceRepository.grantedTreeUri ?: continue
                     val uri = android.provider.DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
                     // Use the reviewed import spec if this is a reviewed model, otherwise generic
-                    // Import always requires a verified SHA-256 (ModelRepository.validateIdentity);
-                    // skip any discovered file that could not be hashed instead of crashing.
-                    val sha = d.sha256 ?: continue
                     val spec = d.reviewedCatalogId?.let { id ->
                         state.value.supportedModels.firstOrNull { it.id == id }?.toImportSpec()
                     } ?: dev.lai.runtime.inference.ModelImportSpec(
@@ -472,14 +522,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         expectedBytes = d.sizeBytes,
                         sha256 = sha,
                     )
-                    container.modelRepository.importModel(spec, app.contentResolver, uri) { _ -> }
-                    // Small delay between imports to avoid I/O storm for 1.1 GB files
+                    val outcome = container.modelRepository.importModel(spec, app.contentResolver, uri) { _ -> }
+                    if (outcome.isSuccess) {
+                        imported++
+                        LaiLog.i("LAI-workspace", "Auto-import: ${d.fileName} installed")
+                    } else {
+                        LaiLog.w("LAI-workspace", "Auto-import: ${d.fileName} not installed: ${outcome.exceptionOrNull()?.message}")
+                    }
+                    // Small delay between imports to avoid I/O storm for ~1.1 GB files
                     kotlinx.coroutines.delay(200)
-                } catch (_: Exception) { }
+                } catch (error: Exception) {
+                    LaiLog.w("LAI-workspace", "Auto-import: ${d.fileName} failed: ${error.message}")
+                }
             }
-            refreshModels()
-            // Also refresh workspace counts
-            scanWorkspaceModels()
+            if (imported > 0) {
+                refreshModels()
+                _state.update {
+                    it.copy(notice = "$imported model(s) imported from the workspace folder")
+                }
+            }
         }
     }
 
