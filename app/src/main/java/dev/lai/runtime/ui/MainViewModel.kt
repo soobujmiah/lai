@@ -632,6 +632,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cancelGeneration() {
         if (state.value.operation != RuntimeOperation.GENERATING) return
+        LaiLog.i("LAI-llm", "Generation stop requested by user")
         _state.update { it.copy(operation = RuntimeOperation.CANCELLING, notice = "Stopping generation…") }
         val cancelled = generationJob
         cancelled?.cancel(CancellationException("User stopped generation"))
@@ -678,6 +679,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Restores a usable chat state after a stopped generation, dropping the empty reply bubble. */
     private fun restoreAfterStoppedGeneration(message: String) {
+        LaiLog.i("LAI-llm", "Generation stopped: $message")
         markLastAssistantContextIneligible()
         dropTrailingEmptyAssistantMessage()
         _state.update {
