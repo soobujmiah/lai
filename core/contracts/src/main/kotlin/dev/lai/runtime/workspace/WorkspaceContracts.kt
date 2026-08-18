@@ -24,6 +24,10 @@ object WorkspaceLayout {
     const val CONFIG_DIRECTORY = "config"
     const val CACHE_DIRECTORY = "cache"
     const val SETTINGS_FILE_NAME = "settings.json"
+    /** Sibling used while bytes are written; never the readable settings file. */
+    const val SETTINGS_TEMP_FILE_NAME = "settings.json.tmp"
+    /** Last known-good copy kept until the new file is renamed into place. */
+    const val SETTINGS_BACKUP_FILE_NAME = "settings.json.bak"
 
     /** Relative path segments of the settings file from the tree root (e.g. `["config","settings.json"]`). */
     val settingsRelativeSegments: List<String> = listOf(CONFIG_DIRECTORY, SETTINGS_FILE_NAME)

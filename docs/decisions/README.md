@@ -57,6 +57,25 @@ These are ADR candidates, not accepted designs:
 
 ADR numbers must be allocated by inspecting both `docs/adr/` and `docs/decisions/`; do not reuse an existing number.
 
+## Commercial, licensing, and ownership series (0100)
+
+These records live in `docs/decisions/` so they do not collide with accepted engineering ADRs 0002–0007. None of them changes [`../../LICENSE`](../../LICENSE). Proposed items are not implementation authorization.
+
+| ADR | Title | Status |
+|---|---|---|
+| 0100 | Current Apache-2.0 state | Accepted as fact record — [`ADR-0100-current-apache-2.0-state.md`](ADR-0100-current-apache-2.0-state.md) |
+| 0101 | Future commercial licensing strategy | Proposed — [`ADR-0101-future-commercial-licensing-strategy.md`](ADR-0101-future-commercial-licensing-strategy.md) |
+| 0102 | Copyright ownership model | Proposed — [`ADR-0102-copyright-ownership-model.md`](ADR-0102-copyright-ownership-model.md) |
+| 0103 | Contributor agreement strategy | Proposed — [`ADR-0103-contributor-agreement-strategy.md`](ADR-0103-contributor-agreement-strategy.md) |
+| 0104 | Free vs paid capability model | Proposed — [`ADR-0104-free-vs-paid-capability-model.md`](ADR-0104-free-vs-paid-capability-model.md) |
+| 0105 | Entitlement architecture | Proposed — [`ADR-0105-entitlement-architecture.md`](ADR-0105-entitlement-architecture.md) |
+| 0106 | Public repository strategy | Proposed — [`ADR-0106-public-repository-strategy.md`](ADR-0106-public-repository-strategy.md) |
+| 0107 | Commercial module boundaries | Proposed — [`ADR-0107-commercial-module-boundaries.md`](ADR-0107-commercial-module-boundaries.md) |
+| 0108 | Third-party license governance | Proposed process — [`ADR-0108-third-party-license-governance.md`](ADR-0108-third-party-license-governance.md) |
+| 0109 | AI-assisted development governance | Accepted as agent operating policy — [`ADR-0109-ai-assisted-development-governance.md`](ADR-0109-ai-assisted-development-governance.md) |
+
+Map index: [`../legal/README.md`](../legal/README.md).
+
 ## Review rule
 
 An ADR is not accepted merely because a file exists. Acceptance requires review of source compatibility, security, privacy, licensing, migration, testability, and rollback. Proposed ADRs cannot be used to describe unimplemented functionality as current capability.

@@ -11,7 +11,7 @@
 
 ## Current Task
 
-**Document the complete future direction** so a future AI agent can read `docs/`, inspect the repo, understand what LAI is, what is built, what remains, and begin work without history.
+**Implementation preparation complete.** Next authorized *documentation* step inside milestone M1 is to refresh stale `implementation/current-state.md` / `architecture/module-map.md` to the 16-module tree. Next authorized *code* step is M1 only (SAF settings atomic write + contract tests). See [`implementation/IMPLEMENTATION_PREPARATION.md`](implementation/IMPLEMENTATION_PREPARATION.md). No other roadmap phase is authorized.
 
 ## Current Status (honest, evidence-based)
 
@@ -42,8 +42,7 @@
 1. Update to `#144` (`17ad75b` auto-import) or `#143` (`0263d30` proper Vulkan) when green → `install -r` → grant `storage/LAI` if needed → `LAI/models/*.gguf` auto-shows **Installed** without Import → **Load** → `hi` → `logcat -s LAI-llama | grep -E "core:.*big|prefill done"` → expect `big 0-3` + `~20 tok/s`.
 2. If `vulkan: available true` after `0263d30`, wire `VulkanBackend::open n_gpu_layers=99` + `generate()` — device test for 93 tok on Adreno 825.
 
-**Next pure-code (after that device test):**
-*   `Vulkan real generate` (until device test mandatory) → `QNN/HTP` → `core:tokenization` → `core:rag` + `rag-litert` + `features:rag` (port from NpuHub 6.6) — all additive, `storage/LAI/models` + `<128 MB` preserved.
+**Next code after M1 (not authorized yet):** Vulkan `generate()` device qualification is milestone M2. QNN, tokenization, and RAG remain later phases and require license intake. Do not start them because they appear in older “next” lists.
 
 ## Blockers
 

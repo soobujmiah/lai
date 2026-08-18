@@ -12,6 +12,8 @@ class WorkspaceContractsTest {
     fun `layout constants are canonical and shared`() {
         assertEquals(listOf("config", "settings.json"), WorkspaceLayout.settingsRelativeSegments)
         assertEquals("settings.json", WorkspaceLayout.SETTINGS_FILE_NAME)
+        assertEquals("settings.json.tmp", WorkspaceLayout.SETTINGS_TEMP_FILE_NAME)
+        assertEquals("settings.json.bak", WorkspaceLayout.SETTINGS_BACKUP_FILE_NAME)
         assertTrue(WorkspaceLayout.MODELS_DIRECTORY in WorkspaceLayout.managedDirectories)
         assertTrue(WorkspaceLayout.CONFIG_DIRECTORY in WorkspaceLayout.managedDirectories)
         assertEquals(listOf("models", "tools", "config", "cache"), WorkspaceLayout.managedDirectories)
