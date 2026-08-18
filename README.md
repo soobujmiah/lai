@@ -172,6 +172,7 @@ Use a credential manager or short-lived token. Never place a token in a remote U
 - [Security and safety](docs/SECURITY_AND_SAFETY.md)
 - [Physical-device testing](docs/DEVICE_TESTING.md)
 - [Diagnostics JSON export](docs/DIAGNOSTICS_EXPORT.md)
+- [Diagnostic logging](docs/LOGGING.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Contributing/documentation policy](CONTRIBUTING.md)
 

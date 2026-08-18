@@ -24,6 +24,7 @@
 | **Tool system** | **One-shot, user-confirmed** | 15 tools, `AgentRuntime.parseToolProposal` (JSON schema, `ToolInstructionGate`), hash-chained `ToolAuditLedger`, `ToolsDashboard` (Vision/Interaction/Elevated) — no multi-step loop |
 | **Agent** | **One-shot** | No planner/memory/verification yet |
 | **Android automation** | **Device validated** | `AccessibilityAutomationService` (400 nodes, `canTakeScreenshot`), `Shizuku UID 2000` argv allowlist, Xiaomi lock guide (`Lock + No restrictions + Autostart`), `install -r` keeps grant |
+| **Diagnostics/logging** | **Implemented** | Centralized `LaiLog` (logcat + app-private file + in-app export; debug `DEBUG` / signed-release `INFO`), `LaiLogRedactor` (token/api-key/password redaction), uncaught-crash handler, R8 `SourceFile/LineNumberTable` + `mapping.txt` artifact — see [LOGGING.md](LOGGING.md) |
 | **Linux/terminal** | **Missing** | No PRoot/QEMU — spec only |
 | **OCR** | **Scaffold** | `PlaceholderBanglaOcrEngine` fails `OcrModelRequiredException`, `OcrResult` JSON ready |
 | **RAG/Memory** | **Missing** | No `core:rag`/`core:tokenization` — planned |

@@ -1,3 +1,12 @@
+# Release diagnostics: keep source file names and line numbers in stack traces so crashes can be
+# de-obfuscated with the mapping.txt produced by R8 (see docs/LOGGING.md). Minification stays on.
+-keepattributes SourceFile,LineNumberTable
+
+# Centralized diagnostic logger and redactor are referenced from app code, but keep them
+# explicitly so future R8 updates can never strip the logging call sites or redaction.
+-keep class dev.lai.runtime.core.LaiLog { *; }
+-keep class dev.lai.runtime.core.LaiLogRedactor { *; }
+
 # JNI entry points and callback methods are resolved by their Java names.
 -keep class dev.lai.runtime.inference.NativeBindings { *; }
 -keep interface dev.lai.runtime.inference.NativeTokenCallback { *; }

@@ -227,6 +227,17 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # R8 mapping for the minified signed build: stack traces from the field are de-obfuscated
+      # with this file (docs/LOGGING.md). Keep it as long as the APK can be tested.
+      - name: Upload release R8 mapping
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: lai-release-mapping-${{ github.run_number }}
+          path: app/build/outputs/mapping/release/*.txt
+          if-no-files-found: warn
+          retention-days: 90
+
       - name: Upload SBOM
         if: always()
         uses: actions/upload-artifact@v7

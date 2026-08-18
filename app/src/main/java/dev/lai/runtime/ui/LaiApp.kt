@@ -484,6 +484,11 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
     ) { uri ->
         uri?.let(viewModel::exportDiagnostics)
     }
+    val logExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri ->
+        uri?.let(viewModel::exportLogFile)
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(20.dp),
@@ -598,8 +603,9 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Support diagnostics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "Export versioned JSON with device, scheduler, model and local performance data. " +
-                            "Prompts, responses, screens, OCR text, documents and credentials are excluded.",
+                        "Export versioned JSON with device, scheduler, model and local performance data, " +
+                            "or the redacted diagnostic log. Prompts, responses, screens, OCR text, " +
+                            "documents and credentials are excluded.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -608,6 +614,10 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                         onClick = { diagnosticsExporter.launch("lai-diagnostics-v1.json") },
                         enabled = !state.busy,
                     ) { Text("Export diagnostics JSON") }
+                    OutlinedButton(
+                        onClick = { logExporter.launch("lai-diagnostic-log.txt") },
+                        enabled = !state.busy,
+                    ) { Text("Export diagnostic log") }
                 }
             }
         }

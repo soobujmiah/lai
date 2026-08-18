@@ -19,12 +19,14 @@ import dev.lai.runtime.audit.ToolAuditOutcome
 import dev.lai.runtime.audit.ToolAuditRecordV1
 import dev.lai.runtime.core.AppRuntimeEvent
 import dev.lai.runtime.core.LaiJson
+import dev.lai.runtime.core.LaiLog
 import dev.lai.runtime.diagnostics.AppDiagnostics
 import dev.lai.runtime.diagnostics.AutomationDiagnostics
 import dev.lai.runtime.diagnostics.DeviceDiagnostics
 import dev.lai.runtime.diagnostics.DiagnosticsPrivacy
 import dev.lai.runtime.diagnostics.DiagnosticsReportV1
 import dev.lai.runtime.diagnostics.GenerationPerformanceDiagnostics
+import dev.lai.runtime.diagnostics.LogEntryDiagnostics
 import dev.lai.runtime.diagnostics.ModelDiagnostics
 import dev.lai.runtime.diagnostics.RuntimeDiagnostics
 import dev.lai.runtime.diagnostics.ToolAuditDiagnostics
@@ -259,6 +261,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             combine(AccessibilityGateway.connected, container.shizukuController.state) { accessibility, shizuku ->
                 accessibility to shizuku
             }.collect { (accessibility, shizuku) ->
+                val previous = _state.value
+                if (previous.accessibilityConnected != accessibility) {
+                    LaiLog.i("LAI-perms", "Accessibility authority connected=$accessibility")
+                }
+                if (previous.shizukuState != shizuku) {
+                    LaiLog.i("LAI-perms", "Shizuku state=$shizuku")
+                }
                 _state.update { it.copy(accessibilityConnected = accessibility, shizukuState = shizuku) }
             }
         }
@@ -266,6 +275,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             container.events.collect { event ->
                 when (event) {
                     is AppRuntimeEvent.ModelUnloadedForMemory -> {
+                        LaiLog.w("LAI-mem", "Model unloaded under memory pressure")
                         generationJob?.cancel(CancellationException("Model released for memory pressure"))
                         _state.update {
                             it.copy(
@@ -306,6 +316,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val granted = container.workspaceRepository.grant(treeUri)
                 .mapCatching { container.workspaceRepository.ensureLayout().getOrThrow() }
             val status = workspace.refresh()
+            granted.fold(
+                onSuccess = { LaiLog.i("LAI-workspace", "Workspace folder granted") },
+                onFailure = { error ->
+                    LaiLog.e("LAI-workspace", "Workspace folder grant failed: ${error.message}", error)
+                },
+            )
             val notice = granted.fold(
                 onSuccess = { "Workspace folder connected • $status" },
                 onFailure = { error ->
@@ -320,6 +336,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Releases the persistable permission. Nothing inside the user's folder is deleted. */
     fun revokeWorkspace() {
         viewModelScope.launch {
+            LaiLog.i("LAI-workspace", "Workspace folder revoked")
             container.workspaceRepository.revoke()
             workspace.refresh()
             _state.update {
@@ -368,7 +385,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setMode(mode: UiMode) = _state.update { it.copy(mode = mode, settingsVisible = false, notice = null) }
     fun setInput(value: String) = _state.update { it.copy(input = value) }
     fun toggleSettings() = _state.update { it.copy(settingsVisible = !it.settingsVisible) }
-    fun setDeveloperMode(enabled: Boolean) = _state.update { it.copy(developerMode = enabled) }
+    fun setDeveloperMode(enabled: Boolean) {
+        LaiLog.i("LAI-app", "Developer mode enabled=$enabled")
+        _state.update { it.copy(developerMode = enabled) }
+    }
     fun setToolProposalsEnabled(enabled: Boolean) {
         if (enabled && !state.value.toolAuditIntegrityValid) {
             _state.update { it.copy(notice = "Persistent tool audit is unavailable; action proposals remain disabled") }
@@ -477,6 +497,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadToolAudit() {
         viewModelScope.launch {
             val snapshot = container.toolAuditRepository.snapshot()
+            if (!snapshot.integrityValid) {
+                LaiLog.w("LAI-audit", "Tool audit integrity invalid; action proposals disabled")
+            }
             _state.update {
                 it.copy(
                     toolAuditHistory = snapshot.records.takeLast(MAX_TOOL_AUDIT_RECORDS),
@@ -571,6 +594,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // This records the last stage reached so a diagnostics export names the blocking call
         // (token counting, waiting for the first token, or mid-stream) instead of guessing.
         generationStage = GenerationStage.COUNTING_TOKENS
+        LaiLog.i("LAI-llm", "Generation start model=${state.value.activeModelId}")
         generationJob = viewModelScope.launch {
             try {
                 val prepared = prepareConversation(requestConfig, requestSettings.context.keepLastTurns)
@@ -684,6 +708,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun completeGeneration(event: InferenceEvent.Completed) {
         val current = state.value
         val modelOutput = current.messages.lastOrNull()?.takeIf { !it.fromUser }?.text.orEmpty()
+        event.metrics?.let { metrics ->
+            LaiLog.i(
+                "LAI-llm",
+                "Generation completed: ${metrics.generatedTokens} tokens, " +
+                    "decode=${metrics.decodeTokensPerSecond} tok/s, " +
+                    "prefill=${metrics.promptTokensPerSecond} tok/s, " +
+                    "ttft=${metrics.timeToFirstTokenMs} ms, total=${metrics.totalMs} ms",
+            )
+        } ?: LaiLog.i("LAI-llm", "Generation completed: no metrics reported")
         val proposal = if (current.toolProposalsEnabled) {
             container.agentRuntime.parseToolProposal(modelOutput)
         } else {
@@ -756,6 +789,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             if (approval.isFailure) {
                 val verified = container.toolAuditRepository.snapshot()
+                LaiLog.e(
+                    "LAI-audit",
+                    "Tool approval audit failed: ${approval.exceptionOrNull()?.message}",
+                    approval.exceptionOrNull(),
+                )
                 val message = "Action not run because approval audit failed: " +
                     (approval.exceptionOrNull()?.message ?: "unknown audit error")
                 _state.update {
@@ -780,6 +818,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             val result = container.agentRuntime.execute(proposal.call, userConfirmed = true)
+            if (result.success) {
+                LaiLog.i("LAI-agent", "Approved tool executed id=${proposal.call.name}")
+            } else {
+                LaiLog.w("LAI-agent", "Approved tool failed id=${proposal.call.name}: ${result.error?.message}")
+            }
             val completion = container.toolAuditRepository.recordCompletion(
                 call = proposal.call,
                 risk = proposal.risk,
@@ -792,6 +835,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 "Approved action was not completed: ${result.error?.message ?: "tool failed"}"
             }
             val auditWarning = completion.exceptionOrNull()?.message
+            if (auditWarning != null) {
+                LaiLog.w("LAI-audit", "Tool audit completion failed: $auditWarning")
+            }
             val verifiedAfterFailure = if (auditWarning != null) container.toolAuditRepository.snapshot() else null
             _state.update {
                 it.copy(
@@ -815,6 +861,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun denyPendingTool() {
         val proposal = state.value.pendingToolProposal ?: return
         if (state.value.busy) return
+        LaiLog.i("LAI-agent", "Tool proposal denied id=${proposal.call.name}")
         _state.update {
             it.copy(
                 pendingToolProposal = null,
@@ -1018,6 +1065,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun markGenerationFailed(message: String) {
+        LaiLog.e("LAI-llm", "Generation failed: $message")
         recordGenerationFailure(message)
         _state.update {
             val updated = it.messages.toMutableList()
@@ -1042,6 +1090,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * The reason is truncated and LAI-authored; prompts and model output are never stored.
      */
     private fun recordGenerationFailure(reason: String) {
+        LaiLog.w("LAI-llm", "Generation recorded as failed: $reason")
         _state.update {
             it.copy(
                 lastGenerationFailure = reason.take(MAX_FAILURE_REASON_CHARS),
@@ -1126,6 +1175,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loadModel(modelId: String) {
         if (state.value.busy) return
         val model = state.value.installedModels.firstOrNull { it.id == modelId } ?: return
+        LaiLog.i("LAI-model", "Loading model id=$modelId")
         _state.update {
             it.copy(operation = RuntimeOperation.LOADING, notice = "Checking device resources for ${model.displayName}…")
         }
@@ -1194,6 +1244,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             result.onSuccess { load ->
+                LaiLog.i(
+                    "LAI-model",
+                    "Model loaded id=$modelId backend=${load.backend.value} in ${load.loadMs} ms",
+                )
                 _state.update {
                     it.copy(
                         operation = RuntimeOperation.READY,
@@ -1206,6 +1260,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }.onFailure { error ->
+                LaiLog.e("LAI-model", "Model load failed id=$modelId: ${error.message}", error)
                 _state.update {
                     it.copy(
                         operation = RuntimeOperation.ERROR,
@@ -1226,6 +1281,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             val removed = container.modelRepository.delete(modelId)
+            LaiLog.i("LAI-model", "Model delete id=$modelId removed=$removed")
             _state.update {
                 it.copy(notice = if (removed) "Model deleted from this device" else "Model was not found")
             }
@@ -1234,6 +1290,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun unloadModel() {
+        LaiLog.i("LAI-model", "Model unload")
         container.inferenceEngine.close()
         _state.update {
             it.copy(
@@ -1428,6 +1485,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                     BackgroundDownloadState.SUCCEEDED -> {
+                        LaiLog.i("LAI-download", "Model download succeeded id=$modelId")
                         _state.update {
                             it.copy(
                                 operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
@@ -1443,6 +1501,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         downloadWatchJob?.cancel()
                     }
                     BackgroundDownloadState.FAILED -> {
+                        LaiLog.e("LAI-download", "Model download failed id=$modelId: ${status.failureReason ?: "unknown reason"}")
                         _state.update {
                             it.copy(
                                 operation = RuntimeOperation.ERROR,
@@ -1456,6 +1515,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     BackgroundDownloadState.CANCELLED -> {
                         // Paused or cancelled by explicit user action; that action already set
                         // the explanatory notice, so only the operational state is restored.
+                        LaiLog.i("LAI-download", "Model download cancelled id=$modelId")
                         _state.update {
                             it.copy(
                                 operation = if (it.activeModelId != null) RuntimeOperation.READY else RuntimeOperation.IDLE,
@@ -1483,6 +1543,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             result.onSuccess {
+                LaiLog.i("LAI-app", "Diagnostics JSON exported")
                 _state.update {
                     it.copy(
                         diagnosticsStatus = "Diagnostics JSON exported by explicit user action",
@@ -1490,10 +1551,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }.onFailure { error ->
+                LaiLog.e("LAI-app", "Diagnostics export failed: ${error.message}", error)
                 _state.update {
                     it.copy(
                         diagnosticsStatus = "Last export failed",
                         notice = error.message ?: "Diagnostics export failed",
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Exports the centralized diagnostic log (redacted) to a user-chosen SAF destination, so a
+     * signed release build can be debugged on a real device without adb/root access.
+     */
+    fun exportLogFile(uri: Uri) {
+        viewModelScope.launch {
+            val result = runCatching {
+                val text = LaiLog.exportText()
+                withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { output ->
+                        output.write(text.toByteArray(Charsets.UTF_8))
+                        output.flush()
+                    } ?: error("Android could not open the selected export destination")
+                }
+            }
+            result.onSuccess {
+                LaiLog.i("LAI-app", "Diagnostic log exported")
+                _state.update {
+                    it.copy(
+                        diagnosticsStatus = "Diagnostic log exported by explicit user action",
+                        notice = "Diagnostic log exported (secrets redacted)",
+                    )
+                }
+            }.onFailure { error ->
+                LaiLog.e("LAI-app", "Diagnostic log export failed: ${error.message}", error)
+                _state.update {
+                    it.copy(
+                        diagnosticsStatus = "Last log export failed",
+                        notice = error.message ?: "Diagnostic log export failed",
                     )
                 }
             }
@@ -1559,6 +1656,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             },
             performance = current.performanceHistory.map { metrics -> metrics.toDiagnostics() },
             privacy = DiagnosticsPrivacy(),
+            logs = LaiLog.recentEntries().map { entry ->
+                LogEntryDiagnostics(
+                    timestampEpochMs = entry.timestampEpochMs,
+                    level = entry.level,
+                    tag = entry.tag,
+                    message = entry.message,
+                )
+            },
             automation = AutomationDiagnostics(
                 toolProposalsEnabled = current.toolProposalsEnabled,
                 proposalResponsesExamined = current.toolProposalCounters.responsesExamined,

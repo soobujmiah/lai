@@ -52,6 +52,7 @@
 *   **PERFORMANCE.md** — SM8735 `16–22 tok/s` CPU, `40–60 tok/s` Vulkan next, `QNN` later, governor `little 7 → big 0-3`
 *   **BENCHMARKING.md** — `MEASURED` only with value, `JSON/Markdown/CSV` export, `sbom-*.txt` → `CycloneDX`
 *   **TESTING.md** — `static/unit/integration/CI/Android/UI/device/GPU/NPU/performance/thermal/security/regression`, `DEVICE TEST REQUIRED` never fabricated
+*   **LOGGING.md** — centralized `LaiLog` (logcat + file + export), debug `DEBUG` vs signed-release `INFO`, redaction contract, R8 `mapping.txt` use
 *   **NETWORK.md** — only `platform:download` has `INTERNET` (signed catalog + reviewed GGUF), allowlist, `WorkManager` `Range`
 *   **CLOUD.md** — `Local` vs `Cloud` vs `Remote` badges, `cost` + `privacy` + `quota` controls
 

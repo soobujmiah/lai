@@ -17,7 +17,8 @@ Included:
 - Accessibility connection boolean and coarse Shizuku state/UID;
 - conversation-turn trim count, never conversation text;
 - local-action-proposal enabled state; session-only response counts (`examined`, `accepted`, `rejected`, `notToolCall`), last coarse outcome and rejection-code counts; persistent-audit integrity/schema plus up to 50 recent content-free event projections;
-- up to 20 in-memory generation samples: prompt/output token counts, prefill, TTFT, decode and total duration.
+- up to 20 in-memory generation samples: prompt/output token counts, prefill, TTFT, decode and total duration;
+- a bounded tail of the centralized diagnostic log (`logs[]`: timestamp, level, tag, message; see [LOGGING.md](LOGGING.md)) — every entry is redacted by `LaiLogRedactor` before capture.
 
 Always excluded:
 
@@ -40,6 +41,7 @@ Always excluded:
   "automation": {"toolProposalsEnabled": true, "proposalResponsesExamined": 1, "proposalAccepted": 0, "proposalRejected": 0, "proposalNotToolCall": 1, "lastProposalOutcome": "NOT_TOOL_CALL", "proposalRejectionCodes": {}, "auditPersistence": "APP_PRIVATE_HASH_CHAIN_V1", "auditIntegrityValid": true, "records": []},
   "models": [{"id": "model-id", "bytes": 1, "sha256": "...", "active": true}],
   "performance": [{"promptTokens": 20, "generatedTokens": 15, "timeToFirstTokenMs": 100}],
+  "logs": [{"timestampEpochMs": 1, "level": "INFO", "tag": "LAI-model", "message": "Model loaded id=... backend=llama-cpu"}],
   "privacy": {"localOnlyUntilUserExport": true, "excludedData": ["prompts", "generated_text"]}
 }
 ```

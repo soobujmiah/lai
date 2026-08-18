@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import dev.lai.runtime.core.LaiLog
 import dev.lai.runtime.ui.LaiApp
 import dev.lai.runtime.ui.MainViewModel
 import dev.lai.runtime.ui.theme.LaiTheme
@@ -17,6 +18,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LaiLog.i("LAI-lifecycle", "MainActivity onCreate")
         enableEdgeToEdge()
         requestHighestRefreshRate()
         setContent {
@@ -24,6 +26,18 @@ class MainActivity : ComponentActivity() {
                 LaiApp(viewModel = viewModel)
             }
         }
+    }
+
+    override fun onDestroy() {
+        LaiLog.i("LAI-lifecycle", "MainActivity onDestroy")
+        super.onDestroy()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_MODERATE) {
+            LaiLog.w("LAI-mem", "MainActivity onTrimMemory level=$level")
+        }
+        super.onTrimMemory(level)
     }
 
     /**

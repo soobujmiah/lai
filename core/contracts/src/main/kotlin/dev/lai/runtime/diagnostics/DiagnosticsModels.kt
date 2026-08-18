@@ -13,6 +13,22 @@ data class DiagnosticsReportV1(
     val performance: List<GenerationPerformanceDiagnostics>,
     val privacy: DiagnosticsPrivacy,
     val automation: AutomationDiagnostics = AutomationDiagnostics(),
+    /**
+     * Bounded tail of the centralized diagnostic log (see app LaiLog). Entries are redacted by
+     * LaiLogRedactor before capture, and call sites must never log prompt/response text or file
+     * contents — the same privacy contract as the rest of this export. Default = none so old
+     * consumers and schema-v1 reports remain valid.
+     */
+    val logs: List<LogEntryDiagnostics> = emptyList(),
+)
+
+/** One redacted diagnostic log entry. [message] may contain a stack trace for ERROR entries. */
+@Serializable
+data class LogEntryDiagnostics(
+    val timestampEpochMs: Long,
+    val level: String,
+    val tag: String,
+    val message: String,
 )
 
 @Serializable
