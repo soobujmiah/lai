@@ -440,13 +440,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val treeUri = container.workspaceRepository.grantedTreeUri ?: continue
                     val uri = android.provider.DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
                     // Use the reviewed import spec if this is a reviewed model, otherwise generic
+                    // Import always requires a verified SHA-256 (ModelRepository.validateIdentity);
+                    // skip any discovered file that could not be hashed instead of crashing.
+                    val sha = d.sha256 ?: continue
                     val spec = d.reviewedCatalogId?.let { id ->
                         state.value.supportedModels.firstOrNull { it.id == id }?.toImportSpec()
                     } ?: dev.lai.runtime.inference.ModelImportSpec(
                         id = d.fileName.removeSuffix(".gguf").lowercase().replace(Regex("[^a-z0-9._-]+"), "-"),
                         displayName = d.fileName.removeSuffix(".gguf"),
                         expectedBytes = d.sizeBytes,
-                        sha256 = d.sha256,
+                        sha256 = sha,
                     )
                     container.modelRepository.importModel(spec, app.contentResolver, uri) { _ -> }
                     // Small delay between imports to avoid I/O storm for 1.1 GB files
