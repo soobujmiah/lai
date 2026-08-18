@@ -37,7 +37,7 @@ std::vector<std::unique_ptr<Backend>> create_backends() {
 #else
     backends.emplace_back(std::make_unique<PlaceholderBackend>("cpu"));
 #endif
-    backends.emplace_back(std::make_unique<PlaceholderBackend>("vulkan"));
+    backends.emplace_back(create_vulkan_backend());
     return backends;
 }
 

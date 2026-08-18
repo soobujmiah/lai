@@ -68,5 +68,6 @@ std::vector<std::unique_ptr<Backend>> create_backends();
 #ifdef LAI_HAS_LLAMA_CPP
 std::unique_ptr<Backend> create_llama_cpu_backend();
 #endif
+std::unique_ptr<Backend> create_vulkan_backend();
 
 }  // namespace lai
