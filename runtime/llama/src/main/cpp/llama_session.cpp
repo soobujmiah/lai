@@ -9,7 +9,9 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <iostream>
 #include <mutex>
+#include <streambuf>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -136,9 +138,54 @@ std::string token_piece(const llama_vocab* vocab, llama_token token) {
 
 }  // namespace
 
+// Routes std::cerr into logcat under the LAI-llama tag. ggml-vulkan reports hard errors such as
+// "Compute pipeline creation failed for <pipeline>" through std::cerr, which Android apps drop to
+// /dev/null — without this redirect a device failure never names the offending shader.
+class LogcatStreambuf final : public std::streambuf {
+public:
+    explicit LogcatStreambuf(const char* tag) : tag_(tag) {}
+
+protected:
+    int overflow(int ch) override {
+        if (ch == traits_type::eof()) return traits_type::not_eof(ch);
+        if (ch == '\n') {
+            flush();
+        } else {
+            line_.push_back(static_cast<char>(ch));
+            if (line_.size() >= 1024) flush();
+        }
+        return ch;
+    }
+
+    std::streamsize xsputn(const char* text, std::streamsize count) override {
+        for (std::streamsize i = 0; i < count; ++i) {
+            if (text[i] == '\n') {
+                flush();
+            } else {
+                line_.push_back(text[i]);
+                if (line_.size() >= 1024) flush();
+            }
+        }
+        return count;
+    }
+
+private:
+    void flush() {
+        if (!line_.empty()) {
+            __android_log_write(ANDROID_LOG_ERROR, tag_, line_.c_str());
+            line_.clear();
+        }
+    }
+
+    const char* tag_;
+    std::string line_;
+};
+
 void initialize_llama_once() {
     static std::once_flag once;
     std::call_once(once, [] {
+        static LogcatStreambuf cerr_buf(kLogTag);
+        std::cerr.rdbuf(&cerr_buf);
         llama_log_set([](enum ggml_log_level level, const char* text, void*) {
             const int priority = level >= GGML_LOG_LEVEL_ERROR ? ANDROID_LOG_ERROR : ANDROID_LOG_DEBUG;
             __android_log_write(priority, kLogTag, text);
@@ -415,7 +462,15 @@ std::unique_ptr<BackendSession> build_llama_session(
         initialize_llama_once();
         llama_model_params model_params = llama_model_default_params();
         model_params.n_gpu_layers = gpu_layers;
-        model_params.load_mode = LLAMA_LOAD_MODE_MMAP;
+        // GPU offload requires copying weights into the device's buffers. With MMAP the loader
+        // keeps tensors in the CPU-mapped file, and llama.cpp deliberately swaps any GPU host
+        // buffer to CPU under mmap ("avoid using a host buffer when using mmap") — so an
+        // integrated GPU (Adreno 825, whose preferred buft is the host-visible Vulkan_Host)
+        // offloads 0 layers and silently runs on CPU (device evidence: 'offloaded 0/29 layers to
+        // GPU' + 'cannot be used with preferred buffer type Vulkan_Host, using CPU instead').
+        // Use LOAD_MODE_NONE for GPU offload so weights land in Vulkan buffers; keep MMAP for
+        // the pure-CPU path (fast mmap load, no copies).
+        model_params.load_mode = gpu_layers > 0 ? LLAMA_LOAD_MODE_NONE : LLAMA_LOAD_MODE_MMAP;
         llama_model* model = llama_model_load_from_file(model_path.c_str(), model_params);
         if (model == nullptr) {
             error = "llama.cpp could not load the GGUF model";

@@ -85,7 +85,9 @@ ggml Vulkan device registers at runtime. Set `validated_accelerators=cpu` to for
 GPU selection additionally requires the model catalog to declare `llama-vulkan` compatible
 (revision 4 does). Physical-device evidence is still recorded under `docs/device-results/`.
 
-On devices where the GPU driver fails at runtime (Adreno 825 currently: `createComputePipeline:
-ErrorUnknown`, 2026-08-19), the app automatically reloads the model on the CPU backend after an
-accelerator generation failure or stall, so inference keeps working; the failure is logged
-(`LAI-llm`) and a notice is shown. Set `validated_accelerators=cpu` to skip the GPU entirely.
+For GPU offload the native loader uses `LLAMA_LOAD_MODE_NONE` (mmap would force the integrated
+GPU's host-visible buffers back to CPU — 0 layers offloaded). If the driver still fails a
+compute pipeline at runtime, the app automatically reloads the model on the CPU backend after
+an accelerator failure/stall (logged at `LAI-llm`), and ggml-vulkan's `std::cerr` diagnostics
+are routed to the `LAI-llama` logcat tag so a pipeline failure names the exact shader. Set
+`validated_accelerators=cpu` to skip the GPU entirely.
