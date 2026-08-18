@@ -115,7 +115,7 @@ jobs:
             echo "apt-get update attempt ${attempt} failed; retrying in 15s" >&2
             sleep 15
           done
-          sudo apt-get install -y -qq --no-install-recommends spirv-headers spirv-tools glslang-tools libvulkan-dev 2>&1 | tail -n 20
+          sudo apt-get install -y -qq --no-install-recommends glslc spirv-headers spirv-tools glslang-tools libvulkan-dev 2>&1 | tail -n 20
           pkg-config --modversion vulkan 2>&1 || echo "vulkan pkg-config not found, but headers should be in /usr/include/vulkan"
 
       - name: Unit tests and lint
