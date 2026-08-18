@@ -18,6 +18,14 @@ android {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
                     "-DLAI_ENABLE_LLAMA_CPP=${providers.gradleProperty("lai.enableLlamaCpp").orNull ?: "OFF"}",
+                    // ggml-vulkan does find_package(SPIRV-Headers CONFIG REQUIRED). The apt-installed
+                    // spirv-headers package puts its CMake config in /usr/share/cmake/SPIRV-Headers,
+                    // but the NDK toolchain isolates package search to the NDK sysroot
+                    // (CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY), so the host config is invisible.
+                    // Point at the exact config and allow host-prefix fallback. CI installs
+                    // spirv-headers; local Vulkan builds must do the same.
+                    "-DSPIRV-Headers_DIR=/usr/share/cmake/SPIRV-Headers",
+                    "-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH",
                 )
                 providers.gradleProperty("lai.llamaCppDir").orNull?.let {
                     arguments += "-DLAI_LLAMA_CPP_DIR=$it"
