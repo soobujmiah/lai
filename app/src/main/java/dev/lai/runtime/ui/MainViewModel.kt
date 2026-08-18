@@ -1870,7 +1870,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
          */
         private const val CANCEL_GRACE_MS = 45_000L
         private const val MAX_PERFORMANCE_SAMPLES = 20
-        private const val MAX_FAILURE_REASON_CHARS = 200
+        private const val MAX_FAILURE_REASON_CHARS = 512
         private const val MAX_TOOL_AUDIT_RECORDS = 50
         private val DIAGNOSTICS_JSON = Json(LaiJson) { prettyPrint = true }
     }

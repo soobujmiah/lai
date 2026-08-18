@@ -138,38 +138,42 @@ std::string token_piece(const llama_vocab* vocab, llama_token token) {
 
 }  // namespace
 
-// Routes std::cerr into logcat under the LAI-llama tag. ggml-vulkan reports hard errors such as
-// "Compute pipeline creation failed for <pipeline>" through std::cerr, which Android apps drop to
-// /dev/null — without this redirect a device failure never names the offending shader.
+// Routes std::cerr into logcat under the LAI-llama tag AND keeps a bounded tail of everything
+// ggml writes there. ggml-vulkan reports hard errors such as "Compute pipeline creation failed
+// for <pipeline>" through std::cerr, which Android apps otherwise drop to /dev/null. Capturing
+// the tail lets a failed generation carry the offending shader name into the app error message,
+// LaiLog and the diagnostics export — no adb/logcat extraction needed.
 class LogcatStreambuf final : public std::streambuf {
 public:
     explicit LogcatStreambuf(const char* tag) : tag_(tag) {}
 
+    /** Bounded tail of what ggml wrote to std::cerr since startup (newest bytes last). */
+    std::string tail() const { return tail_; }
+
 protected:
     int overflow(int ch) override {
         if (ch == traits_type::eof()) return traits_type::not_eof(ch);
-        if (ch == '\n') {
-            flush();
-        } else {
-            line_.push_back(static_cast<char>(ch));
-            if (line_.size() >= 1024) flush();
-        }
+        consume(static_cast<char>(ch));
         return ch;
     }
 
     std::streamsize xsputn(const char* text, std::streamsize count) override {
-        for (std::streamsize i = 0; i < count; ++i) {
-            if (text[i] == '\n') {
-                flush();
-            } else {
-                line_.push_back(text[i]);
-                if (line_.size() >= 1024) flush();
-            }
-        }
+        for (std::streamsize i = 0; i < count; ++i) consume(text[i]);
         return count;
     }
 
 private:
+    void consume(char ch) {
+        if (ch == '\n') {
+            flush();
+        } else {
+            line_.push_back(ch);
+            tail_.push_back(ch);
+            if (line_.size() >= 1024) flush();
+            if (tail_.size() > kMaxTailBytes) tail_.erase(0, tail_.size() - kMaxTailBytes);
+        }
+    }
+
     void flush() {
         if (!line_.empty()) {
             __android_log_write(ANDROID_LOG_ERROR, tag_, line_.c_str());
@@ -177,14 +181,23 @@ private:
         }
     }
 
+    static constexpr size_t kMaxTailBytes = 4096;
     const char* tag_;
     std::string line_;
+    std::string tail_;
 };
+
+LogcatStreambuf* g_cerr_buf = nullptr;
+
+std::string captured_cerr_tail() {
+    return g_cerr_buf != nullptr ? g_cerr_buf->tail() : std::string();
+}
 
 void initialize_llama_once() {
     static std::once_flag once;
     std::call_once(once, [] {
         static LogcatStreambuf cerr_buf(kLogTag);
+        g_cerr_buf = &cerr_buf;
         std::cerr.rdbuf(&cerr_buf);
         llama_log_set([](enum ggml_log_level level, const char* text, void*) {
             const int priority = level >= GGML_LOG_LEVEL_ERROR ? ANDROID_LOG_ERROR : ANDROID_LOG_DEBUG;
@@ -413,9 +426,21 @@ public:
             static_cast<int>(evaluated),
         };
 
-        } catch (...) {
+        } catch (const std::exception& error) {
             // The KV cache may hold a partial or failed decode; never let kv_tokens_ overstate
             // what is actually cached. Next request pays a full prefill, which is always correct.
+            llama_memory_clear(llama_get_memory(context_), true);
+            kv_tokens_.clear();
+            pin_to_little_cores();
+            // Attach whatever ggml-vulkan last wrote to std::cerr (e.g. "Compute pipeline
+            // creation failed for <pipeline>") so the failure names the offending shader in the
+            // app error, LaiLog and the diagnostics export instead of a generic message.
+            const std::string tail = captured_cerr_tail();
+            if (!tail.empty()) {
+                throw std::runtime_error(std::string(error.what()) + " — " + tail);
+            }
+            throw;
+        } catch (...) {
             llama_memory_clear(llama_get_memory(context_), true);
             kv_tokens_.clear();
             pin_to_little_cores();
