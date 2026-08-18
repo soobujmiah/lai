@@ -1,273 +1,56 @@
-# System architecture blueprint
+# Architecture
 
-## 1. Scope
+LAI is a **modular, layered, offline-first Android runtime** for local LLMs, Android automation, and future hybrid AI. The repository is the source of truth; the `16`-module graph is enforced by `scripts/check_architecture_boundaries.py`.
 
-LAI separates product UX, agent decisions, Android control, model storage, recognition, and native inference so each can be replaced or tested without granting another component more authority. Phase labels are part of the design: unavailable adapters fail closed and are never presented as accelerated.
-
-## 2. Compile-time module layers
-
-The enforced graph is documented in [MODULES.md](MODULES.md). Core contracts, policy and scheduling are pure JVM; network, Accessibility and Shizuku each have one platform owner; JNI/C++ lives in runtime adapters; `app` is the composition root. See [the NpuHub comparison](ARCHITECTURE_COMPARISON_NPUHUB.md), [ADR 0002](adr/0002-modular-local-first-backbone.md), and the [Snapdragon-first decision](adr/0005-snapdragon-first-vendor-neutral-backends.md).
-
-## 3. Runtime layers
-
-```mermaid
-flowchart TB
-  subgraph Presentation[Presentation process]
-    UI[Jetpack Compose]
-    VM[MainViewModel]
-    UI --> VM
-  end
-
-  subgraph Orchestration[Policy and orchestration]
-    AR[AgentRuntime]
-    TC[ToolDefinition registry]
-    CG[Confirmation gate]
-    AR --> TC
-    TC --> CG
-  end
-
-  subgraph Android[Android integration]
-    AS[AccessibilityAutomationService]
-    SS[Screen screenshot]
-    SH[ElevatedShell]
-    SZ[Shizuku binder]
-    PA[Private tool audit]
-    AS --> SS
-    SH --> SZ
-  end
-
-  subgraph Intelligence[Intelligence plugins]
-    MR[ModelRepository]
-    OE[OcrEngine]
-    DP[DeviceProfile]
-    IS[Vendor-neutral scheduler]
-    IE[llama InferenceEngine]
-    JNI[NativeBindings / JNI]
-    BR[C++ llama backend registry]
-    TG[C++ bounded TaskGraph target]
-    MICRO[Embedding / Whisper micro-models]
-    CPU[llama.cpp CPU]
-    VK[llama.cpp Vulkan]
-    QR[Dedicated Qualcomm runtime]
-    QNN[QAIRT/QNN HTP]
-    DP --> IS --> IE
-    IE --> JNI --> BR
-    JNI -. future task composition .-> TG
-    TG -. bounded parallel nodes .-> MICRO
-    BR --> CPU
-    BR -. phase 2 .-> VK
-    IS -. future runtime composition .-> QR
-    QR -. phase 3 .-> QNN
-  end
-
-  VM --> AR
-  VM --> MR
-  VM --> DP
-  VM --> PA
-  CG --> AS
-  CG --> SH
-  SS --> OE
-```
-
-### Presentation
-
-The current v0.8 baseline exposes Chat, Screen Reader, and Automator as three primary modes. Runtime details and model URL controls are behind Developer Mode. `MainViewModel` performs lifecycle-bound coroutine work and exposes immutable state. Local action proposals are a separate opt-in; pending validated calls live only in ViewModel memory and are cleared before one-time execution.
-
-The target product keeps two complementary entry points over the same feature contracts and runtime adapters:
-
-1. **Standalone Tools Dashboard** — direct, task-focused cards for OCR, Voice, Image Generation, and Vector Search. A tool can be opened without starting an LLM chat; unavailable models/backends remain visibly disabled rather than simulated.
-2. **Unified Chat Interface** — the conversation composer includes a **+ Attach Tools** menu. The user can attach an image/document, select OCR, Voice, Image Generation, or Vector Search, and see the selected tool as a removable chip before sending. Tool invocation still passes through capability checks, local policy, and confirmation where consequential.
-
-The dashboard and Chat must not contain separate implementations of OCR/search/speech/image generation. Both call shared, vendor-neutral tool/service contracts; only navigation, presentation state, and task composition differ. Feature UI modules may be extracted from `MainViewModel` when implementation begins, as already anticipated in [MODULES.md](MODULES.md).
-
-Chat also reserves a top-right **⚙ quick-settings** action. It opens a bottom sheet scoped to the currently selected model/tool, not a global untyped settings page. The product behavior and parameter precedence are specified in [MODELS_AND_BACKENDS.md](MODELS_AND_BACKENDS.md#product-configuration-and-contextual-quick-settings-target).
-
-### Agent/tool policy
-
-The model-facing format is `ToolCall(id, name, arguments)`. `ToolCallParser` accepts only a complete bounded JSON envelope and validates exact per-tool shapes; `AgentRuntime` repeats typed validation, resolves only the canonical registry, checks trusted confirmation, and returns `ToolResult`. The model never receives Java/Kotlin object references, Binder objects, accessibility nodes, confirmation authority, or a shell.
-
-### Accessibility
-
-`AccessibilityAutomationService` is Android-bound and main-thread confined. `AccessibilityGateway` holds only a weak service reference. Every operation obtains a fresh active root. Snapshots are flattened to immutable, serializable nodes and bounded to 400 nodes / depth 24. Password text and descriptions are omitted.
-
-Selectors are deterministic in this order:
-
-1. fully qualified view resource ID;
-2. hierarchy path;
-3. exact visible text;
-4. exact content description.
-
-### Elevated operations
-
-`ShizukuController` observes binder/permission state. `ShellCommandPolicy` accepts named structured operations and emits an argv list. A Shizuku `UserService` executes `ProcessBuilder(argv)` under shell/root identity; the removed/private `newProcess` API is not used. No command string is passed through `sh -c`; package names, namespaces, keys, values, and key codes are validated. Mutations require confirmation. Output is limited to 64 KiB and execution to 10 seconds by default.
-
-### Model storage
-
-`ModelRepository` lives in the only network-owning module and streams directly to app-private no-backup storage. It supports HTTP Range resume, mandatory SHA-256, explicit-user-action and reviewed-host policy, redirect revalidation, and GGUF magic validation. Registry replacement is write-then-rename. **Keep copy** streams to a user-selected SAF document, checks byte count and source digest, reopens the destination, and verifies its digest. The repository contains no weights. Installed models are loaded only after an explicit user tap, preventing multi-gigabyte startup allocations.
-
-#### User-owned LAI workspace (target)
-
-The standardized user-visible workspace is logically:
+## Module Graph
 
 ```text
-/sdcard/LAI/
-├── models/                 # user-owned model artifacts, primarily .gguf
-├── tools/                  # OCR/STT/TTS/embedding/image tool artifacts
-├── config/
-│   └── settings.json       # versioned non-secret product/tool configuration
-└── cache/                  # disposable downloads, conversion output and indexes
+app (Compose shell + MainViewModel + ToolsDashboard + Xiaomi guide)
+├── core:contracts (pure JVM: inference/ocr/agent/audit/automation/diagnostics/workspace/shell)
+├── core:policy (pure: AgentPolicy, BuiltInToolCatalog, ToolAuditLedger, ToolInstructionGate, SettingsPolicy, ContextWindowPolicy)
+├── core:scheduler (pure: InferenceScheduler, ModelMemoryEstimator, ThermalGovernorPolicy)
+├── core:model (pure: ReviewedModelCatalog)
+├── plugins:api (pure: LaiPlugin contract)
+├── platform:download (ONLY network owner: ModelRepository, ModelDownloadWorker/Coordinator, RemoteModelCatalogRepository, WorkManager)
+├── platform:audit (ONLY audit bytes: ToolAuditRepository hash chain)
+├── platform:device (AndroidRuntimeEnvironmentProvider + thermalStates callback)
+├── platform:history (ONLY content-bearing store: ChatHistoryRepository no-backup)
+├── platform:accessibility (AccessibilityAutomationService, AccessibilityGateway, NodeSnapshotter)
+├── platform:workspace (SAF grant, WorkspaceRepository/Saf/Discovery/Policy, WorkspaceSettingsStore)
+├── platform:shizuku (ElevatedShell, PrivilegedUserService, ShizukuController)
+├── runtime:llama (JNI/C++ llama.cpp CPU + Vulkan scaffold: native_inference, llama_cpu_backend batch 32, backend_registry)
+├── runtime:ocr (BanglaOcrService placeholder)
+└── runtime:orchestrator (AgentRuntime)
 ```
 
-On Android 11+, `/sdcard/LAI/` is a display/logical path—not permission to bypass scoped storage. LAI must create or select the directory through `ACTION_OPEN_DOCUMENT_TREE`, operate through `ContentResolver`/document IDs, and persist the tree grant only after explicit user consent. It must not request `MANAGE_EXTERNAL_STORAGE`. A removable card or another document provider may back the same logical workspace. The provider URI is authoritative even when no raw filesystem path exists.
+**Direction enforced:** `core` → no Android/network/JNI/vendor; `platform` → Android authority, never upward; `runtime` → replaceable adapters, no UI; `app` → only composition root. `network` only in `platform:download`; `audit bytes` only in `platform:audit`; `chat content` only in `platform:history`.
 
-The existing app-private, mmap-friendly runtime copy remains the execution source. User-owned workspace artifacts are portable masters and must be copied/verified into private runtime storage before native loading unless a future seekable-file-descriptor path is separately qualified. **Keep copy** remains a one-document export and does not silently enroll a directory. Workspace permission is lost on uninstall even though the files survive; after reinstall, the user must select the LAI root again before auto-discovery can resume.
-
-`settings.json` is schema-versioned, bounded, atomically replaced, and prohibited from containing prompts, generated text, document chunks, credentials, provider tokens, raw Accessibility data, or shell output. `cache/` is never authoritative and may be removed under storage pressure.
-
-#### Startup restore and model auto-discovery (target)
-
-After a workspace has been explicitly granted, startup performs a bounded background pipeline without blocking first frame:
-
-1. open `config/settings.json`, enforce size/schema/version limits, migrate known versions, and fall back to embedded safe defaults on any failure;
-2. enumerate supported immediate children under `models/` and `tools/` with count/depth/time limits—never scan all shared storage;
-3. stage each `.gguf` candidate as untrusted, read exact size and GGUF magic, stream SHA-256, and compare with signed catalog metadata when known;
-4. register known matches with their reviewed model/backend compatibility metadata;
-5. classify unknown but structurally valid files as `LOCAL_UNREVIEWED`; never auto-load or claim compatibility, licensing, Bangla quality, or acceleration;
-6. detect duplicate hashes and changed bytes, invalidate stale private copies/indexes, and surface a local-only review result;
-7. copy an explicitly selected compatible artifact into app-private runtime storage, then repeat exact-size/GGUF/SHA-256 verification before activation.
-
-Auto-discovery registers metadata only; it never allocates model weights, starts inference, downloads a replacement, or executes a tool at startup.
-
-### Device profile and backend selection
-
-`platform:device` creates a generic `DeviceProfile` from Android manufacturer/model, public SoC fields where available, API/ABI/CPU facts, memory, battery, charging, and thermal status. Runtime adapters contribute `BackendCapability` entries. Branding is diagnostic only: Snapdragon text never proves that QNN is installed or that a model is compatible.
-
-Each adapter owns a stable opaque `BackendId` and publishes a generic `BackendDescriptor` (compute class, formats, known quantizations, and preference). Signed catalog revision 3 declares each artifact's format, context, compatible/preferred/fallback backend IDs, estimated peak memory, and required ABIs. `InferenceScheduler` knows only evidence, compatibility, resource policy, and measurements. A source boundary check rejects hardware-vendor and SDK terminology in generic inference/scheduler code. See [VENDOR_BACKEND_STRATEGY.md](VENDOR_BACKEND_STRATEGY.md) and [ADR 0005](adr/0005-snapdragon-first-vendor-neutral-backends.md).
-
-### Native inference
-
-The current app composes one llama `InferenceEngine`; JNI maps opaque integer handles to shared C++ `BackendSession` instances. C++ validates file existence, GGUF magic, context range, backend availability and conversation roles. Trusted Kotlin system instructions are merged into the single native system message rather than emitted as conflicting duplicate system roles. The CPU runtime clears context memory per request, applies the model-native template to full user/assistant history, counts formatted tokens, evaluates bounded prompt batches, samples, and streams only complete UTF-8 code points through a cancellable callback. Oldest completed turns are omitted when prompt plus response reserve would exceed 4,096 tokens. Native monotonic clocks return prompt evaluation, TTFT, decode and total duration; metrics remain in memory and Developer Mode only.
-
-The llama module owns `llama-cpu` and a future tested `llama-vulkan`; it contains no QNN flag, placeholder, SDK type, or model assumption. A real Qualcomm implementation will be a separately isolated runtime adapter and will be composed only when it exists. A generic backend manager is deliberately deferred until a second concrete runtime is compiled.
-
-A production adapter must provide:
-
-- bounded context and allocation plan;
-- cancellation and token callback;
-- UTF-8-safe streaming;
-- backend capability probe;
-- thermal/memory events;
-- deterministic session destruction;
-- explicit failure classification so runtime composition can choose a compatible fallback.
-
-#### Native C++ task chaining and bounded parallelism (target)
-
-A future native `TaskGraph`/orchestrator may compose a 3B–5B chat LLM with lightweight micro-models such as an embedding encoder or Whisper-class speech recognizer. This does **not** replace Kotlin consent/policy: C++ schedules compute-only nodes, while Android authority, user confirmation, URI access, and tool audit remain outside native code.
-
-Each task node declares dependencies, backend ID, estimated resident weights/KV/workspace/staging bytes, thread/queue demand, cancellation token, input/output ownership, and whether streaming can begin before upstream completion. The scheduler admits parallel nodes only when:
+## Data Flow (simplified)
 
 ```text
-resident sessions
-+ active KV/decoder state
-+ all concurrent task workspaces
-+ shared I/O/audio/tensor buffers
-+ safety margin
-<= current backend/device memory budget
+Compose UI (LaiApp) → MainViewModel (StateFlow) → AppContainer
+  → Inference: MainViewModel → InferenceScheduler (evidence/thermal/memory) → NativeInferenceEngine → JNI C++ (llama.cpp) → Adreno/QNN later
+  → Tools: MainViewModel → AgentRuntime → AccessibilityGateway / Shizuku / BanglaOcrService → ToolAuditRepository (approval-before-authority, replay guard)
+  → Models: ModelRepository (registry.json) ↔ platform:download (OkHttp, WorkManager, SHA-256, resume) ↔ storage/LAI/models (SAF auto-import)
+  → Diagnostics: DiagnosticsReportV1 (privacy-safe, no prompts) → export via SAF
 ```
 
-If the budget, thermal state, or battery policy does not pass, the graph serializes nodes, reduces batch/chunk size, moves a compatible node to a fallback backend, or evicts a recreatable micro-model session. It must never optimistically launch all models and wait for allocation failure.
+## Trust Boundaries
 
-Memory-spike controls:
+*   **Network:** Only `platform:download` has `INTERNET`; all other modules fail if they import `okhttp`/`java.net`.
+*   **Audit:** Only `platform:audit` may write `tool_audit.jsonl` (hash-chained, fsync, full-chain verify).
+*   **Content:** Only `platform:history` may persist `chat_history.json` (no-backup, ≤100 sessions, ≤512 msgs, atomic).
+*   **Authority:** `AccessibilityGateway` (weak ref, `flagIncludeNotImportantViews`) + `ElevatedShell` (argv allowlist, no raw shell). Model text can never self-approve.
+*   **Secrets:** PKCS12 `lai-release` key in `secrets.ANDROID_KEYSTORE_*` + offline copy — never in repo.
 
-- mmap/read-only weights where the backend supports it; never duplicate complete model bytes on the Java/Kotlin heap;
-- one reference-counted session per loaded artifact/backend, with deterministic release and no hidden singleton ownership;
-- bounded reusable arenas for tensors, embedding batches, audio windows, and token pieces;
-- chunked Whisper audio/ring buffers and bounded embedding batches rather than whole-document/audio materialization;
-- separate capped worker pools/queues so LLM, embedding, and speech tasks do not oversubscribe the same CPU cores;
-- stream outputs through bounded channels with backpressure and cooperative cancellation;
-- keep the heavyweight LLM resident only when the measured memory budget permits; otherwise checkpoint/recreate safe state around micro-model work;
-- report per-node latency, peak estimate, backend, throttle/fallback reason, and cancellation without recording user content.
+## Native Boundary
 
-Safe parallel examples include embedding the next bounded document chunk while an admitted LLM decodes, or streaming Whisper segments into a prompt builder while the LLM session is idle. Unsafe combinations are automatically serialized. The existing Qwen 1.5B CPU path and CI pipeline remain the correctness baseline and are not replaced by the planned 3B–5B/task-graph work.
+`runtime/llama` isolates JNI/C++: `runtimeInfo / createSession / countTokens / generate / setThreadLimit / destroySession / lastError` (7-slot metrics array). `BackendSession` (`count_tokens, generate, set_thread_limit`) — thread budget atomic between `llama_decode`. `kv_tokens_` mirrors cache token-for-token; `llama_memory_seq_rm(0, reused, -1)` keeps longest common prefix; batch `32`; adaptive `little 7 idle → big 0-3 burst`; `sched_setaffinity` best-effort.
 
-### OCR
+## Future Additions (additive, no rewrite)
 
-Accessibility screenshot capture creates an ARGB bitmap only in memory. `BanglaOcrService` passes it to an `OcrEngine`; output uses schema version 1 with full text, blocks, BCP-47 language, confidence, polygon, and optional handwritten classification. The current placeholder returns a typed model-required error.
+*   `core:tokenization` (SentencePiece unigram), `core:rag` (BM25 + Granite 107M 384-dim LiteRT embedder), `core:pipeline` (DAG), `core:agent` (split from `core:policy` for multi-step loop), `backend:litert`/`backend:rag-litert`, `features:rag/ocr` — each as new `core`/`backend`/`features` module, composed by `app`. Vulkan `GGML_VULKAN=ON` with `SPIRV-Headers` on CI, QNN isolated `runtime:qnn` with licensed QAIRT.
 
-## 4. Control flow
+## Verification
 
-```mermaid
-sequenceDiagram
-  actor U as User
-  participant UI as Compose
-  participant L as Local LLM
-  participant P as Private audit
-  participant A as AgentRuntime
-  participant X as Accessibility/Shizuku
-  U->>UI: Request a task
-  UI->>L: Prompt + available tool schemas
-  L-->>UI: Proposed ToolCall
-  UI->>U: One-time review
-  U-->>UI: Approve / deny
-  UI->>P: Append approval fingerprint + fsync
-  P-->>UI: Verified sequence/hash
-  UI->>A: Exact ToolCall + trusted confirmation
-  A->>A: Revalidate name, schema, policy
-  A->>X: Typed operation
-  X-->>A: Bounded result
-  A-->>UI: Typed ToolResult
-  UI->>P: Append success/failure
-  UI-->>U: Local result summary
-```
-
-When Local action proposals is enabled, a complete model response may enter the strict built-in `ToolCallParser`. An accepted one-shot proposal is rewritten to a human-readable summary and shown in a trusted Compose dialog; see [ADR 0006](adr/0006-one-shot-model-tool-proposals.md). Approval is hash-chained and fsynced through `platform:audit` before it is passed separately to `AgentRuntime`; an exact previously approved fingerprint is blocked as replay. See [ADR 0007](adr/0007-persistent-tool-audit-and-replay-guard.md). Denial invokes no authority. Tool output is not fed back to the model and no autonomous chain exists. The confirmation bit originates only in trusted UI state, never in model-authored JSON.
-
-## 5. Threads and ownership
-
-| Work | Dispatcher/thread | Owner |
-|---|---|---|
-| Compose/state | Main | Activity/ViewModel |
-| Accessibility node operations | Main immediate | Accessibility service |
-| Model catalog/policy/scheduling | caller / pure JVM | core model, policy and scheduler |
-| Android memory/battery/thermal snapshot | short synchronous platform call | platform:device |
-| Model network and hashing | IO | platform:download ModelRepository |
-| Tool-audit verify/append/fsync | IO + coroutine mutex | platform:audit ToolAuditRepository |
-| Shizuku process streams | IO coroutines | ElevatedShell |
-| OCR preprocessing/inference | Default or plugin-owned | OcrEngine |
-| Native token generation | dedicated native worker | BackendSession |
-| Future LLM/micro-model task graph | capped native pools + bounded channels; admission before launch | C++ TaskGraph/runtime adapters |
-
-No accessibility node survives a command. Bitmaps are recycled after OCR. Native session handles are destroyed by `InferenceEngine.close()`.
-
-## 6. Trust boundaries
-
-1. **Untrusted model output:** tool names and arguments require strict parsing.
-2. **Untrusted visible UI:** screen text can contain prompt injection; it is data, not authority.
-3. **Accessibility authority:** can affect other apps; disabled by default and user-enabled in system settings.
-4. **Shizuku authority:** shell/root identity varies; UID is surfaced and operations are allowlisted.
-5. **Persistent tool audit:** contains no call content, but chain/transition failure blocks model tools; unkeyed hashes do not defend against a root attacker who can rewrite all app-private bytes.
-6. **User-owned workspace:** `settings.json`, discovered models and tool artifacts are mutable external input; strict bounds/schema/hash checks precede registration, and registration never means execution trust.
-7. **Downloaded model:** size/hash/format are validated; model license and provenance remain user responsibilities.
-8. **CI secrets:** signing and future proprietary SDK credentials exist only in GitHub Actions secret scope.
-
-## 7. Plugin seams
-
-- `InferenceEngine`: llama.cpp or a separately isolated ExecuTorch, MNN, QNN, or future runtime adapter.
-- llama C++ `Backend`: CPU and tested Vulkan implementations only.
-- `BackendId`/`BackendDescriptor`: implementation-owned identity and generic compatibility facts; core does not enumerate vendors.
-- `OcrEngine`: TFLite, ONNX Runtime, vendor adapter, or packaged service plugin.
-- future `ToolProvider`: RAG, STT/TTS, calendar, files.
-
-Plugins must publish capability and safety metadata rather than relying on type discovery.
-
-## 8. Performance design for Snapdragon 8s Gen 4
-
-- arm64-only initial artifact avoids unused ABI payload.
-- streaming file I/O avoids model-sized heap allocations.
-- no bitmap crosses JNI in Phase 1.
-- C++ uses hidden visibility and section garbage collection.
-- future Vulkan path should use persistent buffers, mapped staging pools, and device capability probes.
-- the future isolated Qualcomm adapter should cache HTP context binaries by model hash, SoC/firmware ID, QAIRT version, and quantization recipe.
-- UI never waits synchronously for network, OCR, shell, or inference work.
-
-Performance claims require device evidence; see [DEVICE_TESTING.md](DEVICE_TESTING.md).
+`scripts/validate_repo.sh` checks `128 MB` cap, no `*.apk/*.so/*.gguf/*.jks`, docs links, catalog. `check_architecture_boundaries.py` checks direction. `validate_model_catalog.py` checks `models-v1.json` rev3. Tests `169` + JaCoCo ratchets (contracts .15 / policy .55 / scheduler .70 / model .50 / plugins .50) run on CI; device tests (Vulkan, QNN, OCR quality, thermal) are `DEVICE TEST REQUIRED`.
