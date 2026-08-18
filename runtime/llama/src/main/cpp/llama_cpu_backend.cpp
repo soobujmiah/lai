@@ -3,6 +3,8 @@
 #include "llama.h"
 
 #include <android/log.h>
+#include <sched.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <atomic>
@@ -29,6 +31,22 @@ constexpr const char* kSystemPrompt =
 
 long long elapsed_us(Clock::time_point start, Clock::time_point end) {
     return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+}
+
+void pin_to_big_cores() {
+    cpu_set_t mask; CPU_ZERO(&mask);
+    for (int c = 4; c < 8; ++c) CPU_SET(c, &mask);
+    if (sched_setaffinity(0, sizeof(mask), &mask) == 0) {
+        __android_log_print(ANDROID_LOG_INFO, kLogTag, "core: pinned to big cores 4-7");
+    }
+}
+void pin_to_little_cores() {
+    cpu_set_t mask; CPU_ZERO(&mask);
+    for (int c = 0; c < 4; ++c) CPU_SET(c, &mask);
+    // Best-effort: if pinning fails we keep current affinity.
+    if (sched_setaffinity(0, sizeof(mask), &mask) == 0) {
+        __android_log_print(ANDROID_LOG_INFO, kLogTag, "core: pinned to little cores 0-3 (idle)");
+    }
 }
 
 void initialize_llama_once() {
@@ -173,6 +191,9 @@ public:
         }
 
         const auto total_start = Clock::now();
+        // Adaptive cores: when idle the process stays on little cores (cool, efficient).
+        // When user sends a message, burst to big cores for the whole generation, then return.
+        pin_to_big_cores();
         __android_log_print(
             ANDROID_LOG_INFO, kLogTag,
             "generate: lock acquired after %lld us", elapsed_us(lock_wait_start, total_start)
@@ -333,6 +354,7 @@ public:
             "generate: done, %d tokens in %lld us total",
             generated, elapsed_us(total_start, end)
         );
+        pin_to_little_cores();
         return GenerationResult{
             static_cast<int>(prompt_tokens.size()),
             generated,
@@ -348,6 +370,7 @@ public:
             // what is actually cached. Next request pays a full prefill, which is always correct.
             llama_memory_clear(llama_get_memory(context_), true);
             kv_tokens_.clear();
+            pin_to_little_cores();
             throw;
         }
     }
@@ -429,6 +452,8 @@ public:
             error = "llama.cpp could not allocate the inference context";
             return nullptr;
         }
+        // Idle: keep process on little cores until user sends a message.
+        pin_to_little_cores();
         return std::make_unique<LlamaCpuSession>(model, context, static_cast<int>(worker_threads));
     }
 };

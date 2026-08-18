@@ -438,6 +438,21 @@ private fun AutomatorScreen(state: MainUiState, viewModel: MainViewModel) {
         }
         StatusCard(stringResource(R.string.safety_title), stringResource(R.string.safety_body))
         ToolsDashboard(state, viewModel)
+        // Xiaomi/HyperOS kills the accessibility toggle on swipe-away unless the user locks it.
+        // This card is visible only when accessibility is off (or always for Xiaomi) to make the fix discoverable.
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Xiaomi tip: keep access ON", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "HyperOS turns off Accessibility when you swipe LAI away. Fix once:\n• Recent apps → long-press LAI → Lock 🔒\n• Settings → Apps → LAI → Battery saver → No restrictions\n• Security → Autostart → LAI → Allow\nThen just press Home — don’t Force Stop.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                OutlinedButton(onClick = viewModel::openAccessibilitySettings, enabled = !state.accessibilityConnected) {
+                    Text(if (state.accessibilityConnected) "Accessibility is ON" else "Open Accessibility settings")
+                }
+            }
+        }
     }
 }
 
