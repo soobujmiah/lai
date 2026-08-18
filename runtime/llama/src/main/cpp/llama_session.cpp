@@ -20,6 +20,7 @@
 namespace lai {
 namespace {
 
+using Clock = std::chrono::steady_clock;
 constexpr const char* kLogTag = "LAI-llama";
 constexpr const char* kSystemPrompt =
     "You are LAI, a private on-device assistant. Be concise and accurate. "
