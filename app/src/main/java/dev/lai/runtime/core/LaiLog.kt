@@ -103,8 +103,11 @@ object LaiLog {
     fun exportText(): String {
         val file = logFile
         val fromFile = try {
-            file != null && file.exists() && file.length() <= MAX_FILE_BYTES * 2L &&
+            if (file != null && file.exists() && file.length() <= MAX_FILE_BYTES * 2L) {
                 file.readText(Charsets.UTF_8)
+            } else {
+                null
+            }
         } catch (_: Exception) {
             null
         }

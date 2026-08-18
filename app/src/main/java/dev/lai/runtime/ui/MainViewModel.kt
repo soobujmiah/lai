@@ -789,11 +789,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             if (approval.isFailure) {
                 val verified = container.toolAuditRepository.snapshot()
-                LaiLog.e(
-                    "LAI-audit",
-                    "Tool approval audit failed: ${approval.exceptionOrNull()?.message}",
-                    approval.exceptionOrNull(),
-                )
+                val approvalError = approval.exceptionOrNull()
+                if (approvalError != null) {
+                    LaiLog.e("LAI-audit", "Tool approval audit failed: ${approvalError.message}", approvalError)
+                } else {
+                    LaiLog.e("LAI-audit", "Tool approval audit failed: unknown audit error")
+                }
                 val message = "Action not run because approval audit failed: " +
                     (approval.exceptionOrNull()?.message ?: "unknown audit error")
                 _state.update {

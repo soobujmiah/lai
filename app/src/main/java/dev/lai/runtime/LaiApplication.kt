@@ -15,11 +15,13 @@ class LaiApplication : Application() {
         // at DEBUG, signed release builds at INFO (see docs/LOGGING.md). A crash handler records
         // fatal stack traces into the diagnostic log file for later extraction.
         LaiLog.configure(this, debugBuild = BuildConfig.DEBUG)
-        val previousHandler = Thread.defaultUncaughtExceptionHandler
-        Thread.defaultUncaughtExceptionHandler = Thread.UncaughtExceptionHandler { thread, throwable ->
-            LaiLog.e("LAI-crash", "Uncaught exception on ${thread.name}", throwable)
-            previousHandler?.uncaughtException(thread, throwable)
-        }
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler(
+            Thread.UncaughtExceptionHandler { thread, throwable ->
+                LaiLog.e("LAI-crash", "Uncaught exception on ${thread.name}", throwable)
+                previousHandler?.uncaughtException(thread, throwable)
+            },
+        )
         LaiLog.i("LAI-lifecycle", "LaiApplication onCreate (process start)")
         container = AppContainer(this)
     }
