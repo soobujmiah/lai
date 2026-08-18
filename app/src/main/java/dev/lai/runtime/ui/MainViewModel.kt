@@ -477,8 +477,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * a verified SHA-256 (ModelRepository.validateIdentity); files without a digest are skipped
      * and logged rather than failing silently.
      */
+    private var importInFlight = false
+
     private fun importWorkspaceModels() {
+        // Multiple triggers (startup, grant-active transition, manual grant, manual scan) can
+        // fire close together; only one import pass may run at a time, otherwise two passes copy
+        // the same 1.1 GB file into the same .part and corrupt each other (device evidence
+        // 2026-08-19: ENOENT + SHA-256 mismatch on the shared staging file).
+        if (importInFlight) {
+            LaiLog.d("LAI-workspace", "Auto-import already running; skipping duplicate pass")
+            return
+        }
+        importInFlight = true
         viewModelScope.launch {
+        try {
             if (!workspace.state.value.granted) return@launch
             val reviewedBySha = state.value.supportedModels.associate { it.sha256.lowercase() to it.id }
             val result = container.workspaceDiscovery.discoverModels(
@@ -542,6 +554,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     it.copy(notice = "$imported model(s) imported from the workspace folder")
                 }
             }
+        } finally {
+            importInFlight = false
+        }
         }
     }
 
@@ -735,6 +750,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 markLastAssistantContextIneligible()
                 dropTrailingEmptyAssistantMessage()
+                // A stalled generation on an accelerator is usually a wedged driver; closing the
+                // engine releases it and the CPU reload keeps the app usable.
+                fallbackToCpuAfterAcceleratorFailure(
+                    "Stalled at ${generationStage.name} on accelerator for over ${CANCEL_GRACE_MS} ms",
+                )
             }
         }
     }
@@ -1148,6 +1168,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(messages = updated, operation = RuntimeOperation.ERROR, notice = message)
         }
         persistChat()
+        // If an accelerator (GPU) was active and the native driver failed, reload the same model
+        // on CPU so the next attempt works instead of failing on a broken driver. Device evidence
+        // 2026-08-19: Adreno 825 -> vk::Device::createComputePipeline ErrorUnknown.
+        fallbackToCpuAfterAcceleratorFailure(message)
+    }
+
+    /**
+     * When generation fails on an accelerator backend (e.g. a Vulkan driver error), switch the
+     * loaded model to the CPU backend so the app remains usable. Honest and fail-closed: no
+     * acceleration is claimed until it is physically validated. Safe no-op on CPU.
+     */
+    private fun fallbackToCpuAfterAcceleratorFailure(message: String) {
+        val scheduler = state.value.schedulerDetail.orEmpty()
+        val acceleratorActive = scheduler.startsWith("LLAMA-VULKAN") || scheduler.contains("llama-vulkan")
+        val backendFailure = message.contains("vk::", ignoreCase = true) ||
+            message.contains("vulkan", ignoreCase = true) ||
+            message.contains("pipeline", ignoreCase = true) ||
+            message.contains("backend", ignoreCase = true) ||
+            message.contains("device", ignoreCase = true) ||
+            message.contains("accelerator", ignoreCase = true) ||
+            message.contains("stall", ignoreCase = true)
+        if (!acceleratorActive || !backendFailure) return
+        val modelId = state.value.activeModelId ?: return
+        val model = state.value.installedModels.firstOrNull { it.id == modelId } ?: return
+        viewModelScope.launch {
+            LaiLog.w("LAI-llm", "Accelerator generation failed ($message); reloading $modelId on CPU")
+            container.inferenceEngine.close()
+            val file = container.modelRepository.resolve(model)
+            val reloaded = container.inferenceEngine.load(file.absolutePath, BackendId("llama-cpu")).isSuccess
+            _state.update {
+                it.copy(
+                    operation = if (reloaded) RuntimeOperation.READY else RuntimeOperation.ERROR,
+                    activeModelId = if (reloaded) modelId else null,
+                    schedulerDetail = if (reloaded) "LLAMA-CPU: switched after accelerator failure" else it.schedulerDetail,
+                    notice = if (reloaded) {
+                        "The GPU backend failed on this device; switched to CPU for the next attempt."
+                    } else {
+                        "The GPU backend failed and the CPU reload also failed."
+                    },
+                )
+            }
+            if (reloaded) {
+                LaiLog.i("LAI-llm", "Accelerator -> CPU fallback complete for $modelId")
+            }
+        }
     }
 
     /**

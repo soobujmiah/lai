@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <dlfcn.h>
 
+#include <cstdlib>
 #include <string>
 
 #ifdef LAI_HAS_VULKAN
@@ -61,6 +62,10 @@ public:
         }
         dlclose(handle);
 #ifdef LAI_HAS_VULKAN
+        // Same Adreno coopmat workaround as open(): keep the env consistent no matter which
+        // entry point first touches the ggml Vulkan device.
+        setenv("GGML_VK_DISABLE_COOPMAT", "1", 1);
+        setenv("GGML_VK_DISABLE_COOPMAT2", "1", 1);
         initialize_llama_once();
         const ggml_backend_dev_t device = find_gpu_device();
         if (device == nullptr) {
@@ -81,6 +86,14 @@ public:
         std::string& error
     ) override {
 #ifdef LAI_HAS_VULKAN
+        // Adreno driver workaround: the Adreno 825 advertises VK_KHR_cooperative_matrix but its
+        // driver fails vk::Device::createComputePipeline with ErrorUnknown for the coopmat
+        // shaders (device evidence 2026-08-19). ggml-vulkan reads these env vars when the device
+        // is first created; set them before any Vulkan use so the standard (non-coopmat) shader
+        // paths are used. Disabling coopmat only drops the optional matmul acceleration — the
+        // Vulkan backend still runs everything else on the GPU.
+        setenv("GGML_VK_DISABLE_COOPMAT", "1", 1);
+        setenv("GGML_VK_DISABLE_COOPMAT2", "1", 1);
         initialize_llama_once();
         const ggml_backend_dev_t device = find_gpu_device();
         if (device == nullptr) {
