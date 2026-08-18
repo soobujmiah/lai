@@ -29,6 +29,7 @@ env:
   ANDROID_NDK: '27.0.12077973'
   CMAKE_VERSION: '3.22.1'
   LLAMA_CPP_COMMIT: 'ad1de39e0708e3ced9c71bb3c82d93a2c046a73f'
+  VULKAN_HEADERS_TAG: 'v1.4.311'
 
 jobs:
   source-policy:
@@ -102,6 +103,18 @@ jobs:
           bash scripts/ci/fetch_llama_cpp.sh "$LLAMA_CPP_COMMIT" "$RUNNER_TEMP/llama.cpp"
           echo "LAI_LLAMA_CPP_DIR=$RUNNER_TEMP/llama.cpp" >> "$GITHUB_ENV"
 
+      # ggml-vulkan.cpp includes <vulkan/vulkan.hpp> (the Vulkan C++ bindings), which neither
+      # the NDK sysroot nor apt libvulkan-dev provides (C API only). Fetch the Khronos headers
+      # pinned to a tag and inject the include dir via -Plai.vulkanHeadersDir.
+      - name: Fetch pinned Vulkan-Headers (vulkan.hpp C++ bindings)
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/vulkan-headers"
+          curl -fsSL "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/${VULKAN_HEADERS_TAG}.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/vulkan-headers" --strip-components=1
+          test -f "$RUNNER_TEMP/vulkan-headers/include/vulkan/vulkan.hpp"
+          echo "LAI_VULKAN_HEADERS_DIR=$RUNNER_TEMP/vulkan-headers" >> "$GITHUB_ENV"
+
       - name: Install Vulkan build dependencies (SPIRV-Headers, glslang)
         timeout-minutes: 10
         shell: bash
@@ -123,6 +136,7 @@ jobs:
           gradle --no-daemon --stacktrace coverageCheck :platform:audit:testDebugUnitTest :platform:download:testDebugUnitTest :platform:workspace:testDebugUnitTest :platform:history:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug
           -Plai.enableLlamaCpp=ON
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
+          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
 
       - name: Build debug APK and native arm64 library
         if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
@@ -132,6 +146,7 @@ jobs:
           -Plai.versionName=0.6.${{ github.run_number }}
           -Plai.enableLlamaCpp=ON
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
+          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
 
       - name: Build release APK and native arm64 library
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
@@ -143,7 +158,8 @@ jobs:
             -Plai.versionCode="${GITHUB_RUN_NUMBER}" \
             -Plai.versionName="$VERSION_NAME" \
             -Plai.enableLlamaCpp=ON \
-            -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
+            -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR" \
+          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
 
       - name: Inventory native and APK artifacts
         if: always()

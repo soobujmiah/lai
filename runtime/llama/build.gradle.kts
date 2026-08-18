@@ -30,6 +30,12 @@ android {
                 providers.gradleProperty("lai.llamaCppDir").orNull?.let {
                     arguments += "-DLAI_LLAMA_CPP_DIR=$it"
                 }
+                // ggml-vulkan.cpp needs <vulkan/vulkan.hpp> (C++ bindings), which the NDK sysroot
+                // and apt libvulkan-dev do not ship. CI fetches a pinned KhronosGroup/Vulkan-Headers
+                // tag; inject its include dir for every C++ target (incl. the ggml-vulkan subdir).
+                providers.gradleProperty("lai.vulkanHeadersDir").orNull?.let {
+                    arguments += "-DCMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES=$it/include"
+                }
             }
         }
     }
