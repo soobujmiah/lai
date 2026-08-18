@@ -284,6 +284,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         loadToolAudit()
+        importBundledModels()
         refreshModels()
         loadCachedCatalog()
         refreshWorkspace()
@@ -413,6 +414,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val snapshot = container.modelCatalogRepository.cachedOrEmbedded()
             applyCatalog(snapshot.document.models, snapshot.source)
+        }
+    }
+
+    private fun importBundledModels() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                dev.lai.runtime.inference.BundledModelImporter.importIfNeeded(getApplication())
+                refreshModels()
+            } catch (_: Exception) { }
         }
     }
 
