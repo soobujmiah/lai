@@ -30,11 +30,17 @@ android {
                 providers.gradleProperty("lai.llamaCppDir").orNull?.let {
                     arguments += "-DLAI_LLAMA_CPP_DIR=$it"
                 }
-                // ggml-vulkan.cpp needs <vulkan/vulkan.hpp> (C++ bindings), which the NDK sysroot
-                // and apt libvulkan-dev do not ship. CI fetches a pinned KhronosGroup/Vulkan-Headers
-                // tag; inject its include dir for every C++ target (incl. the ggml-vulkan subdir).
-                providers.gradleProperty("lai.vulkanHeadersDir").orNull?.let {
-                    arguments += "-DCMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES=$it/include"
+                // ggml-vulkan.cpp includes <vulkan/vulkan.hpp> and <spirv/unified1/spirv.hpp>,
+                // which the NDK sysroot and apt packages do not expose to the cross-compiler
+                // (apt installs them under /usr/include, hidden by NDK sysroot isolation). CI
+                // fetches pinned KhronosGroup/Vulkan-Headers + SPIRV-Headers tags; inject both
+                // include dirs for every C++ target (incl. the ggml-vulkan subdirectory).
+                val extraIncludeDirs = listOfNotNull(
+                    providers.gradleProperty("lai.vulkanHeadersDir").orNull?.let { "$it/include" },
+                    providers.gradleProperty("lai.spirvHeadersDir").orNull?.let { "$it/include" },
+                )
+                if (extraIncludeDirs.isNotEmpty()) {
+                    arguments += "-DCMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES=${extraIncludeDirs.joinToString(";")}"
                 }
             }
         }

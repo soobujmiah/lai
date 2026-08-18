@@ -30,6 +30,7 @@ env:
   CMAKE_VERSION: '3.22.1'
   LLAMA_CPP_COMMIT: 'ad1de39e0708e3ced9c71bb3c82d93a2c046a73f'
   VULKAN_HEADERS_TAG: 'v1.4.311'
+  SPIRV_HEADERS_TAG: 'vulkan-sdk-1.4.357.0'
 
 jobs:
   source-policy:
@@ -115,6 +116,18 @@ jobs:
           test -f "$RUNNER_TEMP/vulkan-headers/include/vulkan/vulkan.hpp"
           echo "LAI_VULKAN_HEADERS_DIR=$RUNNER_TEMP/vulkan-headers" >> "$GITHUB_ENV"
 
+      # ggml-vulkan.cpp also includes <spirv/unified1/spirv.hpp> (SPIR-V C++ header). apt
+      # spirv-headers installs it under /usr/include, which the NDK cross-compiler never
+      # searches (sysroot isolation), so fetch the pinned Khronos sources like the others.
+      - name: Fetch pinned SPIRV-Headers (spirv.hpp C++ header)
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/spirv-headers"
+          curl -fsSL "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/${SPIRV_HEADERS_TAG}.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/spirv-headers" --strip-components=1
+          test -f "$RUNNER_TEMP/spirv-headers/include/spirv/unified1/spirv.hpp"
+          echo "LAI_SPIRV_HEADERS_DIR=$RUNNER_TEMP/spirv-headers" >> "$GITHUB_ENV"
+
       - name: Install Vulkan build dependencies (SPIRV-Headers, glslang)
         timeout-minutes: 10
         shell: bash
@@ -137,6 +150,7 @@ jobs:
           -Plai.enableLlamaCpp=ON
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
+          -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
 
       - name: Build debug APK and native arm64 library
         if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
@@ -147,6 +161,7 @@ jobs:
           -Plai.enableLlamaCpp=ON
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
+          -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
 
       - name: Build release APK and native arm64 library
         if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
@@ -159,7 +174,8 @@ jobs:
             -Plai.versionName="$VERSION_NAME" \
             -Plai.enableLlamaCpp=ON \
             -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR" \
-          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
+          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR" \
+          -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
 
       - name: Inventory native and APK artifacts
         if: always()
