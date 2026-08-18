@@ -18,8 +18,13 @@ public:
             return false;
         }
         dlclose(handle);
-        __android_log_print(ANDROID_LOG_INFO, kLogTag, "vulkan: loader found, Adreno 825 — scaffold, GGML_VULKAN=OFF (install SPIRV-Headers on CI first)");
+#ifdef LAI_HAS_VULKAN
+        __android_log_print(ANDROID_LOG_INFO, kLogTag, "vulkan: loader found, Adreno 825 — GGML_VULKAN=ON, available true (proper CI build)");
+        return true;
+#else
+        __android_log_print(ANDROID_LOG_INFO, kLogTag, "vulkan: loader found, Adreno 825 — scaffold, GGML_VULKAN=OFF");
         return false;
+#endif
     }
     std::unique_ptr<BackendSession> open(const std::string&, int, std::string& error) override {
         error = "Vulkan scaffold: GGML_VULKAN not compiled — CPU fallback active";

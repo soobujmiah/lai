@@ -102,6 +102,13 @@ jobs:
           bash scripts/ci/fetch_llama_cpp.sh "$LLAMA_CPP_COMMIT" "$RUNNER_TEMP/llama.cpp"
           echo "LAI_LLAMA_CPP_DIR=$RUNNER_TEMP/llama.cpp" >> "$GITHUB_ENV"
 
+      - name: Install Vulkan build dependencies (SPIRV-Headers, glslang)
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq spirv-headers spirv-tools glslang-tools libvulkan-dev 2>&1 | tail -n 20
+          pkg-config --modversion vulkan 2>&1 || echo "vulkan pkg-config not found, but headers should be in /usr/include/vulkan"
+
       - name: Unit tests and lint
         run: >-
           gradle --no-daemon --stacktrace coverageCheck :platform:audit:testDebugUnitTest :platform:download:testDebugUnitTest :platform:workspace:testDebugUnitTest :platform:history:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug
