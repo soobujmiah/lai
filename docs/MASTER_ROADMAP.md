@@ -112,7 +112,7 @@
 
 ## 20. Product Hardening & Release
 
-**Current:** `v0.9.7` production-signed (`lai-release` RSA-4096 V1–V4, SHA-256 `80:03:8D…7E:8E`), `16` modules, `0.93 MB`, `169 tests`, `work:2.10.1`, Actions majors current, **debug signed `0.1.139 @22 tok/s` on SM8735**, `storage/LAI/models` + `install -r` rule.  
+**Current:** `v0.9.7` production-signed (`lai-release` RSA-4096 V1–V4, SHA-256 `80:03:8D…7E:8E`), `16` modules, `~1.25 MB`, `176 tests`, `work:2.10.1`, Actions majors current, main green at CI run #154 (`9ab9aff`, 2026-08-18 repair session), **debug signed `0.1.139 @22 tok/s` on SM8735**, `storage/LAI/models` + `install -r` rule.  
 **Target:** SBOM (`app/build/sbom` lightweight → CycloneDX), provenance/SLSA, reproducible builds, supply-chain hardening, Play-ready. **Planned.**
 
 ---

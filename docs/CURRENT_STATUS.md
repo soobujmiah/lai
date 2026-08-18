@@ -1,7 +1,7 @@
 # Current Status
 
-**Snapshot:** 2026-08-18 — `main` @ `17ad75b` (workspace auto-import) + `0263d30` (proper Vulkan)  
-**Build:** `Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10` — `validate_repo.sh` PASS (937 KB <128 MB), `16` modules, `169` tests, `NOMINAL` on SM8735.
+**Snapshot:** 2026-08-18 — `main` @ `9ab9aff` (CI repair session; earlier snapshot at `17ad75b`/`0263d30`)  
+**Build:** `Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10` — `validate_repo.sh` PASS (~1.25 MB <128 MB), `16` modules, `176` tests, main green at CI run #154.
 
 ## Implemented — Device-validated or Build-verified
 

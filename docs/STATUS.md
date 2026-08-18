@@ -4,16 +4,16 @@ Last reviewed: 2026-08-17
 
 > The directive-aligned, source-audited status is maintained in [`implementation/current-state.md`](implementation/current-state.md). The canonical full roadmap is [`ROADMAP.md`](ROADMAP.md). This legacy evidence table is retained for detailed build/device history and uses its original evidence vocabulary.
 
-Working-tree candidate: model download/import now has a pre-write expected-size/storage-reserve/8 GiB ceiling with dedicated `platform:download` unit tests and CI wiring. It is **not build verified** until the updated workflow passes.
+Merged and build-verified: model download/import enforces a pre-write expected-size/storage-reserve/8 GiB ceiling with dedicated `platform:download` unit tests, green in CI run #154 and later. Also merged 2026-08-18: workspace auto-import of `storage/LAI/models/*.gguf` (nullable-hash compile fix) and the full Vulkan toolchain (SPIRV-Headers CMake config, `glslc`, Vulkan-Headers `vulkan.hpp`, SPIRV-Headers `spirv.hpp`) so `GGML_VULKAN=ON` builds.
 
-Latest release: [`v0.8.2`](https://github.com/soobujmiah/lai/releases/tag/v0.8.2), commit `cbf6ff9`, [release run 31958838061](https://github.com/soobujmiah/lai/actions/runs/31958838061). Privacy-safe proposal counters, strengthened exact-format instruction, persistent-ledger/Android file/replay/corruption tests, strict schemas, trusted review UI, diagnostics privacy, vendor boundaries, coverage, lint, Kotlin/JNI/native runtime and release APK assembly passed. The published temporary/debug-signed `app-release.apk` is 8,371,584 bytes. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) signed and published revision 3; the exact 1,131-byte catalog asset and detached signature were independently verified.
+Latest release: [`v0.9.7`](https://github.com/soobujmiah/lai/releases/tag/v0.9.7), commit `5921f1b` — production-signed (`lai-release` RSA-4096 V1–V4, cert SHA-256 `80:03:8D:3E…7E:8E`), with earlier releases v0.9.0–v0.9.6 on the same key. Current `main` head `9ab9aff` is CI-green at [run #154](https://github.com/soobujmiah/lai/actions/runs/32167493495) after the 2026-08-18 repair session. [Catalog run 31951341094](https://github.com/soobujmiah/lai/actions/runs/31951341094) signed and published revision 3; the exact 1,131-byte catalog asset and detached signature were independently verified.
 
 Legend: **Ready** = implemented and intended to work; **Build verified** = compiles and packages remotely but awaits the named physical-device gate; **Scaffold** = compiling contract with honest unavailable behavior; **Planned** = not implemented.
 
 | Capability | Status | Evidence / boundary |
 |---|---|---|
 | Source-only repository policy | Ready | `scripts/validate_repo.sh` enforces size, binary, docs, and token rules |
-| Layered module backbone | Ready | fourteen-module graph including dedicated persistent-audit ownership passed run 31956572135 |
+| Layered module backbone | Ready | sixteen-module graph including dedicated persistent-audit ownership passed run 31956572135 |
 | Zero-egress architecture policy | Ready | only download module owns transport; outbound user data denied; boundary check passes |
 | Signed web model catalog | Build verified | encrypted ECDSA signer, stable `catalog-v1` assets, in-app verification/cache/fallback and supported-list UI passed; device refresh pending |
 | Evidence-aware scheduler | Device validated (CPU) | Redmi selected CPU with 3,077 MiB available vs 1,833 MiB estimated peak at nominal thermal state |

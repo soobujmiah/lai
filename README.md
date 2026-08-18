@@ -2,7 +2,7 @@
 
 LAI is a source-only Android foundation for private, Bangla-first on-device AI and consent-driven Android automation. It targets modern arm64 Snapdragon devices, beginning with Snapdragon 8s Gen 4 (Hexagon NPU + Adreno GPU).
 
-> **Current status:** v0.8.2 adds build-verified vendor-neutral backend contracts, opt-in one-shot local tool proposals, approval-before-execution hash-chained audit/replay protection, and privacy-safe parser outcome diagnostics for the next Qwen compliance test. Snapdragon 8s Gen 4 has physically passed reviewed Qwen installation, CPU scheduling, memory preflight, multi-turn local inference, coherent Bangla output, ~20 tok/s decode, and retained-model offline restore after uninstall. The v0.8.0 model-proposal attempt produced no valid recognized proposal, so proposal-format diagnostics/refinement, Stop/recovery, forced context trimming, and sustained thermal behavior remain gates. See [status](docs/STATUS.md).
+> **Current status:** `v0.9.7` is the latest production-signed release (v0.9.0–v0.9.7, RSA-4096 V1–V4 signing). Snapdragon 8s Gen 4 has physically passed reviewed Qwen installation, CPU scheduling, memory preflight, multi-turn local inference, coherent Bangla output, ~20 tok/s decode, KV-prefix reuse (~0.6 s steady-state TTFT), and retained-model offline restore after uninstall. A closed-loop thermal governor, persistent chat history, background downloads and model management are build-verified (0.9.5–0.9.7). On 2026-08-18 `main` was repaired and CI-verified green (run #154): workspace auto-import of `storage/LAI/models/*.gguf` no longer crashes on unhashable files, and the GGML_VULKAN toolchain (SPIRV-Headers, glslc, Vulkan C++/SPIR-V headers) now builds — Vulkan still requires physical Adreno 825 qualification before any acceleration is claimed. See [status](docs/STATUS.md).
 
 ## Product principles
 
@@ -94,7 +94,7 @@ lai/
 └── MODEL_LICENSES.md        # reviewed/local model license register
 ```
 
-Current device-test APK: [LAI v0.8.2](https://github.com/soobujmiah/lai/releases/download/v0.8.2/app-release.apk) (temporary/debug signing).
+Current device-test APK: [LAI v0.9.7](https://github.com/soobujmiah/lai/releases/download/v0.9.7/app-release.apk) (production-signed; a newer debug build is produced by every green `main` CI run).
 
 ## Remote build: fastest path
 

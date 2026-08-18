@@ -2,7 +2,7 @@
 
 **Scope:** Documentation and audit only — no license file was modified, deleted, replaced, or rewritten; no source was changed; no legal claim beyond documented facts is made. **Final licensing decision: DECISION REQUIRED.**
 
-**Audit date:** 2026-08-18 — `main` @ `94d88aa` (`docs: complete documentation-first`), `validate_repo.sh` PASS (`1035925 bytes <128 MB`), `16` modules, `169` tests. **This audit is factual, not legal advice.**
+**Audit date:** 2026-08-18 — `main` @ `94d88aa` (`docs: complete documentation-first`), re-verified at `9ab9aff` after the same-day CI repair session (build tooling only; no dependency or license changes). `validate_repo.sh` PASS (`1249371 bytes <128 MB`), `16` modules, `176` tests. **This audit is factual, not legal advice.**
 
 ## 1. Exact location of the current Apache-2.0 license
 
@@ -51,7 +51,7 @@ Per `THIRD_PARTY_NOTICES.md` / `THIRD_PARTY_LICENSES.md` (last audited 2026-08-1
 
 ## 6. Any model files or model references and their licenses
 
-*   **No model weights are committed.** `find . -name "*.gguf"` (excluding `.git`) → 0; `find . -path "./.git" -prune -o -name "*.gguf"` is in `validate_repo.sh` forbidden list. `model/README.md` documents `storage/LAI/models` (`/sdcard/LAI/models`) as the **single** user-owned SAF store; `model/.gitkeep` is tracked, `*.gguf` is `* .gitignore` (`models/`, `*.gguf`, `*.onnx`, etc.) and `937 KB` repo size confirms no blob.
+*   **No model weights are committed.** `find . -name "*.gguf"` (excluding `.git`) → 0; `find . -path "./.git" -prune -o -name "*.gguf"` is in `validate_repo.sh` forbidden list. `model/README.md` documents `storage/LAI/models` (`/sdcard/LAI/models`) as the **single** user-owned SAF store; `model/.gitkeep` is tracked, `*.gguf` is `* .gitignore` (`models/`, `*.gguf`, `*.onnx`, etc.) and `~1.25 MB` repo size confirms no blob.
 *   **References:** `catalog/models-v1.json` rev3 (`qwen2.5-1.5b-instruct-q4-k-m` → `Qwen/Qwen2.5-1.5B-Instruct-GGUF` `qwen2.5-1.5b-instruct-q4_k_m.gguf`, `Apache-2.0`, `1,117,320,736` bytes, SHA `6a1a2e…9407e`, `compatibleBackendIds: ["llama-cpu"]`, `preferredBackendId: "llama-cpu"`), `ReviewedModelCatalog.kt` same `license = "Apache-2.0"`, `MODEL_LICENSES.md` documents the same **Apache-2.0** upstream (not bundled) and `LOCAL_UNREVIEWED` for workspace-discovered unknown GGUF (no provenance/safety claim, no auto-load, no redistribution right).
 
 ## 7. Any generated code and its possible licensing implications

@@ -22,4 +22,4 @@ Snapdragon tuning is **optimization, not architecture lock**: `core` pure JVM, `
 
 ## Testing
 
-`coverageCheck` `169` + `JaCoCo`, `DEVICE TEST REQUIRED` for `MEASURED` (`prefill/decode` on SM8735, `Adreno 825` Vulkan `40–60 tok/s`, `QNN` DLC, `thermal: Reduced CPU threads…`, `big 0-3` pin).
+`coverageCheck` `176` + `JaCoCo`, `DEVICE TEST REQUIRED` for `MEASURED` (`prefill/decode` on SM8735, `Adreno 825` Vulkan `40–60 tok/s`, `QNN` DLC, `thermal: Reduced CPU threads…`, `big 0-3` pin).

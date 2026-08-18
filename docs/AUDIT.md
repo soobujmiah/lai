@@ -18,7 +18,7 @@ LAI shall provide a **tamper-evident, privacy-safe, content-free audit**.
 
 ## Verification (never invent)
 
-`validate_repo.sh` (hash history clean), `check_architecture_boundaries.py`, `coverageCheck` `169` tests + `JaCoCo` ratchets, `DEVICE TEST REQUIRED` for `MEASURED` claim. Every completed task must update `DEVELOPMENT_STATE.md` and `docs/device-results/`.
+`validate_repo.sh` (hash history clean), `check_architecture_boundaries.py`, `coverageCheck` `176` tests + `JaCoCo` ratchets, `DEVICE TEST REQUIRED` for `MEASURED` claim. Every completed task must update `DEVELOPMENT_STATE.md` and `docs/device-results/`.
 
 ## Privacy
 

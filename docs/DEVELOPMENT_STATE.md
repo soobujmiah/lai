@@ -1,7 +1,7 @@
 # Development State
 
 **Snapshot:** 2026-08-18T17:45 UTC — `main` @ `0263d30` + `17ad75b` + `c4732fe` + `712ad6f` → `17ad75b` auto-import  
-**Build:** `Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10 + OkHttp 5.4.0 + API 36` — Actions majors current, `validate_repo.sh` PASS (937 KB <128 MB), boundaries/catalog/docs PASS.  
+**Build:** `Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10 + OkHttp 5.4.0 + API 36` — Actions majors current, `validate_repo.sh` PASS (~1.25 MB <128 MB), boundaries/catalog/docs PASS.  
 **Last green:** `push` `#140` (scaffold), `workflow_dispatch` `#137`/`#133` (release) — **#142 failed** on `SPIRV-Headers` (now fixed via revert + proper CI apt step in `0263d30`). Head `17ad75b` (workspace auto-import) is green; `0263d30` proper Vulkan `GGML_VULKAN=ON` is in-flight.
 
 ## Current Phase
@@ -66,7 +66,7 @@
 
 ## Required Tests
 
-*   **CI (no device):** `scripts/validate_repo.sh` (size/boundaries/docs/catalog), `coverageCheck` (169 tests, ratchets), `lintDebug`.
+*   **CI (no device):** `scripts/validate_repo.sh` (size/boundaries/docs/catalog), `coverageCheck` (176 tests, ratchets), `lintDebug`.
 *   **Device:** `count_tokens` 334→93, `generate` prefill 93/11 reuse, `thermal: decode threads`, `core: pinned`, `vulkan: loader`, `storage/LAI/models` auto-import, `install -r` grant persistence, Xiaomi lock.
 
 ## Device Test Requirements

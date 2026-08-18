@@ -4,7 +4,7 @@ LAI shall provide **SAF-based file and document intelligence** over `storage/LAI
 
 ## Current
 
-`WorkspaceRepository` (SAF `ACTION_OPEN_DOCUMENT_TREE`, persistable `GRANTED/REVOKED`), `WorkspaceDiscovery` (bounded `depth 4`, `256` files, `8 GB` cap, `SHA-256` streaming, `ModelFormatDetector` `GGUF` magic), `WorkspaceSettingsStore` (`settings.json` atomic), `Keep copy` export (verified, survives uninstall). No `MANAGE_EXTERNAL_STORAGE`. `validate_repo.sh` forbids `*.apk/*.so/*.gguf` in repo (`937 KB <128 MB`).
+`WorkspaceRepository` (SAF `ACTION_OPEN_DOCUMENT_TREE`, persistable `GRANTED/REVOKED`), `WorkspaceDiscovery` (bounded `depth 4`, `256` files, `8 GB` cap, `SHA-256` streaming, `ModelFormatDetector` `GGUF` magic), `WorkspaceSettingsStore` (`settings.json` atomic), `Keep copy` export (verified, survives uninstall). No `MANAGE_EXTERNAL_STORAGE`. `validate_repo.sh` forbids `*.apk/*.so/*.gguf` in repo (~1.25 MB <128 MB).
 
 ## Target
 

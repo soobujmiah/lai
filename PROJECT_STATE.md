@@ -1,16 +1,16 @@
 # LAI Project State
 
-Snapshot date: 2026-08-17 (pause — initialization + hotfix complete)
+Snapshot date: 2026-08-18 (CI repair session — workspace auto-import fix + Vulkan toolchain; main green at run #154)
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime` · Public repo
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
-Latest release: **`v0.9.7`** (`5921f1b`) — **green, production-signed** · Debug head: `f7a0db0` (hotfix prefill stall) + `7fce77a` (Tools Dashboard v1 + SBOM) — CI #127 building
-Graph: **16 Gradle modules** · Source footprint ~0.93 MB (limit 128 MB) · **169 unit tests** · WorkManager 2.10.1 · Actions majors current (checkout v7, upload-artifact v7, setup-java v5, setup-android v4, gradle/actions v6) · **Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10 ✅ verified (run 32018545745 green)**
+Latest release: **`v0.9.7`** (`5921f1b`) — **green, production-signed** · Head: `9ab9aff` (2026-08-18 fix session: `88fe08f` workspace auto-import, `2a7d2ad` apt hardening, `cf8d1b4`/`5ed2a1c`/`d93b266`/`9ab9aff` Vulkan toolchain) — **CI #154 green**
+Graph: **16 Gradle modules** · Source footprint ~1.25 MB (limit 128 MB) · **176 unit tests** · WorkManager 2.10.1 · Actions majors current (checkout v7, upload-artifact v7, setup-java v5, setup-android v4, gradle/actions v6) · **Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10 ✅ verified (run #154 green on `9ab9aff`)**
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase 0–14 roadmap and accepted ADRs govern architecture.
 
 **Status vocabulary.** **Implemented** = source exists · **Build verified** = CI compiles/tests it · **Device validated** = named behaviour observed on physical hardware · **Scaffold** = compiling boundary with honest unavailable behaviour · **Pending/Planned** = not built.
 
-> ✅ **Milestones this cycle:** first chat replies ever (P0 closed, en+bn) → KV-prefix reuse **device-validated at ~25× faster TTFT (17 s → 0.6 s)** → production signing key + 8 signed releases → rolling context window → Bangla quality pass → background downloads → persistent chat history → closed-loop thermal governor → **coordinated AGP 9.3 upgrade green + Tools Dashboard v1 + hotfix for SM8735 prefill stall (179 sec → fix).**
+> ✅ **Milestones this cycle:** first chat replies ever (P0 closed, en+bn) → KV-prefix reuse **device-validated at ~25× faster TTFT (17 s → 0.6 s)** → production signing key + 8 signed releases → rolling context window → Bangla quality pass → background downloads → persistent chat history → closed-loop thermal governor → **coordinated AGP 9.3 upgrade green + Tools Dashboard v1 + hotfix for SM8735 prefill stall (179 sec → fix)** → **2026-08-18 CI repair: workspace auto-import nullable-hash fix + full Vulkan toolchain (SPIRV-Headers, glslc, vulkan.hpp, spirv.hpp) — main green at run #154.**
 
 ---
 
@@ -26,7 +26,7 @@ Graph: **16 Gradle modules** · Source footprint ~0.93 MB (limit 128 MB) · **16
 | Bangla quality pass | Build verified (0.9.4) | Tuned bilingual system prompt (short simple Bangla, no literal translation, admit ignorance) + repetition penalty 1.1/64 after top-p | Qualitative device check — several 3-token replies observed |
 | Backend scheduler | Device validated (CPU) | Compatibility, memory preflight, battery/thermal admission, evidence-based selection | — |
 | Token streaming | Device validated | `trySendBlocking` + `buffer(256)`; 14+ streamed replies observed | — |
-| **Thermal governor** | Build verified (0.9.7 + hotfix f7a0db0) | Closed loop: `PowerManager` callback → `ThermalGovernorPolicy` (hysteresis, 9 tests) → JNI atomic → threads changed only between `llama_decode`; minimum 2 threads (was 1 at CRITICAL) | Device validation under sustained warm load (run 28671 stalled at 0.71 tok/s, fix in-flight) |
+| **Thermal governor** | Build verified (0.9.7 + hotfix f7a0db0) | Closed loop: `PowerManager` callback → `ThermalGovernorPolicy` (hysteresis, 9 tests) → JNI atomic → threads changed only between `llama_decode`; minimum 2 threads (was 1 at CRITICAL) | Device validation under sustained warm load (run 28671 stalled at 0.71 tok/s; hotfix merged and CI-verified) |
 | Native stall tracing | Device proven useful | µs logs: mutex wait, template, tokenize, per-chunk prefill, first token, thermal thread changes — used to diagnose 179 sec stall | — |
 | Rolling context window | Build verified (0.9.3) | `ContextWindowPolicy` applies `keepLastTurns` before token counting; `windowedConversationTurns` in diagnostics | Exercise on device (slider low → windowed > 0) |
 | Vulkan backend | Planned | `llama-vulkan` descriptor reserved | Compile ggml Vulkan, Adreno qualification |
@@ -56,8 +56,8 @@ Graph: **16 Gradle modules** · Source footprint ~0.93 MB (limit 128 MB) · **16
 |---|---|---|
 | Source policy | Ready | 128 MB cap; no binaries/models/SDKs/keystores; history scanned clean — **928 KB** |
 | Architecture policy | Ready | Network only in `platform:download`; audit bytes only in `platform:audit`; module direction enforced |
-| Android build | **Verified (124) + in-flight 127** | JDK 17, **API 36**, NDK 27, CMake, **Gradle 9.5.0 + AGP 9.3.1**, pinned llama.cpp; tests + lint + APK; action majors current · 32018545745 green (kotlin.android + kotlinOptions removal); 32019489063 + f7a0db0 building |
-| Tests / coverage | Ready | 169 tests incl. `platform:history` + scheduler thermal tests (updated for min 2); JaCoCo ratchets (contracts .15 / policy .55 / scheduler .70 / model .50 / plugins .50) |
+| Android build | **Verified (154)** | JDK 17, **API 36**, NDK 27, CMake, **Gradle 9.5.0 + AGP 9.3.1**, pinned llama.cpp; tests + lint + APK; action majors current · `9ab9aff` green at run #154 (fix session: workspace import nullable-hash fix + Vulkan toolchain: SPIRV-Headers config, glslc, Vulkan-Headers, SPIRV-Headers source) |
+| Tests / coverage | Ready | 176 tests incl. `platform:history` + scheduler thermal tests (updated for min 2); JaCoCo ratchets (contracts .15 / policy .55 / scheduler .70 / model .50 / plugins .50) |
 | **Releases** | **Production-signed** | Tag-triggered; `v0.9.0`–`v0.9.7` signed with permanent `lai-release` RSA-4096 key (V1–V4), cert SHA-256 `80:03:8D:3E…7E:8E` |
 | Signing key custody | Done | PKCS12 in Actions secrets (`ANDROID_KEYSTORE_*`) + owner's offline copy — **never in repo** |
 | Dependabot | **Partially merged** | 5 action bumps merged; **#9 (okhttp 5.4.0), #10 (AGP 9.3.1), #11 (Kotlin 2.4.10 + coroutines 1.11.0 + serialization 1.11.0) merged ✅**; **#4 deferred** (androidx 2026.08.00/1.19.0 requires API 37 not on runners) |
@@ -247,7 +247,7 @@ The proposal parse path is device-validated; actual `screen.click/type/scroll/gl
 
 ### Process notes for the next session
 
-- **CI is the only compile gate.** `scripts/validate_repo.sh` checks size/architecture/docs but does not compile Kotlin. Push, watch "Compile Kotlin, C++ and APK", then claim. Current head `f7a0db0` is the gate.
+- **CI is the only compile gate.** `scripts/validate_repo.sh` checks size/architecture/docs but does not compile Kotlin. Push, watch "Compile Kotlin, C++ and APK", then claim. Current head `9ab9aff` is the gate (run #154 green).
 - **Auth:** git remote + identity are wiped between sessions — re-add `origin` and `git config user.*`. Tokens must never be pasted into chat, committed, or stored in this file. Revoke any token that has been exposed.
 - **Release ritual:** merge to main → CI green → annotated tag `v0.9.x` → tag run builds + signs + publishes the APK automatically. Signing needs no per-release action.
 - **Regressions to avoid:** never `trySend` for streamed tokens; never `imePadding()` twice; never gate the bottom bar on the current IME inset; the Stop watchdog must not unload the model; reply budget < full context; `kv_tokens_` must only be appended after a *successful* decode; thread changes only between decodes; **CRITICAL threads never below 2 on SM8735**.

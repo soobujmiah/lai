@@ -53,4 +53,4 @@ Compose UI (LaiApp) → MainViewModel (StateFlow) → AppContainer
 
 ## Verification
 
-`scripts/validate_repo.sh` checks `128 MB` cap, no `*.apk/*.so/*.gguf/*.jks`, docs links, catalog. `check_architecture_boundaries.py` checks direction. `validate_model_catalog.py` checks `models-v1.json` rev3. Tests `169` + JaCoCo ratchets (contracts .15 / policy .55 / scheduler .70 / model .50 / plugins .50) run on CI; device tests (Vulkan, QNN, OCR quality, thermal) are `DEVICE TEST REQUIRED`.
+`scripts/validate_repo.sh` checks `128 MB` cap, no `*.apk/*.so/*.gguf/*.jks`, docs links, catalog. `check_architecture_boundaries.py` checks direction. `validate_model_catalog.py` checks `models-v1.json` rev3. Tests `176` + JaCoCo ratchets (contracts .15 / policy .55 / scheduler .70 / model .50 / plugins .50) run on CI; device tests (Vulkan, QNN, OCR quality, thermal) are `DEVICE TEST REQUIRED`.
