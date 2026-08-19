@@ -78,19 +78,21 @@ All compilation remains in GitHub Actions. Generated build folders are ignored a
 
 ## GPU enablement
 
-The workflow builds with `-Plai.validatedAccelerators=llama-vulkan` by default (the
-`validated_accelerators` input, default `llama-vulkan`), which grants the scheduler
-`DEVICE_VALIDATED` evidence for the Vulkan backend so it can be selected on devices where the
-ggml Vulkan device registers at runtime. Set `validated_accelerators=cpu` to force CPU-only.
-GPU selection additionally requires the model catalog to declare `llama-vulkan` compatible
-(revision 4 does). Physical-device evidence is still recorded under `docs/device-results/`.
+**Default is CPU-only (`validated_accelerators` input default empty).** This is the stable
+configuration: on the SM8735 / Adreno 825, the Vulkan driver both fails to compile the MMVQ
+shader family (mitigated by LAI's `ggml-vulkan-skip-mmvq.patch`) AND then **crashes natively
+during Vulkan compute** (device evidence 2026-08-19: process restart on message send, release
+0.1.175). Per the project's rule, no acceleration is claimed until device-validated, so GPU is
+**opt-in**: set `validated_accelerators=llama-vulkan` only on a device/driver combo that has
+been qualified. CPU remains the reviewed, reliable backend.
 
-For GPU offload the native loader uses `LLAMA_LOAD_MODE_NONE` (mmap would force the integrated
-GPU's host-visible buffers back to CPU — 0 layers offloaded). If the driver still fails a
-compute pipeline at runtime, the app automatically reloads the model on the CPU backend after
-an accelerator failure/stall (logged at `LAI-llm`), and ggml-vulkan's `std::cerr` diagnostics
-are routed to the `LAI-llama` logcat tag so a pipeline failure names the exact shader. Set
-`validated_accelerators=cpu` to skip the GPU entirely.
+GPU offload uses `LLAMA_LOAD_MODE_NONE` (mmap would force the integrated GPU's host-visible
+buffers back to CPU — 0 layers offloaded). `VulkanBackend` sets `GGML_VK_DISABLE_COOPMAT/_2`
+and `GGML_VK_DISABLE_MMVQ`, and `fetch_llama_cpp.sh` applies `ggml-vulkan-skip-mmvq.patch` so
+the MMVQ family is not compiled when disabled (the env var alone only stopped the kernels being
+used). `std::cerr` is routed to the `LAI-llama` logcat tag and the failing-pipeline name is
+captured in-app; a Kotlin-level accelerator failure auto-falls back to CPU — but a native
+driver crash cannot be caught by the app, which is why GPU defaults off on unqualified devices.
 
 ## Working rule: signed release only by default
 

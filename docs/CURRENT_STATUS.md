@@ -6,7 +6,7 @@
 ## Implemented — Device-validated or Build-verified
 
 *   **CPU LLM:** `llama.cpp` mmap GGUF, `Qwen 1.5B Q4_K_M`, **10–20 tok/s prefill / 2.5–15 tok/s decode**, KV-prefix reuse (`evaluatedPromptTokens` 6–15; TTFT ~0.5–1.4 s), streaming, `45s` Stop watchdog, `storage/LAI/models` auto-import (startup, grant-active, manual grant, manual scan — serialized), `install -r` keeps grant.
-*   **Vulkan GPU:** real `VulkanBackend` with full layer offload (`LLAMA_LOAD_MODE_NONE`), IGPU probe (Adreno 825 is integrated), `GGML_VK_DISABLE_COOPMAT/_2` + `GGML_VK_DISABLE_MMVQ` for the confirmed failing shader `mul_mat_vec_q4_k_f32_f32`, in-app capture of failing pipeline name, auto CPU fallback on failure/stall. **Device qualification pending — retest release-172+.**
+*   **Vulkan GPU (opt-in, CPU default):** real `VulkanBackend` (full layer offload, IGPU probe) + LAI patch skipping MMVQ compile (fixed the pipeline error), but the **Adreno 825 driver crashes natively during Vulkan compute** on this llama.cpp revision (process restart on send, 0.1.175). Default `validated_accelerators` is now **empty = CPU-only**; set `llama-vulkan` only on a qualified device.
 *   **Thermal/Governor:** `ThermalGovernorPolicy` hysteresis, `setDecodeThreadLimit` atomic between `llama_decode`, adaptive `little 7 idle → big 0-3 burst`, batch 32.
 *   **Tool/Agent (one-shot):** 15 tools, `ToolInstructionGate`, hash-chained `ToolAuditLedger` (`APP_PRIVATE_HASH_CHAIN_V1`), `ToolsDashboard`, Xiaomi lock guide.
 *   **Android:** `AccessibilityAutomationService` (400 nodes, `canTakeScreenshot`), `Shizuku UID 2000` argv allowlist (no raw shell), `Workspace` SAF (depth 4/256/8 GB, SHA streaming).
@@ -29,4 +29,4 @@ QNN/HTP NPU (licensed QAIRT), `core:tokenization` (SentencePiece unigram), `core
 
 ## Next Device Test
 
-Install **`lai-release-172`**+ (installs over previous builds — deterministic test cert `D3:A6:6C:E0:…`) → load model → send a message → expect either GPU generation on `Vulkan0` (MMVQ disabled) or the auto CPU fallback; export diagnostics + log and record evidence in `docs/device-results/`.
+Install **`lai-release-176`**+ (default CPU — stable, no crash) → load model → send a message → confirm normal CPU generation. GPU is opt-in only; if you want to pursue it, capture `adb logcat -d` during the crash (look for `F libc`/tombstone naming the native function) so we can decide whether a llama.cpp bump or driver-side fix makes Adreno usable.

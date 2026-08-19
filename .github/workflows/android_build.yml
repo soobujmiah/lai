@@ -19,11 +19,12 @@ on:
       validated_accelerators:
         description: >-
           Accelerators the scheduler may select (DEVICE_VALIDATED evidence).
-          Default llama-vulkan enables the Adreno GPU on the SM8735 test device;
-          set to 'cpu' to force CPU-only. Grants the scheduler permission to
-          select these accelerators.
+          Default EMPTY = CPU-only (stable; the Adreno 825 Vulkan driver crashes
+          at compute time on this llama.cpp revision — see docs/BUILD_AND_RELEASE).
+          Set llama-vulkan to opt into GPU experimentation on a device where the
+          driver has been qualified.
         required: false
-        default: llama-vulkan
+        default: ''
         type: string
 
 concurrency:
@@ -193,7 +194,7 @@ jobs:
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
-          -Plai.validatedAccelerators="${{ inputs.validated_accelerators || 'llama-vulkan' }}"
+          -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
 
       - name: Build debug APK and native arm64 library
         # Debug is NOT built by default (working rule: signed-only). Built for pull-request
@@ -207,7 +208,7 @@ jobs:
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
-          -Plai.validatedAccelerators="${{ inputs.validated_accelerators || 'llama-vulkan' }}"
+          -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
 
       # WORKING RULE (docs/BUILD_AND_RELEASE.md): build ONLY the signed release APK by default.
       # Push/tags -> signed release (production key on tags, deterministic test key otherwise).
@@ -225,7 +226,7 @@ jobs:
             -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR" \
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR" \
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR" \
-          -Plai.validatedAccelerators="${{ inputs.validated_accelerators || 'llama-vulkan' }}"
+          -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
 
       - name: Inventory native and APK artifacts
         if: always()
