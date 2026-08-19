@@ -70,6 +70,9 @@ public:
         setenv("GGML_VK_DISABLE_INTEGER_DOT_PRODUCT", "1", 1);
         setenv("GGML_VK_DISABLE_F16", "1", 1);
         setenv("GGML_VK_DISABLE_ASYNC", "1", 1);
+        setenv("GGML_VK_DISABLE_MULTI_ADD", "1", 1);
+        setenv("GGML_VK_DISABLE_FUSION", "1", 1);
+        setenv("GGML_VK_DISABLE_GRAPH_OPTIMIZE", "1", 1);
         initialize_llama_once();
         const ggml_backend_dev_t device = find_gpu_device();
         if (device == nullptr) {

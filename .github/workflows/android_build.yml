@@ -272,6 +272,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
+      # Unstripped native lib for offline addr2line of native crash backtraces (load-base-relative
+      # offsets are captured by the LAI crash handler into the diagnostic log).
+      - name: Upload unstripped native library
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          LIB=$(find runtime/llama/build -path '*obj/arm64-v8a/liblai_runtime.so' | head -1 || true)
+          if [[ -n "$LIB" ]]; then
+            mkdir -p app/build/native
+            cp "$LIB" app/build/native/liblai_runtime-unsymbolized.so
+            echo "unstripped lib: $LIB"
+          else
+            echo "unstripped lib not found (ok)"
+          fi
+      - name: Upload unstripped native library artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: lai-native-unstripped-${{ github.run_number }}
+          path: app/build/native/*.so
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Upload SBOM
         if: always()
         uses: actions/upload-artifact@v7

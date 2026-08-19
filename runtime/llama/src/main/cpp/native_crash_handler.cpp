@@ -81,14 +81,35 @@ void crash_handler(int sig) {
         if (dladdr(frames[i], &info) != 0 && info.dli_sname != nullptr) {
             const uintptr_t offset =
                 reinterpret_cast<const char*>(frames[i]) - reinterpret_cast<const char*>(info.dli_saddr);
+            const uintptr_t base =
+                reinterpret_cast<const char*>(frames[i]) - reinterpret_cast<const char*>(info.dli_fbase);
             snprintf(
                 line, sizeof line,
-                "  #%02zu %p %s+0x%lx  [%s]",
-                i, frames[i], info.dli_sname, static_cast<unsigned long>(offset),
+                "  #%02zu pc=0x%lx(+0x%lx) %s+0x%lx  [%s]",
+                i,
+                static_cast<unsigned long>(base), static_cast<unsigned long>(frames[i] - info.dli_fbase),
+                info.dli_sname, static_cast<unsigned long>(offset),
                 info.dli_fname != nullptr ? info.dli_fname : "?"
             );
         } else {
-            snprintf(line, sizeof line, "  #%02zu %p", i, frames[i]);
+            // Unsymbolized (hidden-visibility) frame: still record the load-base-relative offset
+            // so it can be mapped offline with addr2line against an unstripped build.
+            void* base = nullptr;
+            Dl_info libinfo;
+            if (dladdr(frames[i], &libinfo) != 0) {
+                base = libinfo.dli_fbase;
+                snprintf(
+                    line, sizeof line,
+                    "  #%02zu pc=0x%lx(+0x%lx)  [%s]",
+                    i,
+                    static_cast<unsigned long>(reinterpret_cast<const char*>(frames[i]) -
+                                               reinterpret_cast<const char*>(base)),
+                    static_cast<unsigned long>(frames[i] - base),
+                    libinfo.dli_fname != nullptr ? libinfo.dli_fname : "?"
+                );
+            } else {
+                snprintf(line, sizeof line, "  #%02zu %p", i, frames[i]);
+            }
         }
         write_crash_line(line);
     }
