@@ -31,3 +31,4 @@ models/
 # Logs and captures
 *.log
 captures/
+__pycache__/
