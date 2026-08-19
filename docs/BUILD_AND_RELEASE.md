@@ -124,7 +124,9 @@ secrets.
 
 ### GPU note (Adreno)
 
-`VulkanBackend` sets `GGML_VK_DISABLE_COOPMAT`/`_2` and `GGML_VK_DISABLE_MMVQ` before ggml Vulkan
-init: the Adreno 825 driver fails to compile those shader families (`mul_mat_vec_q4_k_f32_f32`
-was confirmed on-device 2026-08-19). Non-affected shaders still run on the GPU; the CPU fallback
-protects against any remaining driver failure.
+`VulkanBackend` sets `GGML_VK_DISABLE_COOPMAT`/`_2` and `GGML_VK_DISABLE_MMVQ` before ggml
+Vulkan init, and `fetch_llama_cpp.sh` applies LAI's `ggml-vulkan-skip-mmvq.patch` so the MMVQ
+shader family is NOT COMPILED when disabled (the env var alone only stopped the kernels being
+used; the Adreno 825 driver still failed compiling `mul_mat_vec_q4_k_f32_f32` at init, confirmed
+on-device 2026-08-19). Non-affected shaders run on the GPU; the CPU fallback protects against any
+remaining driver failure. Retest GPU with release-175+.
