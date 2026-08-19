@@ -14,6 +14,11 @@ val hasReleaseSigning = listOf(
     releaseKeyAlias,
     releaseKeyPassword,
 ).all { !it.isNullOrBlank() }
+// True only when CI decoded the production ANDROID_KEYSTORE_* secrets (v* tags). Non-tag
+// builds use a deterministic TEST keystore derived in CI (scripts/ci/generate_test_keystore.py)
+// so every release build shares one certificate and installs over the previous version — those
+// are explicitly NOT production-signed.
+val isProductionSigning = System.getenv("LAI_SIGNING_PRODUCTION") == "true"
 
 android {
     namespace = "dev.lai.runtime"
@@ -27,7 +32,7 @@ android {
         versionName = providers.gradleProperty("lai.versionName").orNull ?: "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-        buildConfigField("boolean", "PRODUCTION_SIGNED", hasReleaseSigning.toString())
+        buildConfigField("boolean", "PRODUCTION_SIGNED", (hasReleaseSigning && isProductionSigning).toString())
         // Accelerators that have passed physical-device qualification (device-results evidence),
         // comma-separated. Defaults to empty — no accelerator is ever selected by the scheduler
         // without DEVICE_VALIDATED evidence, so GPU remains disabled until on-device validation.

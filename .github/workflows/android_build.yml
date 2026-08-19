@@ -9,9 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: APK variant — 'both' builds debug and release in one run
+        description: >-
+          APK variant. Default 'release' builds ONLY the signed release APK (working rule).
+          Choose 'debug' or 'both' only when a debug APK is explicitly needed for debugging.
         required: true
-        default: both
+        default: release
         type: choice
         options: [debug, release, both]
       validated_accelerators:
@@ -105,6 +107,31 @@ jobs:
             echo "LAI_KEYSTORE_PASSWORD=$STORE_PASSWORD"
             echo "LAI_KEY_ALIAS=$KEY_ALIAS"
             echo "LAI_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "LAI_SIGNING_PRODUCTION=true"
+          } >> "$GITHUB_ENV"
+
+      # Working rule (docs/BUILD_AND_RELEASE.md): every CI run produces the SIGNED release APK.
+      # On v* tags that is the production keystore from secrets (LAI_SIGNING_PRODUCTION=true).
+      # Otherwise we sign with a DETERMINISTIC test keystore derived from a committed seed
+      # (scripts/ci/generate_test_keystore.py): the SAME certificate every run, so release
+      # builds install over the previous version — the per-run debug keystore would change the
+      # certificate on every build and Android would refuse the update.
+      - name: Ensure release signing key (production or deterministic test)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        shell: bash
+        run: |
+          if [[ -n "$LAI_KEYSTORE_FILE" ]]; then
+            echo "Production keystore present; skipping test keystore generation."
+            exit 0
+          fi
+          python3 -m pip install --quiet --disable-pip-version-check pycryptodome cryptography
+          python3 scripts/ci/generate_test_keystore.py "$RUNNER_TEMP/lai-test-release.p12"
+          {
+            echo "LAI_KEYSTORE_FILE=$RUNNER_TEMP/lai-test-release.p12"
+            echo "LAI_KEYSTORE_PASSWORD=lai-test-release"
+            echo "LAI_KEY_ALIAS=lai-test"
+            echo "LAI_KEY_PASSWORD=lai-test-release"
+            echo "LAI_SIGNING_PRODUCTION=false"
           } >> "$GITHUB_ENV"
 
       - name: Fetch pinned llama.cpp source
@@ -169,7 +196,9 @@ jobs:
           -Plai.validatedAccelerators="${{ inputs.validated_accelerators || 'llama-vulkan' }}"
 
       - name: Build debug APK and native arm64 library
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
+        # Debug is NOT built by default (working rule: signed-only). Built for pull-request
+        # validation and only when a debug APK is explicitly requested via build_type.
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'release') }}
         run: >-
           gradle --no-daemon --stacktrace :app:assembleDebug
           -Plai.versionCode=${{ github.run_number }}
@@ -180,12 +209,11 @@ jobs:
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
           -Plai.validatedAccelerators="${{ inputs.validated_accelerators || 'llama-vulkan' }}"
 
-      # Rule: a single run produces BOTH variants. Push/tags build debug + release together
-      # (release uses the production keystore only on tags, else the debug key); manual runs
-      # follow the build_type input (default 'both'). Pull requests stay debug-only to keep
-      # CI light.
+      # WORKING RULE (docs/BUILD_AND_RELEASE.md): build ONLY the signed release APK by default.
+      # Push/tags -> signed release (production key on tags, deterministic test key otherwise).
+      # Dispatch -> follow build_type (default release). Pull requests stay debug-only (CI check).
       - name: Build release APK and native arm64 library
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
+        if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'debug') }}
         shell: bash
         run: |
           VERSION_NAME="${GITHUB_REF_NAME#v}"
@@ -215,7 +243,7 @@ jobs:
           ls -lh app/build/sbom/ 2>/dev/null || true
 
       - name: Upload debug APK
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'release') }}
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'release') }}
         uses: actions/upload-artifact@v7
         with:
           name: lai-debug-${{ github.run_number }}
@@ -224,7 +252,7 @@ jobs:
           retention-days: 14
 
       - name: Upload release APK
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
+        if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'debug') }}
         uses: actions/upload-artifact@v7
         with:
           name: lai-release-${{ github.run_number }}
@@ -235,7 +263,7 @@ jobs:
       # R8 mapping for the minified signed build: stack traces from the field are de-obfuscated
       # with this file (docs/LOGGING.md). Keep it as long as the APK can be tested.
       - name: Upload release R8 mapping
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'debug') }}
+        if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'debug') }}
         uses: actions/upload-artifact@v7
         with:
           name: lai-release-mapping-${{ github.run_number }}

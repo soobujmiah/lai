@@ -91,3 +91,40 @@ compute pipeline at runtime, the app automatically reloads the model on the CPU 
 an accelerator failure/stall (logged at `LAI-llm`), and ggml-vulkan's `std::cerr` diagnostics
 are routed to the `LAI-llama` logcat tag so a pipeline failure names the exact shader. Set
 `validated_accelerators=cpu` to skip the GPU entirely.
+
+## Working rule: signed release only by default
+
+**Default CI produces ONLY the signed release APK.** The debug APK is built only when it is
+explicitly required for debugging:
+
+- `workflow_dispatch` `build_type` default is `release` (options: `debug` / `release` / `both`).
+- Push/tag builds → signed release APK only.
+- Pull requests → debug APK only (CI validation; no release artifact from unmerged code).
+
+### Why every release build is properly signed (and installs over the previous one)
+
+GitHub Actions auto-creates a **fresh Android debug keystore on every runner**, so "release" APKs
+signed with the debug key would carry a **different certificate on every build** — Android then
+refuses to install a newer build over the previous one (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`).
+That was the root cause of "signed app cannot be installed over the previous version"
+(field reports 2026-08-19).
+
+Fix: **every CI release APK is signed with a real keystore**:
+
+| Build source | Keystore | `PRODUCTION_SIGNED` |
+|---|---|---|
+| `v*` tag | production keystore from `ANDROID_KEYSTORE_*` secrets | `true` |
+| push / dispatch release | **deterministic test keystore** derived in CI from a committed seed (`scripts/ci/generate_test_keystore.py`) — the SAME certificate every run | `false` |
+
+The test keystore is generated at build time into runner temp storage — **no key material is
+committed**. Because the certificate is stable across runs and `versionCode` = GitHub run number
+keeps increasing, every release APK installs over the previous one with `adb install -r` (or the
+on-device installer). The test key is for device testing only; production releases always use the
+secrets.
+
+### GPU note (Adreno)
+
+`VulkanBackend` sets `GGML_VK_DISABLE_COOPMAT`/`_2` and `GGML_VK_DISABLE_MMVQ` before ggml Vulkan
+init: the Adreno 825 driver fails to compile those shader families (`mul_mat_vec_q4_k_f32_f32`
+was confirmed on-device 2026-08-19). Non-affected shaders still run on the GPU; the CPU fallback
+protects against any remaining driver failure.
