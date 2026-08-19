@@ -87,7 +87,7 @@ void crash_handler(int sig) {
                 line, sizeof line,
                 "  #%02zu pc=0x%lx(+0x%lx) %s+0x%lx  [%s]",
                 i,
-                static_cast<unsigned long>(base), static_cast<unsigned long>(frames[i] - info.dli_fbase),
+                static_cast<unsigned long>(base), static_cast<unsigned long>(reinterpret_cast<const char*>(frames[i]) - reinterpret_cast<const char*>(info.dli_fbase)),
                 info.dli_sname, static_cast<unsigned long>(offset),
                 info.dli_fname != nullptr ? info.dli_fname : "?"
             );
@@ -104,7 +104,7 @@ void crash_handler(int sig) {
                     i,
                     static_cast<unsigned long>(reinterpret_cast<const char*>(frames[i]) -
                                                reinterpret_cast<const char*>(base)),
-                    static_cast<unsigned long>(frames[i] - base),
+                    static_cast<unsigned long>(reinterpret_cast<const char*>(frames[i]) - reinterpret_cast<const char*>(base)),
                     libinfo.dli_fname != nullptr ? libinfo.dli_fname : "?"
                 );
             } else {
