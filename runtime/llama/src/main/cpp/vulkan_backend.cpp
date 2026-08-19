@@ -70,6 +70,9 @@ public:
         setenv("GGML_VK_DISABLE_INTEGER_DOT_PRODUCT", "1", 1);
         setenv("GGML_VK_DISABLE_F16", "1", 1);
         setenv("GGML_VK_DISABLE_ASYNC", "1", 1);
+        // Adreno 825: the compute-only queue is a known source of driver bugs; route Vulkan
+        // submissions through the (more battle-tested) graphics queue instead.
+        setenv("GGML_VK_ALLOW_GRAPHICS_QUEUE", "1", 1);
         setenv("GGML_VK_DISABLE_MULTI_ADD", "1", 1);
         setenv("GGML_VK_DISABLE_FUSION", "1", 1);
         setenv("GGML_VK_DISABLE_GRAPH_OPTIMIZE", "1", 1);

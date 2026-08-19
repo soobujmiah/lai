@@ -522,6 +522,10 @@ std::unique_ptr<BackendSession> build_llama_session(
         context_params.n_threads = worker_threads;
         context_params.n_threads_batch = worker_threads;
         context_params.no_perf = false;
+        // Adreno 825 driver: disable the fused flash-attention path when offloading to Vulkan.
+        // It uses a different (fused) pipeline set and is a prime suspect for the
+        // vkCmdBindPipeline crash; the standard attention path is far more widely exercised.
+        context_params.flash_attn_type = gpu_layers > 0 ? LLAMA_FLASH_ATTN_TYPE_DISABLED : LLAMA_FLASH_ATTN_TYPE_AUTO;
 
         llama_context* context = llama_init_from_model(model, context_params);
         if (context == nullptr) {
