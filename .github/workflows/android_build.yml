@@ -124,7 +124,7 @@ jobs:
             echo "Production keystore present; skipping test keystore generation."
             exit 0
           fi
-          python3 -m pip install --quiet --disable-pip-version-check pycryptodome cryptography
+          python3 -m pip install --quiet --disable-pip-version-check cryptography
           python3 scripts/ci/generate_test_keystore.py "$RUNNER_TEMP/lai-test-release.p12"
           {
             echo "LAI_KEYSTORE_FILE=$RUNNER_TEMP/lai-test-release.p12"

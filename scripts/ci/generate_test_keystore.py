@@ -12,14 +12,22 @@ This script derives a FIXED RSA key + self-signed certificate from a committed s
 CI "release" build is signed with the SAME certificate and installs cleanly over the previous
 build (versionCode = GitHub run number keeps increasing).
 
-Security posture
-----------------
-- The private key is derived from the seed constant in this file: anyone can reproduce it.
-  This is a TEST-ONLY key for installable device builds. It is NEVER used for production —
-  v* tag builds use the ANDROID_KEYSTORE_* secrets and set LAI_SIGNING_PRODUCTION=true, which
-  drives BuildConfig.PRODUCTION_SIGNED.
+Determinism strategy
+--------------------
+- Key generation is PURE STDLIB (Miller-Rabin over deterministic candidates derived from the
+  seed) — no third-party RNG that could consume randomness differently across versions, which
+  is what made a pycryptodome-based attempt non-reproducible between environments.
+- The certificate is built with `cryptography` (RSA-PKCS1v15 signing is deterministic; fixed
+  serial/subject/validity), and the keystore is wrapped with `openssl pkcs12 -legacy` (PBES1)
+  so every JDK/apksigner can read it.
 - No key material is stored in the repository; the keystore is generated into the runner's
   temp directory at build time.
+
+Security posture
+----------------
+The private key is reproducible from this file's seed by design: it is a TEST-ONLY key for
+installable device builds. Production releases (v* tags) use the ANDROID_KEYSTORE_* secrets and
+set LAI_SIGNING_PRODUCTION=true, which drives BuildConfig.PRODUCTION_SIGNED.
 
 Usage: python3 scripts/ci/generate_test_keystore.py <output.p12>
 Writes a PKCS#12 keystore with: password "lai-test-release", alias "lai-test".
@@ -29,22 +37,68 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import subprocess
 import sys
+import tempfile
+import os
 
 SEED = b"lai-test-release-signing-v1"  # committed; reproducible by design
+EXPONENT = 65537
 
-# Stateful across calls on purpose: pycryptodome draws repeatedly from randfunc while searching
-# for primes; a stateless counter would return the same bytes on every call and loop forever.
-_STATE = {"n": 0}
+# Deterministic Miller-Rabin bases and trial-division primes (stdlib only).
+_TRIAL_PRIMES = [
+    2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
+    73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151,
+    157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229,
+]
 
 
-def _randfunc(n: int) -> bytes:
-    """Deterministic pseudo-random stream: SHA-256 chain over SEED + a process-global counter."""
+def _digest_stream(seed: bytes, idx: int, length: int) -> bytes:
+    """Deterministic 'length' bytes derived from seed + index (SHA-256 chain)."""
     out = b""
-    while len(out) < n:
-        out += hashlib.sha256(SEED + _STATE["n"].to_bytes(8, "big")).digest()
-        _STATE["n"] += 1
-    return out[:n]
+    counter = 0
+    while len(out) < length:
+        out += hashlib.sha256(seed + idx.to_bytes(8, "big") + counter.to_bytes(8, "big")).digest()
+        counter += 1
+    return out[:length]
+
+
+def _candidate(bits: int, idx: int) -> int:
+    length = (bits + 7) // 8
+    value = int.from_bytes(_digest_stream(SEED, idx, length), "big")
+    value |= (1 << (bits - 1)) | (1 << (bits - 2)) | 1  # top two bits + odd
+    return value
+
+
+def _is_prime(n: int) -> bool:
+    if n < 2:
+        return False
+    for p in _TRIAL_PRIMES:
+        if n % p == 0:
+            return n == p
+    d = n - 1
+    r = 0
+    while d % 2 == 0:
+        d //= 2
+        r += 1
+    for a in _TRIAL_PRIMES[:25]:  # deterministic base set, ample for 1024-bit
+        x = pow(a, d, n)
+        if x in (1, n - 1):
+            continue
+        for _ in range(r - 1):
+            x = pow(x, 2, n)
+            if x == n - 1:
+                break
+        else:
+            return False
+    return True
+
+
+def _prime(bits: int, idx: int) -> int:
+    candidate = _candidate(bits, idx)
+    while not _is_prime(candidate):
+        candidate += 2
+    return candidate
 
 
 def _fixed_serial() -> int:
@@ -58,25 +112,30 @@ def main() -> int:
         return 2
     out_path = sys.argv[1]
 
-    from Crypto.Util.number import getPrime, inverse  # pip: pycryptodome
-    from Crypto.PublicKey import RSA
     from cryptography import x509  # pip: cryptography
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.x509.oid import NameOID
 
-    # Deterministic RSA-2048-class key built from seeded primes (RSA.generate hangs on a
-    # deterministic randfunc because it re-draws candidates from the same bytes forever).
-    e = 65537
-    p = getPrime(1024, randfunc=_randfunc)
-    q = getPrime(1024, randfunc=_randfunc)
+    # Deterministic RSA key from seeded primes (pure stdlib).
+    p = _prime(1024, idx=1)
+    q = _prime(1024, idx=2)
+    while q == p:
+        q = _prime(1024, idx=3)
     n = p * q
-    d = inverse(e, (p - 1) * (q - 1))
-    pycrypto_key = RSA.construct((n, e, d, p, q))
-    private = serialization.load_pem_private_key(pycrypto_key.export_key("PEM"), password=None)
-    assert isinstance(private, rsa.RSAPrivateKey)
+    phi = (p - 1) * (q - 1)
+    d = pow(EXPONENT, -1, phi)
+    private = rsa.RSAPrivateNumbers(
+        p=p,
+        q=q,
+        d=d,
+        dmp1=d % (p - 1),
+        dmq1=d % (q - 1),
+        iqmp=pow(q, -1, p),
+        public_numbers=rsa.RSAPublicNumbers(EXPONENT, n),
+    ).private_key()
 
-    # Deterministic self-signed certificate (fixed serial + validity window).
+    # Deterministic self-signed certificate (RSA-PKCS1v15 signing is deterministic).
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "LAI Test Release Signing")])
     cert = (
         x509.CertificateBuilder()
@@ -89,19 +148,12 @@ def main() -> int:
         .sign(private, hashes.SHA256())
     )
 
-    # PKCS#12 keystore (Gradle/AGP accepts it like a .jks).
-    # Wrap key + certificate into a PKCS#12 keystore with openssl -legacy (PBES1). cryptography's
-    # own PKCS12 output uses PBES2 (HmacPBESHA256) which older JDKs reject ("keystore password was
-    # incorrect" / "Algorithm HmacPBESHA256 not available"). openssl is already a CI dependency
-    # (used by catalog_publish.yml). The certificate is what signing uses, and it is deterministic.
+    # Wrap key + certificate into a PKCS#12 keystore with openssl -legacy (PBES1), readable by
+    # every JDK/apksigner. openssl is already a CI dependency (catalog_publish.yml uses it).
     key_pem = private.private_bytes(
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
     )
     cert_pem = cert.public_bytes(serialization.Encoding.PEM)
-    import os
-    import subprocess
-    import tempfile
-
     with tempfile.TemporaryDirectory() as tmp:
         key_path = os.path.join(tmp, "key.pem")
         cert_path = os.path.join(tmp, "cert.pem")
