@@ -12,6 +12,7 @@ add_library(
     native_inference.cpp
     backend_registry.cpp
     vulkan_backend.cpp
+    native_crash_handler.cpp
 )
 
 target_include_directories(lai_runtime PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")

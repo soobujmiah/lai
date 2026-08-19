@@ -67,6 +67,9 @@ public:
         setenv("GGML_VK_DISABLE_COOPMAT", "1", 1);
         setenv("GGML_VK_DISABLE_COOPMAT2", "1", 1);
         setenv("GGML_VK_DISABLE_MMVQ", "1", 1);
+        setenv("GGML_VK_DISABLE_INTEGER_DOT_PRODUCT", "1", 1);
+        setenv("GGML_VK_DISABLE_F16", "1", 1);
+        setenv("GGML_VK_DISABLE_ASYNC", "1", 1);
         initialize_llama_once();
         const ggml_backend_dev_t device = find_gpu_device();
         if (device == nullptr) {
@@ -87,18 +90,22 @@ public:
         std::string& error
     ) override {
 #ifdef LAI_HAS_VULKAN
-        // Adreno driver workarounds: the Adreno 825 fails vk::Device::createComputePipeline with
-        // ErrorUnknown for specific shader families (device evidence 2026-08-19). ggml-vulkan
-        // reads these env vars when the device is first created; set them before any Vulkan use
-        // so the standard (non-coopmat, non-MMVQ) shader paths are used.
+        // Adreno driver workarounds (SM8735 / Adreno 825, device evidence 2026-08-19).
+        // ggml-vulkan reads these env vars when the device is first created; set them before any
+        // Vulkan use so the safest shader paths are used:
         //  - GGML_VK_DISABLE_COOPMAT/_2: driver advertises VK_KHR_cooperative_matrix but cannot
-        //    compile the coopmat pipelines.
-        //  - GGML_VK_DISABLE_MMVQ: the single-token quantized mat-vec kernel
-        //    'mul_mat_vec_q4_k_f32_f32' fails to compile (mmvq_mode=-1 falls back to the regular
-        //    mul_mat shaders, which compile fine). Costs a little decode throughput only.
+        //    compile the coopmat pipelines (ErrorUnknown at init).
+        //  - GGML_VK_DISABLE_MMVQ: the single-token quantized mat-vec family fails to compile
+        //    (LAI patch ggml-vulkan-skip-mmvq.patch then skips compiling it entirely).
+        //  - GGML_VK_DISABLE_INTEGER_DOT_PRODUCT / _F16 / _ASYNC: suspected runtime-crash
+        //    triggers during Vulkan compute (driver crashes natively on message send in 0.1.175).
+        //    These only reduce GPU-path throughput; the CPU backend is unaffected.
         setenv("GGML_VK_DISABLE_COOPMAT", "1", 1);
         setenv("GGML_VK_DISABLE_COOPMAT2", "1", 1);
         setenv("GGML_VK_DISABLE_MMVQ", "1", 1);
+        setenv("GGML_VK_DISABLE_INTEGER_DOT_PRODUCT", "1", 1);
+        setenv("GGML_VK_DISABLE_F16", "1", 1);
+        setenv("GGML_VK_DISABLE_ASYNC", "1", 1);
         initialize_llama_once();
         const ggml_backend_dev_t device = find_gpu_device();
         if (device == nullptr) {

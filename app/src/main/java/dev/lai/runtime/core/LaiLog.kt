@@ -96,6 +96,9 @@ object LaiLog {
         ring.toList().takeLast(limit)
     }
 
+    /** Absolute path of the current diagnostic log file (for the native crash handler). */
+    fun logFilePath(): String? = synchronized(lock) { logFile?.absolutePath }
+
     /**
      * Complete log text (header + file content) for explicit user export via SAF. Falls back to
      * the in-memory ring buffer when no file exists yet.

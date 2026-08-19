@@ -38,6 +38,7 @@ internal class NativeBindings private constructor() {
         @JvmStatic external fun setThreadLimit(session: Long, decodeThreads: Int)
         @JvmStatic external fun destroySession(session: Long)
         @JvmStatic external fun lastError(): String
+        @JvmStatic external fun installNativeCrashHandler(logFilePath: String?)
     }
 }
 
@@ -46,6 +47,16 @@ private data class NativeRuntimeInfo(val backends: List<String> = emptyList(), v
 
 class NativeInferenceEngine : InferenceEngine {
     @Volatile private var session: Long = 0
+
+    /**
+     * Installs the native signal handler (SIGSEGV/SIGABRT/SIGBUS/SIGILL/SIGFPE) so that GPU /
+     * driver crashes — which are native and uncatchable by Kotlin — write a backtrace into the
+     * diagnostic log file (see LaiLog) and logcat. Call once at startup after the log path is
+     * known; safe no-op if the native library is not loaded.
+     */
+    fun installNativeCrashHandler(logFilePath: String?) {
+        if (NativeBindings.loaded) NativeBindings.installNativeCrashHandler(logFilePath)
+    }
 
     /**
      * Thermal governor hook: records a decode-thread budget that the native decode loop applies

@@ -11,7 +11,7 @@ without adb/root, while keeping the debug build as verbose as before.
 | Redactor | `app/src/main/java/dev/lai/runtime/core/LaiLogRedactor.kt` | Pure JVM; last line of defense — every line passes through it before it can reach logcat or the file. Unit-tested in `app/src/test/.../LaiLogRedactorTest.kt`. |
 | Startup wiring | `LaiApplication.onCreate` | Picks the level from the build type, writes the context header, installs a crash handler that logs fatal stack traces. |
 | Key event call sites | `MainViewModel`, `MainActivity` | Subsystem events: permissions, model load/unload/delete, generation start/completed/failed, downloads, tool approval/execution, audit integrity, workspace grant, developer mode, activity lifecycle, memory pressure. |
-| Native runtime | `runtime/llama/src/main/cpp/*` | The C++ layer logs to logcat under the `LAI-llama` tag (stall tracing, thermal thread changes, Vulkan probe). `initialize_llama_once` also redirects `std::cerr` to `LAI-llama` so ggml-vulkan hard errors (e.g. `Compute pipeline creation failed for <name>`) appear in logcat instead of being dropped to /dev/null. |
+| Native runtime | `runtime/llama/src/main/cpp/*` | The C++ layer logs to logcat under the `LAI-llama` tag (stall tracing, thermal thread changes, Vulkan probe). `initialize_llama_once` redirects `std::cerr` to `LAI-llama` so ggml-vulkan hard errors appear in logcat. `native_crash_handler.cpp` installs SIGSEGV/SIGABRT/SIGBUS/SIGILL/SIGFPE handlers that append a **backtrace to the diagnostic log file** (and `LAI-crash` logcat) before re-raising — so native GPU/driver crashes are visible in the in-app log export with no adb. |
 
 Levels are `DEBUG < INFO < WARN < ERROR`.
 

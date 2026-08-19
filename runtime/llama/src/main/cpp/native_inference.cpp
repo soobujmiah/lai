@@ -1,4 +1,5 @@
 #include "include/lai/backend.h"
+#include "native_crash_handler.h"
 
 #include <jni.h>
 
@@ -391,4 +392,11 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_dev_lai_runtime_inference_NativeBindings_lastError(JNIEnv* env, jclass) {
     std::lock_guard<std::mutex> lock(g_mutex);
     return to_jstring(env, g_last_error);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_dev_lai_runtime_inference_NativeBindings_installNativeCrashHandler(JNIEnv* env, jclass, jstring log_file_path) {
+    const char* path = log_file_path != nullptr ? env->GetStringUTFChars(log_file_path, nullptr) : nullptr;
+    lai::install_native_crash_handler(path);
+    if (path != nullptr) env->ReleaseStringUTFChars(log_file_path, path);
 }

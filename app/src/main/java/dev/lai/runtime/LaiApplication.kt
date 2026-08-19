@@ -24,6 +24,9 @@ class LaiApplication : Application() {
         )
         LaiLog.i("LAI-lifecycle", "LaiApplication onCreate (process start)")
         container = AppContainer(this)
+        // Native (GPU/driver) crashes are uncatchable by Kotlin; install the native signal
+        // handler so any such crash writes a backtrace into the diagnostic log file.
+        container.inferenceEngine.installNativeCrashHandler(LaiLog.logFilePath())
     }
 
     override fun onTrimMemory(level: Int) {
