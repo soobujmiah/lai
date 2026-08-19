@@ -6,7 +6,7 @@
 ## Implemented — Device-validated or Build-verified
 
 *   **CPU LLM:** `llama.cpp` mmap GGUF, `Qwen 1.5B Q4_K_M`, **10–20 tok/s prefill / 2.5–15 tok/s decode**, KV-prefix reuse (`evaluatedPromptTokens` 6–15; TTFT ~0.5–1.4 s), streaming, `45s` Stop watchdog, `storage/LAI/models` auto-import (startup, grant-active, manual grant, manual scan — serialized), `install -r` keeps grant.
-*   **Vulkan GPU (opt-in, CPU default):** real `VulkanBackend` (full layer offload, IGPU probe) + LAI patch skipping MMVQ compile (fixed the pipeline error), but the **Adreno 825 driver crashes natively during Vulkan compute** on this llama.cpp revision (process restart on send, 0.1.175). Default `validated_accelerators` is now **empty = CPU-only**; set `llama-vulkan` only on a qualified device.
+*   **Vulkan GPU (unsupported on this device):** addr2line of the crash handler backtrace (release-183) shows SIGSEGV at `vkCmdBindPipeline+0x4` in `vulkan.adreno.so` while binding the **MUL_MAT** pipeline (ggml-vulkan.cpp:15635) — the core matmul of every token. No env/patch combination avoids it; llama.cpp pin is current. **Qualcomm driver bug — CPU is the stable default; GPU stays opt-in for a qualified device/driver.**
 *   **Thermal/Governor:** `ThermalGovernorPolicy` hysteresis, `setDecodeThreadLimit` atomic between `llama_decode`, adaptive `little 7 idle → big 0-3 burst`, batch 32.
 *   **Tool/Agent (one-shot):** 15 tools, `ToolInstructionGate`, hash-chained `ToolAuditLedger` (`APP_PRIVATE_HASH_CHAIN_V1`), `ToolsDashboard`, Xiaomi lock guide.
 *   **Android:** `AccessibilityAutomationService` (400 nodes, `canTakeScreenshot`), `Shizuku UID 2000` argv allowlist (no raw shell), `Workspace` SAF (depth 4/256/8 GB, SHA streaming).
