@@ -1,0 +1,33 @@
+diff -ruN a/ggml/src/ggml-vulkan/ggml-vulkan.cpp b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
+--- a/ggml/src/ggml-vulkan/ggml-vulkan.cpp	2026-08-19 06:57:19.420210382 +0000
++++ b/ggml/src/ggml-vulkan/ggml-vulkan.cpp	2026-08-19 06:57:19.420210382 +0000
+@@ -828,6 +828,9 @@
+     bool integer_dot_product;
+     // 0: default, 1: force mmvq, -1: disable mmvq
+     int32_t mmvq_mode;
++    // True when MMVQ pipelines must not be compiled at device init (Adreno 825 driver cannot
++    // compile the dequant mul_mat_vec shaders -> vk::Device::createComputePipeline ErrorUnknown).
++    bool disable_mmvq_pipelines = false;
+ 
+     bool subgroup_size_control;
+     uint32_t subgroup_min_size;
+@@ -5221,7 +5224,10 @@
+ #define OCP_DMMV_DATA(NAME, REDUC) NAME ## _data[REDUC]
+ #endif
+ 
+-    for (uint32_t w = 0; w < DMMV_WG_SIZE_COUNT; ++w) {
++    // When MMVQ is disabled, do not compile the dequant mul_mat_vec shader family at all —
++    // GGML_VK_DISABLE_MMVQ previously only stopped the kernels being USED, but the pipelines
++    // were still pre-created, so a driver that cannot compile them still failed at init.
++    for (uint32_t w = 0; w < (device->disable_mmvq_pipelines ? 0u : DMMV_WG_SIZE_COUNT); ++w) {
+         const uint32_t wg_size_subgroup   = (w == DMMV_WG_SIZE_SUBGROUP) ? subgroup_size : (subgroup_size * 4);
+         const uint32_t wg_size_subgroup16 = (w == DMMV_WG_SIZE_SUBGROUP) ? subgroup_size16 : (subgroup_size16 * 4);
+ 
+@@ -7075,6 +7081,7 @@
+         device->mmvq_mode = 0;
+         if (getenv("GGML_VK_DISABLE_MMVQ")) {
+             device->mmvq_mode = -1;
++            device->disable_mmvq_pipelines = true;
+         } else if (getenv("GGML_VK_FORCE_MMVQ")) {
+             device->mmvq_mode = 1;
+         }
