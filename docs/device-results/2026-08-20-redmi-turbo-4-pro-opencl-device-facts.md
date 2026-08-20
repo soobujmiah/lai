@@ -62,3 +62,40 @@ needs re-collection over adb. Treat these as the ground truth for the Adreno Ope
 
 With a build that actually contains ggml-opencl again: the table above names the exact
 remaining stage if anything fails (dlopen vs ICD compliance vs probe).
+
+## Update 2 — build #192 probe results (2026-08-20 17:13)
+
+Build #192 was the first artifact that actually contained ggml-opencl after the CI
+restoration. Its probe ran exactly as designed and produced the decisive sequence:
+
+```text
+opencl: no system ICD directory — synthesized 4 vendor entries at /data/user/0/dev.lai.runtime/files/lai-opencl-vendors (OCL_ICD_VENDORS set)
+ggml_opencl: platform IDs not available.
+opencl: dlopen(libOpenCL.so) failed: dlopen failed: library "libOpenCL.so" not found
+opencl probe: device 0 type=2 name='Vulkan0' description='Adreno (TM) 825'
+opencl probe: device 1 type=0 name='CPU' description='CPU'
+opencl: compiled but no OpenCL GPU device registered (no vendor ICD?)
+```
+
+Interpretation:
+
+- Vendor-directory synthesis and OCL_ICD_VENDORS plumbing WORKED (all four .icd
+  candidates were attempted by the ICD loader).
+- **The wall is Android itself: `dlopen("libOpenCL.so")` from the app process returns
+  "library not found" even though `/vendor/lib64/libOpenCL.so` exists and is listed in
+  `/vendor/etc/public.libraries.txt`.** The bionic linker reports both ENOENT and EACCES
+  (SELinux denial) as "library not found", so the two remaining hypotheses are:
+  1. SELinux policy denies untrusted_app access to the vendor OpenCL library
+     (a known HyperOS/Xiaomi behaviour — Termux/clinfo users hit it on this vendor);
+  2. the linker namespace config on Android 16 does not expose it to apps targeting SDK 36.
+- Consequence: any approach that dlopens the vendor lib FROM THE APP inherits this wall —
+  including absolute-path .icd candidates (they failed identically via the ICD loader).
+
+Next evidence gates (record results here):
+
+- [ ] OpenCL-Z (Play Store) on this exact device: does it show the Adreno 825 OpenCL
+      platform? YES → an app-visible path exists (find it via linker debug logs);
+      NO → Xiaomi blocks OpenCL for third-party apps on this device, and the OpenCL track
+      closes here (pivot: wait for Vulkan driver fix, or QNN/HTP later).
+- [ ] Linker debug trace: `setprop debug.ld.app dlopen` (in rish), restart LAI,
+      `logcat -d | grep -i linker` — shows the exact search paths / denial.
