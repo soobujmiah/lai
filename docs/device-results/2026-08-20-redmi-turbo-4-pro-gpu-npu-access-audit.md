@@ -111,3 +111,24 @@ Not pursued.
   refuses both `/vendor/lib64/libOpenCL.so` and `/system/vendor/lib64/libOpenCL.so`.
 - rish = Shizuku interactive shell (uid 2000) is the user's adb substitute; `/` is
   read-only there — never redirect files to `/`; use `/data/local/tmp` or no redirection.
+
+## Addendum — NPU ecosystem map and the ggml-hexagon route (2026-08-20)
+
+- Every shipping NPU solution converges on one door: `libcdsprpc.so` fastRPC → Hexagon.
+  MLC Chat (TVM→Hexagon, 8 Elite-only), MNN Chat (downloaded QNN libs → QNN HTP), Local
+  Dream (bundled QNN), avisre/snapdragon-npu-llm (ExecuTorch QNN .pte, proved working on
+  v69/8 Gen 1 at 31 tok/s for Qwen3-0.6B).
+- **llama.cpp already ships an experimental `ggml-hexagon` backend, present in LAI's
+  pinned commit ad1de39** (`ggml/src/ggml-hexagon`, dlopens `libcdsprpc.so`, requires
+  Hexagon SDK at build time for the DSP skels + optional HTP cert signing). Upstream
+  support: Hexagon v73/v75/v79/v81 (8 Gen 3 / 8 Elite / 8 Elite Gen 5); Q4_0/Q8_0/MXFP4/
+  FP32; core LLM ops (MUL_MAT/MUL_MAT_ID, RMS_NORM, ROPE, SWIGLU, SOFTMAX...).
+- SM8735 (8s Gen 4): Hexagon ~60 TOPS INT4/INT8, advertised LLM support, but the
+  dsp_arch version is not publicly listed (between v75 and v79). Determine via QNN SDK
+  chipset table or experiment before scoping ggml-hexagon for LAI.
+- MLC Chat on this phone ran TVM-Vulkan/CPU, NOT NPU (Hexagon path is 8 Elite-only).
+  If TVM-Vulkan performed well here, it is evidence the Adreno 825 executes LLM compute
+  under a different Vulkan kernel stack — i.e. LAI's crash is ggml-kernel-specific.
+- Decisive door test (unchanged): Local Dream or MNN Chat on this Redmi — does NPU engage
+  on HyperOS? YES → scope ggml-hexagon integration (Hexagon SDK pinned in CI, skel build,
+  backend registered like the others, evidence-gated). NO → NPU waits for an OTA.
