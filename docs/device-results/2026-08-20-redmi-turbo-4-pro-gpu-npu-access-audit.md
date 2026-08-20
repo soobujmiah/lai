@@ -132,3 +132,33 @@ Not pursued.
 - Decisive door test (unchanged): Local Dream or MNN Chat on this Redmi — does NPU engage
   on HyperOS? YES → scope ggml-hexagon integration (Hexagon SDK pinned in CI, skel build,
   backend registered like the others, evidence-gated). NO → NPU waits for an OTA.
+
+## BREAKTHROUGH — decisive device observations (user, 2026-08-20 evening)
+
+Two independent observations overturn the pessimistic reading of the shell-side greps:
+
+1. **MLC Chat runs "so fast" on the Redmi Turbo 4 Pro.** MLC's Hexagon path is
+   8 Elite-only, so this was MLC's **TVM-Vulkan** (or CPU) path. "So fast" on this
+   device means the **Adreno 825 executes LLM compute successfully under TVM's Vulkan
+   kernel stack** — the GPU is NOT incapable; LAI's SIGSEGV is specific to ggml's
+   Vulkan kernels/driver interaction. This strongly motivates the ggml warptile-clamp
+   patch experiment (§1): the hardware is proven innocent.
+2. **Local Dream generates Stable Diffusion images "in seconds" on the same phone.**
+   Local Dream's fast path is **QNN on the Hexagon NPU** (SD1.5 supported on Hexagon
+   V68+); CPU mode takes minutes. Seconds-per-image is NPU-class performance →
+   **the fastRPC door (libcdsprpc → Hexagon) is OPEN to real Play apps on this HyperOS
+   build**, despite `ld.config.txt` greps from a shell reading empty. The shell-side
+   linkerconfig view is NOT the app-namespace view — treat those greps as inconclusive,
+   the device observations as authoritative.
+
+Status changes:
+
+- **NPU door test: PROBABLY PASSED** — confirm which backend Local Dream's UI shows
+  (NPU vs GPU vs CPU) to make it certain.
+- SM8735 Hexagon is evidently usable by QNN (V68+ scope includes this chip's NPU per
+  Local Dream's support list) — determine the exact dsp_arch (QNN SDK chipset table) as
+  the first scoping step for ggml-hexagon.
+- Updated priority: (1) Vulkan warptile-clamp qualification build — GPU now proven
+  viable by MLC; (2) scope ggml-hexagon integration (backend already present in LAI's
+  pinned llama.cpp ad1de39) now that the door is demonstrably open; (3) OpenCL remains
+  a separate locked wall (linker trace is app-side evidence), dormant.
