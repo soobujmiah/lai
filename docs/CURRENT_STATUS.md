@@ -30,10 +30,10 @@ QNN/HTP NPU (licensed QAIRT), `core:tokenization` (SentencePiece unigram), `core
 
 ## Next Device Test
 
-**No GPU qualification test is currently actionable on this device** — both accelerator paths are closed by external walls, recorded with full evidence: Vulkan = Qualcomm driver bug (`vkCmdBindPipeline` MUL_MAT bind, release-183 addr2line), OpenCL = HyperOS publishes `libOpenCL.so` to no modern-app namespace (2026-08-20 device-facts record). The dormant Vulkan + OpenCL backends remain compiled and will self-activate when the walls move. Triggers to re-test:
+**No GPU qualification test is currently actionable on this device** — both accelerator paths are closed by external walls, recorded with full evidence: Vulkan = Qualcomm driver bug (`vkCmdBindPipeline` MUL_MAT bind, release-183 addr2line), OpenCL = HyperOS publishes `libOpenCL.so` to no modern-app namespace (2026-08-20 device-facts record). The dormant Vulkan + OpenCL backends remain compiled and will self-activate when the walls move. **Strategy handoff with the complete decision table (incl. the new Vulkan warptile-clamp lever from upstream PR #25735 and the one remaining NPU/NNAPI HAL check): [`device-results/2026-08-20-redmi-turbo-4-pro-gpu-npu-access-audit.md`](device-results/2026-08-20-redmi-turbo-4-pro-gpu-npu-access-audit.md).** Triggers to re-test:
 
-1. **HyperOS/Xiaomi OTA** → retest OpenCL first: `logcat -d -s LAI-llama | grep -i opencl` after app start; `dlopen(libOpenCL.so) OK` means the wall moved and the existing qualification flow resumes.
-2. **Qualcomm Vulkan driver update** → qualification build with `validated_accelerators=llama-vulkan`.
-3. **QNN/HTP (NPU) intake** → the remaining sanctioned acceleration path (bundled QNN runtime bypasses the linker wall); needs licensed QAIRT SDK + model conversion per roadmap.
+1. **Land the warptile-clamp LAI patch** (dry-run verified against the pin) → one `validated_accelerators=llama-vulkan` qualification build — the only Vulkan lever LAI controls today.
+2. **NNAPI HAL check** (`ls /vendor/bin/hw | grep -iE "neural"`) — decides whether the NPU has a sanctioned side door before any QNN engineering is spent.
+3. **HyperOS/Xiaomi OTA** → re-grep the linker config; the dormant OpenCL backend self-activates if published.
 
 CPU remains the device-validated shipped default; no build is needed until one of the triggers above happens.
