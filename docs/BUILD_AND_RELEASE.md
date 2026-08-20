@@ -123,6 +123,22 @@ At runtime the statically linked ICD loader discovers the vendor Adreno driver t
 If a device has no vendor ICD, `OpenCLBackend::available()` reports false and the app stays
 on CPU: no crash, no acceleration claim.
 
+**Android vendor discovery (fixed 2026-08-20 after device evidence #188):** the Khronos ICD
+loader's default Android search path is ONLY `/system/vendor/Khronos/OpenCL/vendors`, which
+the Redmi Turbo 4 Pro (and most Qualcomm devices) does not populate — the first qualification
+build probed zero OpenCL platforms even though the Adreno driver is present. Fix: at startup
+(`LaiApplication.onCreate`, before any backend probe) native
+`prepare_opencl_vendor_dir(filesDir)` checks the system vendor dirs; when none contains `.icd`
+files it synthesizes `<filesDir>/lai-opencl-vendors/` with one candidate per `.icd` file —
+the bare soname `libOpenCL.so` first (resolved through Android's public-library namespace,
+the standard Qualcomm path), then `/vendor/lib64/libOpenCL.so`,
+`/system/vendor/lib64/libOpenCL.so`, `/system/lib64/libOpenCL.so` — and points
+`OCL_ICD_VENDORS` at that single directory (the loader accepts one path, not a list, and reads
+one library name per `.icd` file, skipping dlopen failures). `OpenCLBackend::available()`
+additionally dlopens `libOpenCL.so` directly and logs the linker result, and the probe logs
+every registered ggml device, so any remaining failure is diagnosable from
+`adb logcat -s LAI-llama` without a rebuild.
+
 Selection rules are identical to Vulkan:
 
 - `llama-opencl` is declared in model catalog **rev 5** (`compatibleBackendIds`,

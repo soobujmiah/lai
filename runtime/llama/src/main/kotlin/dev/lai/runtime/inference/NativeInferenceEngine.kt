@@ -39,6 +39,7 @@ internal class NativeBindings private constructor() {
         @JvmStatic external fun destroySession(session: Long)
         @JvmStatic external fun lastError(): String
         @JvmStatic external fun installNativeCrashHandler(logFilePath: String?)
+        @JvmStatic external fun configureOpenCLVendors(baseDir: String?)
     }
 }
 
@@ -56,6 +57,18 @@ class NativeInferenceEngine : InferenceEngine {
      */
     fun installNativeCrashHandler(logFilePath: String?) {
         if (NativeBindings.loaded) NativeBindings.installNativeCrashHandler(logFilePath)
+    }
+
+    /**
+     * Android OpenCL vendor discovery for the Adreno track. The statically linked Khronos
+     * ICD loader only searches /system/vendor/Khronos/OpenCL/vendors by default, which most
+     * Qualcomm devices do not populate; this native call synthesizes a vendor directory in
+     * app-private storage (bare soname `libOpenCL.so` resolved through the public-library
+     * namespace, plus absolute vendor paths) and points OCL_ICD_VENDORS at it. Must run
+     * BEFORE any backend capability probe. Safe no-op when the native library is not loaded.
+     */
+    fun configureOpenCLVendors(baseDir: String?) {
+        if (NativeBindings.loaded) NativeBindings.configureOpenCLVendors(baseDir)
     }
 
     /**

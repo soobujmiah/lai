@@ -1,8 +1,14 @@
 #include "include/lai/backend.h"
 
 #include <android/log.h>
+#include <dlfcn.h>
+#include <jni.h>
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <string>
+#include <system_error>
 
 #ifdef LAI_HAS_OPENCL
 #include "ggml-backend.h"
@@ -14,34 +20,56 @@ namespace {
 
 constexpr const char* kLogTag = "LAI-llama";
 
+std::string jstring_to_utf8(JNIEnv* env, jstring value) {
+    if (value == nullptr) return {};
+    const char* chars = env->GetStringUTFChars(value, nullptr);
+    if (chars == nullptr) return {};
+    std::string result(chars);
+    env->ReleaseStringUTFChars(value, chars);
+    return result;
+}
+
 #ifdef LAI_HAS_OPENCL
 
-// Returns the GPU device registered by the ggml OpenCL backend (registered under the
+// True when `dir` exists and contains at least one .icd vendor file.
+bool dir_has_icd_files(const char* dir) {
+    std::error_code ec;
+    if (!std::filesystem::is_directory(dir, ec)) return false;
+    for (auto it = std::filesystem::directory_iterator(dir, ec);
+         !ec && it != std::filesystem::directory_iterator(); it.increment(ec)) {
+        if (it->path().extension() == ".icd") return true;
+    }
+    return false;
+}
+
+// Returns the first GPU device registered by the ggml OpenCL backend (registered under the
 // device name "GPUOpenCL"; its description carries the real device string, e.g.
 // "Adreno (TM) 825"). ggml-opencl only registers CL_DEVICE_TYPE_GPU devices. Returns
 // nullptr when no OpenCL device is registered (no vendor ICD on the device, or the
 // driver refused to initialise), which makes this backend report unavailable and lets
-// the app fall back to CPU without any acceleration claim.
+// the app fall back to CPU without any acceleration claim. Logs every registered ggml
+// device so a failed probe is fully diagnosable from logcat.
 ggml_backend_dev_t find_opencl_device() {
     const size_t count = ggml_backend_dev_count();
+    ggml_backend_dev_t match = nullptr;
     for (size_t index = 0; index < count; ++index) {
         ggml_backend_dev_t device = ggml_backend_dev_get(index);
         if (device == nullptr) continue;
         const char* name = ggml_backend_dev_name(device);
+        const char* description = ggml_backend_dev_description(device);
+        __android_log_print(
+            ANDROID_LOG_INFO, kLogTag,
+            "opencl probe: device %zu type=%d name='%s' description='%s'",
+            index, static_cast<int>(ggml_backend_dev_type(device)),
+            name != nullptr ? name : "?",
+            description != nullptr ? description : "?"
+        );
+        if (match != nullptr || name == nullptr) continue;
         const enum ggml_backend_dev_type type = ggml_backend_dev_type(device);
         if (type != GGML_BACKEND_DEVICE_TYPE_GPU && type != GGML_BACKEND_DEVICE_TYPE_IGPU) continue;
-        if (name != nullptr && std::string(name).find("OpenCL") != std::string::npos) {
-            const char* description = ggml_backend_dev_description(device);
-            __android_log_print(
-                ANDROID_LOG_INFO, kLogTag,
-                "opencl: device %zu type=%d name='%s' description='%s'",
-                index, static_cast<int>(type), name,
-                description != nullptr ? description : "?"
-            );
-            return device;
-        }
+        if (std::string(name).find("OpenCL") != std::string::npos) match = device;
     }
-    return nullptr;
+    return match;
 }
 
 #endif  // LAI_HAS_OPENCL
@@ -61,6 +89,16 @@ public:
 
     bool available() const override {
 #ifdef LAI_HAS_OPENCL
+        // Direct namespace probe: can this app process even dlopen the vendor OpenCL
+        // library? Qualcomm exposes it through the public-library namespace on most
+        // devices; a failure here names the exact linker error in logcat.
+        void* probe = dlopen("libOpenCL.so", RTLD_NOW);
+        if (probe == nullptr) {
+            __android_log_print(ANDROID_LOG_WARN, kLogTag, "opencl: dlopen(libOpenCL.so) failed: %s", dlerror());
+        } else {
+            __android_log_print(ANDROID_LOG_INFO, kLogTag, "opencl: dlopen(libOpenCL.so) OK");
+            dlclose(probe);
+        }
         // Probe only: initializing llama.cpp registers the ggml OpenCL backend, which
         // enumerates OpenCL platforms/devices through the statically linked Khronos ICD
         // loader. On a device without a vendor OpenCL driver this yields zero devices and
@@ -115,4 +153,68 @@ std::unique_ptr<Backend> create_opencl_backend() {
     return std::make_unique<OpenCLBackend>();
 }
 
+// Android OpenCL vendor discovery (device evidence 2026-08-20: the Khronos ICD loader
+// compiled into liblai_runtime.so found zero platforms on the Redmi Turbo 4 Pro because
+// its default Android search path is ONLY /system/vendor/Khronos/OpenCL/vendors, while
+// Qualcomm devices expose the Adreno OpenCL driver elsewhere — typically resolvable as
+// the plain soname "libOpenCL.so" through the app's public-library namespace, or under
+// /vendor/lib64). The loader honours OCL_ICD_VENDORS, but as a SINGLE directory that it
+// opens with opendir(), and reads one library name per *.icd file. So when no system
+// vendor directory with .icd files exists, synthesize one in app-private storage listing
+// every plausible driver location, and point OCL_ICD_VENDORS at it. Must run before the
+// first ggml backend probe (initialize_llama_once), i.e. from LaiApplication.onCreate.
+void prepare_opencl_vendor_dir(const std::string& base_dir) {
+#ifdef LAI_HAS_OPENCL
+    namespace fs = std::filesystem;
+    static const char* kSystemVendorDirs[] = {
+        "/system/vendor/Khronos/OpenCL/vendors",
+        "/vendor/Khronos/OpenCL/vendors",
+    };
+    for (const char* system_dir : kSystemVendorDirs) {
+        if (dir_has_icd_files(system_dir)) {
+            __android_log_print(
+                ANDROID_LOG_INFO, kLogTag,
+                "opencl: system vendor ICD directory present (%s) — using loader default",
+                system_dir
+            );
+            return;
+        }
+    }
+    std::error_code ec;
+    const fs::path vendors_dir = fs::path(base_dir) / "lai-opencl-vendors";
+    fs::create_directories(vendors_dir, ec);
+    if (ec) {
+        __android_log_print(ANDROID_LOG_WARN, kLogTag, "opencl: cannot create vendor dir (%s)", ec.message().c_str());
+        return;
+    }
+    // One candidate per .icd file; the loader dlopens each and skips failures. The bare
+    // soname first: that is how Android resolves the vendor's Adreno OpenCL driver through
+    // the public-library namespace on Qualcomm devices.
+    static const char* kCandidates[][2] = {
+        {"10-libOpenCL.so.icd", "libOpenCL.so"},
+        {"20-vendor-lib64.icd", "/vendor/lib64/libOpenCL.so"},
+        {"30-system-vendor-lib64.icd", "/system/vendor/lib64/libOpenCL.so"},
+        {"40-system-lib64.icd", "/system/lib64/libOpenCL.so"},
+    };
+    for (const auto& candidate : kCandidates) {
+        std::ofstream out(vendors_dir / candidate[0], std::ios::trunc);
+        if (out) out << candidate[1] << "\n";
+    }
+    setenv("OCL_ICD_VENDORS", vendors_dir.c_str(), 1);
+    __android_log_print(
+        ANDROID_LOG_INFO, kLogTag,
+        "opencl: no system ICD directory — synthesized %zu vendor entries at %s (OCL_ICD_VENDORS set)",
+        sizeof(kCandidates) / sizeof(kCandidates[0]), vendors_dir.c_str()
+    );
+#else
+    (void) base_dir;
+    __android_log_print(ANDROID_LOG_INFO, kLogTag, "opencl: GGML_OPENCL not compiled — vendor discovery skipped");
+#endif
+}
+
 }  // namespace lai
+
+extern "C" JNIEXPORT void JNICALL
+Java_dev_lai_runtime_inference_NativeBindings_configureOpenCLVendors(JNIEnv* env, jclass, jstring base_dir) {
+    lai::prepare_opencl_vendor_dir(lai::jstring_to_utf8(env, base_dir));
+}
