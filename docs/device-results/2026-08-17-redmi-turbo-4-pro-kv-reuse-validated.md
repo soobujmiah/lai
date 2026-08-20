@@ -36,3 +36,21 @@ every request) to **~0.6 s flat** — a ~25× improvement, measured on device, o
    qualitative check of actual reply text (diagnostics exclude content by design).
 2. Turn-10/12 prefix shifts are consistent with the tool-instruction gate toggling or window
    sliding — bounded cost, works as designed.
+
+## Postscript — ChatterUI CPU comparison (2026-08-20, user test)
+
+Same model (`qwen2.5-1.5b-instruct-q4_k_m.gguf`, same SHA source) run in ChatterUI on the
+same device, **GPU Layers: 0 (CPU)**, 4 threads, batch 512, context 4096:
+
+| Run | Prompt tok/s | Decode tok/s |
+|---|---|---|
+| Chat 1 | 99.44 (40 tok) | 27.45 (9 tok) |
+| Chat 2 | 74.62 (15 tok) | 28.01 (36 tok) |
+| Chat 3 | 62.45 (11 tok) | 27.97 (16 tok) |
+
+Decode ~28 tok/s is 2–3× LAI's device-validated CPU decode (8–15 tok/s). Leading hypothesis:
+LAI's CMake forces `GGML_CPU_KLEIDIAI OFF`; ChatterUI's newer llama.cpp ships with KleidiAI
+(ARM's optimized quantized matmul kernels) enabled. LAI's pinned llama.cpp ad1de39 has
+first-class KleidiAI support (downloads pinned `v1.24.0` release archive with MD5
+`2f02ebe29573d45813e671eb304f2a00` — compatible with the immutable-source policy).
+Action: one-line flip `GGML_CPU_KLEIDIAI ON` + device A/B, no new dependency plumbing.
