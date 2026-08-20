@@ -99,3 +99,38 @@ Next evidence gates (record results here):
       closes here (pivot: wait for Vulkan driver fix, or QNN/HTP later).
 - [ ] Linker debug trace: `setprop debug.ld.app dlopen` (in rish), restart LAI,
       `logcat -d | grep -i linker` — shows the exact search paths / denial.
+
+## Final verdict — OpenCL track CLOSED on this device (device-policy wall)
+
+Evidence chain completed 2026-08-20:
+
+1. **OpenCL-Z (legacy 2015 app, targetSdk ~22) sees the full stack:** platform
+   `QUALCOMM Snapdragon(TM)`, `OpenCL 3.0 QUALCOMM build: 0800.33`, device
+   `QUALCOMM Adreno(TM) 825`, FULL_PROFILE, compiler available, 8 compute units, unified
+   memory, 5.5 GB global, `cl_khr_subgroups`/`cl_qcom_dot_product8`/`cl_khr_bfloat16`
+   among extensions. Loaded via **32-bit** `/system/vendor/lib/libOpenCL.so`. Report:
+   `OpenCL-Z-Android-Report.txt` (kept outside the repo per screenshot policy; facts above
+   are the retained text evidence).
+2. **LAI (targetSdk 36) is refused by the linker** (debug.ld.app=dlopen trace):
+   `library "/vendor/lib64/libOpenCL.so" … is not accessible for the namespace
+   [clns-10, permitted_paths="/data:/mnt/expand:/data/user/0/dev.lai.runtime"]`.
+3. **`cat /linkerconfig/ld.config.txt | grep -n -i opencl` → EMPTY.** The generated
+   linker configuration publishes `libOpenCL.so` to NO app namespace on this HyperOS
+   build (`BP2A.250605.031.A3`), even though `/vendor/etc/public.libraries.txt` lists
+   it — legacy apps bypass that config entirely, which is the only reason OpenCL-Z works.
+
+**Conclusion:** the Adreno 825 OpenCL stack is fully functional; HyperOS restricts it to
+legacy-targeting apps. No app-side code can honestly reach it from a modern targetSdk.
+The OpenCL backend stays compiled and dormant: it will self-activate (probe → scheduler
+evidence → offload, zero code change) if a future HyperOS build publishes the library to
+app namespaces. Deliberately lowering targetSdk to bypass the linker namespace violates
+the project's security policy and Play requirements, and is rejected.
+
+GPU acceleration status after this session:
+
+| Path | State |
+|---|---|
+| Vulkan | driver bug at `vkCmdBindPipeline` (MUL_MAT bind) — retest on Qualcomm driver updates |
+| OpenCL | device-policy wall (this record) — dormant backend auto-activates if Xiaomi publishes the library |
+| QNN/HTP (NPU) | the remaining sanctioned path: Qualcomm distributes the QNN runtime for bundling INSIDE the APK, which bypasses the linker wall entirely; needs licensed QAIRT SDK + model conversion (roadmap) |
+| CPU | device-validated baseline; remains the shipped default |
