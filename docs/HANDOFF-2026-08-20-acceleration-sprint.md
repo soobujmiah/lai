@@ -92,3 +92,39 @@ HyperOS 3.0.303.0, Android 16) on 2026-08-20. Full evidence lives in
   (never claim acceleration without DEVICE_VALIDATED device evidence), docs-with-code
   (`scripts/validate_repo.sh` before every push), cancel auto-CI on docs commits.
 - Token rotation still recommended (PAT was pasted in chat early in the project).
+
+---
+
+## SESSION CLOSE — 2026-08-20 ~19:45 (Asia/Dhaka)
+
+### Current state (at close)
+
+- **Builds:** none running, none queued; build freeze active (user controls dispatch).
+  Latest green qualification artifact: `lai-release-192` (OpenCL-era; superseded by the
+  upcoming Build 1). Catalog: rev 5 signed & published. Main @ `6e6eb00` (docs).
+- **Code shipped today (all in main):** Adreno OpenCL track (`opencl_backend.cpp`,
+  vendor-dir synthesis, catalog rev 5, scheduler gate + tests), Vulkan device pinning,
+  full diagnostics chain (dlopen probe, per-device probe logs), restored CI workflow.
+- **Device-verified today:** OpenCL stack healthy but HyperOS-walled (dormant backend);
+  NPU fastRPC door OPEN (Local Dream NPU-class generation); Adreno 825 GPU capable
+  (MLC TVM-Vulkan fast); CPU 2–3× headroom identified (KleidiAI off in LAI builds).
+- **Knowledge persisted:** this file + `docs/device-results/2026-08-20-*` (LAI) and
+  `sobuj-knowledge-base` → `devices/redmi-turbo-4-pro/` (README, problems-and-fixes
+  ledger, access audit, evidence/, ASSISTANT_CONTEXT mission state).
+
+### Next steps (ordered)
+
+1. **User says GO** → Build 1: `GGML_CPU_KLEIDIAI ON` (one line) +
+   `scripts/ci/ggml-vulkan-clamp-warptile.patch` (adapt upstream PR #25735; verified
+   applicable) wired into `fetch_llama_cpp.sh` → dispatch with
+   `validated_accelerators=llama-vulkan` → user installs/tests → record evidence.
+2. **Collect user's pending observations:** ChatterUI GPU Layers=99 outcome (may
+   replace the patch with a llama.cpp pin bump if newer upstream already fixed the
+   Adreno bug), Local Dream backend indicator (NPU vs GPU), MLC model/tok/s.
+3. **NPU scoping:** identify SM8735 dsp_arch (QNN chipset table) → plan Hexagon SDK
+   intake in CI + `ggml-hexagon` enablement as `llama-hexagon` backend (contract:
+   evidence-gated like all others).
+4. **Standing watch:** on any HyperOS OTA → re-run the three greps
+   (opencl / cdsprpc / neural-HAL); dormant OpenCL backend self-activates if published.
+
+Session closed. Everything needed to resume is in this file and the KB.
