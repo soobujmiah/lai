@@ -1,5 +1,7 @@
 #include "llama_session.h"
 
+#include "ggml-backend.h"
+
 #include <android/log.h>
 #include <sched.h>
 #include <unistd.h>
@@ -482,11 +484,51 @@ std::unique_ptr<BackendSession> build_llama_session(
     const std::string& model_path,
     int context_size,
     int gpu_layers,
+    const char* gpu_device_name,
     std::string& error
 ) {
         initialize_llama_once();
         llama_model_params model_params = llama_model_default_params();
         model_params.n_gpu_layers = gpu_layers;
+        // When several GPU backends are compiled into one artifact (Vulkan + OpenCL on the
+        // Adreno track) llama.cpp's default device selection is ambiguous. Pin the model to
+        // exactly the accelerator this LAI backend represents (plus CPU for the non-offloaded
+        // remainder) so offload can never land on the other GPU backend's device.
+        static ggml_backend_dev_t g_pinned_devices[3] = {nullptr, nullptr, nullptr};
+        if (gpu_layers > 0 && gpu_device_name != nullptr) {
+            ggml_backend_dev_t gpu_device = nullptr;
+            const size_t device_count = ggml_backend_dev_count();
+            for (size_t index = 0; index < device_count; ++index) {
+                ggml_backend_dev_t candidate = ggml_backend_dev_get(index);
+                if (candidate == nullptr) continue;
+                const enum ggml_backend_dev_type type = ggml_backend_dev_type(candidate);
+                if (type != GGML_BACKEND_DEVICE_TYPE_GPU && type != GGML_BACKEND_DEVICE_TYPE_IGPU) continue;
+                const char* candidate_name = ggml_backend_dev_name(candidate);
+                if (candidate_name != nullptr &&
+                    std::string(candidate_name).find(gpu_device_name) != std::string::npos) {
+                    gpu_device = candidate;
+                    break;
+                }
+            }
+            if (gpu_device == nullptr) {
+                error = std::string("No ggml GPU device matching '") + gpu_device_name +
+                        "' is registered — the accelerator backend is compiled but unavailable here";
+                return nullptr;
+            }
+            ggml_backend_dev_t cpu_device = ggml_backend_dev_by_name("CPU");
+            if (cpu_device == nullptr) {
+                cpu_device = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+            }
+            g_pinned_devices[0] = gpu_device;
+            g_pinned_devices[1] = cpu_device;
+            g_pinned_devices[2] = nullptr;
+            model_params.devices = g_pinned_devices;
+            __android_log_print(
+                ANDROID_LOG_INFO, kLogTag,
+                "device: pinned offload to '%s' (+ CPU for the remainder)",
+                ggml_backend_dev_name(gpu_device)
+            );
+        }
         // GPU offload requires copying weights into the device's buffers. With MMAP the loader
         // keeps tensors in the CPU-mapped file, and llama.cpp deliberately swaps any GPU host
         // buffer to CPU under mmap ("avoid using a host buffer when using mmap") — so an

@@ -215,12 +215,19 @@ class NativeInferenceEngine : InferenceEngine {
             supportedModelFormats = setOf("gguf"),
             defaultPriority = 200,
         )
+        "opencl" -> BackendDescriptor(
+            id = BackendId("llama-opencl"),
+            computeClass = ComputeClass.GPU,
+            supportedModelFormats = setOf("gguf"),
+            defaultPriority = 200,
+        )
         else -> null
     }
 
     private fun nativeName(id: BackendId): String = when (id.value) {
         "llama-cpu" -> "cpu"
         "llama-vulkan" -> "vulkan"
+        "llama-opencl" -> "opencl"
         else -> error("Unknown llama backend ${id.value}")
     }
 

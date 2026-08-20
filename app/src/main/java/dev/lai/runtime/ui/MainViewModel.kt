@@ -1181,9 +1181,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun fallbackToCpuAfterAcceleratorFailure(message: String) {
         val scheduler = state.value.schedulerDetail.orEmpty()
-        val acceleratorActive = scheduler.startsWith("LLAMA-VULKAN") || scheduler.contains("llama-vulkan")
+        val acceleratorActive = scheduler.startsWith("LLAMA-VULKAN") || scheduler.contains("llama-vulkan") ||
+            scheduler.startsWith("LLAMA-OPENCL") || scheduler.contains("llama-opencl")
         val backendFailure = message.contains("vk::", ignoreCase = true) ||
             message.contains("vulkan", ignoreCase = true) ||
+            message.contains("opencl", ignoreCase = true) ||
             message.contains("pipeline", ignoreCase = true) ||
             message.contains("backend", ignoreCase = true) ||
             message.contains("device", ignoreCase = true) ||

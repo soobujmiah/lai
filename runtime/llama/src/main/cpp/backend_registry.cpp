@@ -38,6 +38,7 @@ std::vector<std::unique_ptr<Backend>> create_backends() {
     backends.emplace_back(std::make_unique<PlaceholderBackend>("cpu"));
 #endif
     backends.emplace_back(create_vulkan_backend());
+    backends.emplace_back(create_opencl_backend());
     return backends;
 }
 

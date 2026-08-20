@@ -21,8 +21,9 @@ Head: **`e80bd1e`** · CI: **#172 green** (signed release APK + R8 mapping; debu
 |---|---|---|---|
 | Inference contract | Build verified | `InferenceEngine` (load / streaming `Flow<InferenceEvent>` / capabilities / context size) + `GenerationConfig` + `GenerationMetrics` (honest `evaluatedPromptTokens`) | — |
 | llama.cpp CPU adapter | **Device validated** | `llama_session.{h,cpp}` shared session: KV-prefix reuse (~0.6 s steady TTFT), chat template, cancellation, thermal thread limit, `LAI-llama` µs stall tracing. Decode 2.5–15 tok/s; prefill 10–20 tok/s | — |
-| **Vulkan (GPU) adapter** | Implemented; **device qualification pending** | Real `VulkanBackend::open()` with full layer offload (`LLAMA_LOAD_MODE_NONE` for GPU, mmap kept for CPU); IGPU device probe (Adreno 825 is integrated); `GGML_VK_DISABLE_COOPMAT/_2` + **`GGML_VK_DISABLE_MMVQ`** for the Adreno driver's confirmed failing shader `mul_mat_vec_q4_k_f32_f32`; `std::cerr` → `LAI-llama` logcat + in-app capture of the failing pipeline name; auto **CPU fallback** on accelerator failure/stall (fail-closed, no acceleration claim until device-validated) | **Retest GPU with release-172+ on device**; record evidence in `docs/device-results/`; if another shader fails the log names it |
-| Backend scheduler | Device validated (CPU) | `InferenceScheduler`: evidence gates — accelerators need `DEVICE_VALIDATED` (granted per build via `-Plai.validatedAccelerators`, default `llama-vulkan`); memory/battery/thermal admission; model catalog declares compatible backends (rev 4: `llama-cpu` preferred, `llama-vulkan` fallback) | — |
+| **Vulkan (GPU) adapter** | Implemented; **device qualification pending** | Real `VulkanBackend::open()` with full layer offload (`LLAMA_LOAD_MODE_NONE` for GPU, mmap kept for CPU); IGPU device probe (Adreno 825 is integrated); `GGML_VK_DISABLE_COOPMAT/_2` + **`GGML_VK_DISABLE_MMVQ`** for the Adreno driver's confirmed failing shader `mul_mat_vec_q4_k_f32_f32`; `std::cerr` → `LAI-llama` logcat + in-app capture of the failing pipeline name; auto **CPU fallback** on accelerator failure/stall (fail-closed, no acceleration claim until device-validated) | **Driver crash unresolved** (SIGSEGV `vkCmdBindPipeline` MUL_MAT bind, release-183 addr2line); Vulkan stays opt-in; GPU qualification moved to the OpenCL track below |
+| **Adreno OpenCL track (GPU primary path)** | Implemented; **device qualification pending** | llama.cpp's Qualcomm-maintained OpenCL backend compiled into `liblai_runtime.so` (Adreno-optimized kernels embedded); Khronos headers + ICD loader fetched by immutable SHA on CI, ICD loader linked statically (no binaries committed); `OpenCLBackend` probes `GPUOpenCL`; catalog rev 5 declares `llama-opencl` fallback; `model_params.devices` pinned per backend | **Qualification build** (`validated_accelerators=llama-opencl`) + device evidence in `docs/device-results/`; record tok/s and thermal if generation succeeds |
+| Backend scheduler | Device validated (CPU) | `InferenceScheduler`: evidence gates — accelerators need `DEVICE_VALIDATED` (granted per build via `-Plai.validatedAccelerators`, default empty = CPU-only); memory/battery/thermal admission; model catalog declares compatible backends (rev 5: `llama-cpu` preferred; `llama-opencl` + `llama-vulkan` fallbacks) | — |
 | Rolling context window / Bangla pass / thermal governor | Build verified | `ContextWindowPolicy`, tuned bilingual system prompt + repetition penalty, closed-loop thermal governor (min 2 threads) | Device re-validation |
 | Qualcomm QNN/HTP (NPU) | Planned — no code | Boundary documented only | Licensed QAIRT CI + model conversion (Phase 3) |
 
@@ -75,7 +76,7 @@ lai/
 ├── .github/
 │   ├── dependabot.yml · pull_request_template.md
 │   └── workflows/{android_build.yml, catalog_publish.yml}
-├── catalog/{catalog-public-key.pem, models-v1.json}      # signed catalog revision 4
+├── catalog/{catalog-public-key.pem, models-v1.json}      # signed catalog revision 5
 ├── app/                                                   # composition root + Compose shell
 │   ├── src/main/java/dev/lai/runtime/
 │   │   ├── LaiApplication.kt · MainActivity.kt            # logger configure + crash handler
@@ -89,7 +90,7 @@ lai/
 │   ├── contracts/   # pure tool/inference/OCR/model/workspace/diagnostics contracts
 │   ├── policy/      # consent, shell, zero-egress, settings, audit policy
 │   ├── scheduler/   # thermal governor, memory estimator, backend routing
-│   └── model/       # immutable reviewed-model catalog (rev 4 embedded)
+│   └── model/       # immutable reviewed-model catalog (rev 5 embedded)
 ├── platform/
 │   ├── download/    # sole network owner; WorkManager downloads, import/verify
 │   ├── audit/       # app-private no-backup hash-chained JSONL audit
@@ -137,7 +138,7 @@ lai/
   backends on `CapabilityEvidence.DEVICE_VALIDATED` + model-catalog compatibility + memory/
   battery/thermal admission; `ScheduleDecision(selected, evaluations, reason)`.
 - Catalog (`core/model`): `ReviewedModelCatalog.recommendedCpuBaseline` + `embeddedDocument`
-  (rev 4; `compatibleBackendIds=[llama-cpu, llama-vulkan]`, preferred `llama-cpu`).
+  (rev 5; `compatibleBackendIds=[llama-cpu, llama-vulkan, llama-opencl]`, preferred `llama-cpu`; fallbacks `llama-opencl`, `llama-vulkan`).
 - Build-time GPU enablement: `-Plai.validatedAccelerators` (default `llama-vulkan` in CI) →
   `BuildConfig.VALIDATED_ACCELERATORS` → `MainViewModel` grants `DEVICE_VALIDATED`.
 
@@ -183,7 +184,7 @@ lai/
   `Ensure release signing key` step generates the deterministic test keystore when secrets are
   absent; artifacts `lai-release-<run>` (30 d), `lai-release-mapping-<run>` (90 d), `sbom`,
   `lint`. Tags additionally publish a GitHub Release.
-- `catalog_publish.yml`: validates + signs `catalog/models-v1.json` (rev 4) → `catalog-v1` assets.
+- `catalog_publish.yml`: validates + signs `catalog/models-v1.json` (rev 5) → `catalog-v1` assets.
 
 ---
 

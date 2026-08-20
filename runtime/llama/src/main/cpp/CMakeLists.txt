@@ -3,6 +3,10 @@ project(lai_runtime LANGUAGES C CXX)
 
 option(LAI_ENABLE_LLAMA_CPP "Compile the pinned llama.cpp CPU adapter" OFF)
 set(LAI_LLAMA_CPP_DIR "" CACHE PATH "Path to a CI-fetched llama.cpp checkout")
+# Adreno OpenCL track: when CI provides the Khronos headers + a static ICD loader,
+# ggml-opencl is compiled into liblai_runtime.so (docs/BUILD_AND_RELEASE.md).
+set(LAI_OPENCL_INCLUDE_DIR "" CACHE PATH "Path to CI-fetched Khronos OpenCL-Headers")
+set(LAI_OPENCL_LIBRARY "" CACHE FILEPATH "Path to CI-built static OpenCL ICD loader (libOpenCL.a)")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -12,6 +16,7 @@ add_library(
     native_inference.cpp
     backend_registry.cpp
     vulkan_backend.cpp
+    opencl_backend.cpp
     native_crash_handler.cpp
 )
 
@@ -41,9 +46,30 @@ if(LAI_ENABLE_LLAMA_CPP)
     set(GGML_CPU_KLEIDIAI OFF CACHE BOOL "" FORCE)
     set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
     set(GGML_VULKAN ON CACHE BOOL "" FORCE)
+    # Adreno OpenCL track. ggml-opencl's CMakeLists does find_package(OpenCL REQUIRED) and
+    # find_package(Python3 REQUIRED); the hints below point at the CI-fetched Khronos
+    # headers and the CI-built STATIC ICD loader, which gets linked into liblai_runtime.so
+    # (no separate .so is packaged). At runtime the loader discovers the vendor Adreno
+    # driver through /vendor/etc/OpenCL/drivers/*.icd, like every Android OpenCL app.
+    if(EXISTS "${LAI_OPENCL_LIBRARY}" AND EXISTS "${LAI_OPENCL_INCLUDE_DIR}/CL/cl.h")
+        set(GGML_OPENCL ON CACHE BOOL "" FORCE)
+        set(GGML_OPENCL_EMBED_KERNELS ON CACHE BOOL "" FORCE)
+        # Adreno-optimized matmul kernels are the point of this track; keep the default ON
+        # explicit so a future ggml default change cannot silently drop them.
+        set(GGML_OPENCL_USE_ADRENO_KERNELS ON CACHE BOOL "" FORCE)
+        set(OpenCL_INCLUDE_DIR "${LAI_OPENCL_INCLUDE_DIR}" CACHE PATH "" FORCE)
+        set(OpenCL_LIBRARY "${LAI_OPENCL_LIBRARY}" CACHE FILEPATH "" FORCE)
+        message(STATUS "LAI: ggml-opencl enabled (Adreno track)")
+    else()
+        set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+        message(STATUS "LAI: ggml-opencl disabled (no OpenCL headers/ICD loader provided)")
+    endif()
     # Proper way: SPIRV-Headers + glslang are now installed on CI via workflow apt-get.
     add_subdirectory("${LAI_LLAMA_CPP_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/llama.cpp" EXCLUDE_FROM_ALL)
     target_sources(lai_runtime PRIVATE llama_cpu_backend.cpp llama_session.cpp)
     target_compile_definitions(lai_runtime PRIVATE LAI_HAS_LLAMA_CPP=1 LAI_HAS_VULKAN=1)
+    if(GGML_OPENCL)
+        target_compile_definitions(lai_runtime PRIVATE LAI_HAS_OPENCL=1)
+    endif()
     target_link_libraries(lai_runtime PRIVATE llama)
 endif()

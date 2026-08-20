@@ -120,9 +120,11 @@ public:
         }
         // Offload every model layer to the Adreno device; llama.cpp keeps the CPU for
         // prompt/output glue. The Kotlin scheduler only selects this backend after
-        // physical-device validation has granted DEVICE_VALIDATED evidence.
+        // physical-device validation has granted DEVICE_VALIDATED evidence. The "Vulkan"
+        // pin keeps the offload on the Vulkan device even though the OpenCL backend is
+        // compiled into the same artifact (Adreno track).
         __android_log_print(ANDROID_LOG_INFO, kLogTag, "vulkan: opening session with full layer offload");
-        return build_llama_session(model_path, context_size, 999, error);
+        return build_llama_session(model_path, context_size, 999, "Vulkan", error);
 #else
         (void) model_path;
         (void) context_size;

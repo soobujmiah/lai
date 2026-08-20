@@ -94,6 +94,54 @@ used). `std::cerr` is routed to the `LAI-llama` logcat tag and the failing-pipel
 captured in-app; a Kotlin-level accelerator failure auto-falls back to CPU — but a native
 driver crash cannot be caught by the app, which is why GPU defaults off on unqualified devices.
 
+## GPU enablement — Adreno OpenCL track (2026-08-20)
+
+The Adreno 825 Vulkan driver bug is addr2line-verified (release-183): SIGSEGV at
+`vkCmdBindPipeline+0x4` inside `vulkan.adreno.so` while binding the MUL_MAT pipeline, after
+every compile-time failure mode (coopmat, MMVQ, f16, integer dot product, async, fusion,
+flash attention) was disabled. Upstream llama.cpp already routes large matmul tiles away
+from Qualcomm (`mul_mat_l=false` for `VK_VENDOR_ID_QUALCOMM`), so the crash is in the
+medium/small tile path itself — a driver bug, not a configuration left to try.
+
+The **OpenCL backend** is Qualcomm's own acceleration path for Snapdragon GPUs: maintained
+with Qualcomm/Codelinaro upstream, shipped with Adreno-optimized matmul kernels
+(`GGML_OPENCL_USE_ADRENO_KERNELS=ON` by default), full llama graph coverage for this model
+(MUL_MAT/MUL_MAT_ID/ROPE/SOFT_MAX/RMS_NORM/flash-attention and all glue ops), and it drives
+the same Adreno 825 through the mature OpenCL driver stack instead of the Vulkan driver that
+crashes. llama.cpp's OpenCL backend requires OpenCL ≥ 2.0; Adreno drivers advertise that.
+
+Build integration (all bytes stay off-repository, per the source-only policy):
+
+| Piece | Source | How it enters CI |
+|---|---|---|
+| OpenCL headers | `KhronosGroup/OpenCL-Headers` @ `15b536b7fbe1098cea462a27db496b287ac89b63` | workflow fetch by immutable SHA into runner temp |
+| OpenCL ICD loader | `KhronosGroup/OpenCL-ICD-Loader` @ `45cdbda4ddd31c324e32a744f112087c42da18f7` | workflow fetch + static arm64 build (`BUILD_SHARED_LIBS=OFF`), linked INTO `liblai_runtime.so` |
+| OpenCL kernels | embedded at compile time (`GGML_OPENCL_EMBED_KERNELS=ON`) | Python3 on the runner |
+
+At runtime the statically linked ICD loader discovers the vendor Adreno driver through
+`/vendor/etc/OpenCL/drivers/*.icd` — the standard Android OpenCL path every OpenCL app uses.
+If a device has no vendor ICD, `OpenCLBackend::available()` reports false and the app stays
+on CPU: no crash, no acceleration claim.
+
+Selection rules are identical to Vulkan:
+
+- `llama-opencl` is declared in model catalog **rev 5** (`compatibleBackendIds`,
+  `fallbackBackendIds`); `llama-cpu` remains `preferredBackendId`.
+- The scheduler still refuses it without `DEVICE_VALIDATED` evidence, granted per build via
+  `-Plai.validatedAccelerators=llama-opencl` (workflow input `validated_accelerators`).
+- `build_llama_session` pins `model_params.devices` to the `GPUOpenCL` device (+ CPU), so a
+  build with both GPU backends compiled can never offload to the wrong one; the Vulkan
+  backend pins `Vulkan` symmetrically.
+- Flash attention stays disabled for GPU sessions; the standard attention path is used.
+- Kotlin-level auto CPU fallback on accelerator failure covers OpenCL messages too.
+- Known first-run cost: OpenCL program compilation happens at first model load (the
+  cl-program cache is disabled on Android when no writable temp dir is set) — a slow first
+  load is expected, not a failure.
+
+**Qualification build:** Actions → Android build → Run workflow with
+`validated_accelerators=llama-opencl` → install the signed release artifact on the Redmi
+Turbo 4 Pro → load Qwen → generate. Evidence protocol per `docs/DEVICE_TESTING.md`.
+
 ## Working rule: signed release only by default
 
 **Default CI produces ONLY the signed release APK.** The debug APK is built only when it is
@@ -131,4 +179,7 @@ Vulkan init, and `fetch_llama_cpp.sh` applies LAI's `ggml-vulkan-skip-mmvq.patch
 shader family is NOT COMPILED when disabled (the env var alone only stopped the kernels being
 used; the Adreno 825 driver still failed compiling `mul_mat_vec_q4_k_f32_f32` at init, confirmed
 on-device 2026-08-19). Non-affected shaders run on the GPU; the CPU fallback protects against any
-remaining driver failure. Retest GPU with release-175+.
+remaining driver failure. Vulkan remains opt-in (`validated_accelerators=llama-vulkan`) because
+the driver crash at `vkCmdBindPipeline` (MUL_MAT bind) is unresolved on the pinned llama.cpp;
+the **primary GPU qualification track is now OpenCL** (`validated_accelerators=llama-opencl`,
+see "GPU enablement — Adreno OpenCL track" above).

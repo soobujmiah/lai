@@ -151,6 +151,57 @@ class InferenceSchedulerTest {
         )
     }
 
+    @Test
+    fun `opencl accelerator is selected when it holds the only DEVICE_VALIDATED evidence`() {
+        // Mirrors the LAI catalog (rev 5): Qwen declares llama-cpu/llama-vulkan/llama-opencl
+        // compatible, CPU preferred, OpenCL and Vulkan as fallbacks. Only the backend granted
+        // DEVICE_VALIDATED evidence by a qualification build may be selected.
+        val opencl = BackendId("llama-opencl")
+        val vulkan = BackendId("llama-vulkan")
+        val llamaCpu = BackendId("llama-cpu")
+        val decision = scheduler.select(
+            InferenceWorkload(
+                estimatedRequiredBytes = 1_000,
+                modelFormat = "gguf",
+                quantization = "Q4_K_M",
+                compatibleBackends = setOf(llamaCpu, vulkan, opencl),
+                backendPreference = listOf(llamaCpu, opencl, vulkan),
+            ),
+            RuntimeEnvironment(10_000, 80, true, ThermalState.NOMINAL),
+            listOf(
+                capability(llamaCpu, ComputeClass.CPU, ready),
+                capability(vulkan, ComputeClass.GPU, ready),
+                capability(opencl, ComputeClass.GPU, ready + CapabilityEvidence.DEVICE_VALIDATED),
+            ),
+        )
+        assertEquals(opencl, decision.selected)
+    }
+
+    @Test
+    fun `without accelerator evidence CPU stays selected despite GPU fallbacks in the catalog`() {
+        val opencl = BackendId("llama-opencl")
+        val vulkan = BackendId("llama-vulkan")
+        val llamaCpu = BackendId("llama-cpu")
+        val decision = scheduler.select(
+            InferenceWorkload(
+                estimatedRequiredBytes = 1_000,
+                modelFormat = "gguf",
+                quantization = "Q4_K_M",
+                compatibleBackends = setOf(llamaCpu, vulkan, opencl),
+                backendPreference = listOf(llamaCpu, opencl, vulkan),
+            ),
+            RuntimeEnvironment(10_000, 80, true, ThermalState.NOMINAL),
+            listOf(
+                capability(llamaCpu, ComputeClass.CPU, ready),
+                capability(vulkan, ComputeClass.GPU, ready),
+                capability(opencl, ComputeClass.GPU, ready),
+            ),
+        )
+        assertEquals(llamaCpu, decision.selected)
+        assertTrue(decision.evaluations.first { it.backend == opencl }.rejectionReasons.isNotEmpty())
+        assertTrue(decision.evaluations.first { it.backend == vulkan }.rejectionReasons.isNotEmpty())
+    }
+
     private fun capability(
         id: BackendId,
         computeClass: ComputeClass,

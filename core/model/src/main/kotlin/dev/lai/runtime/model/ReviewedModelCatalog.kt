@@ -59,7 +59,9 @@ object ReviewedModelCatalog {
     val recommendedCpuBaseline = ReviewedModel(
         id = "qwen2.5-1.5b-instruct-q4-k-m",
         displayName = "Qwen 2.5 1.5B Instruct",
-        description = "Device-validated Snapdragon CPU baseline; broader Bangla quality evaluation pending.",
+        description = "Device-validated Snapdragon CPU baseline; llama-opencl (Adreno OpenCL track) and " +
+            "llama-vulkan declared compatible as fallbacks pending device qualification; " +
+            "broader Bangla quality evaluation pending.",
         sourceRepository = "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
         fileName = "qwen2.5-1.5b-instruct-q4_k_m.gguf",
         url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/" +
@@ -71,12 +73,13 @@ object ReviewedModelCatalog {
         quantization = "Q4_K_M",
         modelFormat = "gguf",
         contextSize = 4_096,
-        // llama-vulkan is declared compatible (fallback) so the scheduler may select the Adreno
-        // GPU once it has DEVICE_VALIDATED evidence; until then the accelerator gate keeps CPU
-        // active. CPU remains the reviewed baseline and preferred backend.
-        compatibleBackendIds = listOf("llama-cpu", "llama-vulkan"),
+        // llama-opencl (Adreno OpenCL track) and llama-vulkan are declared compatible
+        // (fallbacks) so the scheduler may select the Adreno GPU once a backend has
+        // DEVICE_VALIDATED evidence; until then the accelerator gate keeps CPU active.
+        // CPU remains the reviewed baseline and preferred backend.
+        compatibleBackendIds = listOf("llama-cpu", "llama-vulkan", "llama-opencl"),
         preferredBackendId = "llama-cpu",
-        fallbackBackendIds = listOf("llama-vulkan"),
+        fallbackBackendIds = listOf("llama-opencl", "llama-vulkan"),
         estimatedPeakBytes = 1_933_521_832,
         requiredAbis = listOf("arm64-v8a"),
         reviewState = setOf(
@@ -90,8 +93,8 @@ object ReviewedModelCatalog {
     val all: List<ReviewedModel> = listOf(recommendedCpuBaseline)
     val embeddedDocument = ReviewedModelCatalogDocument(
         schemaVersion = 1,
-        revision = 4,
-        generatedAt = "2026-08-18T19:00:00+06:00",
+        revision = 5,
+        generatedAt = "2026-08-20T14:00:00+06:00",
         models = all,
     )
 

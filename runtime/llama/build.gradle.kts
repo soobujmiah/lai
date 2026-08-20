@@ -30,6 +30,18 @@ android {
                 providers.gradleProperty("lai.llamaCppDir").orNull?.let {
                     arguments += "-DLAI_LLAMA_CPP_DIR=$it"
                 }
+                // Adreno OpenCL track (docs/BUILD_AND_RELEASE.md): CI fetches the pinned Khronos
+                // OpenCL-Headers and builds the Khronos ICD loader as a static arm64 library; both
+                // arrive as absolute paths. When both are present the native build compiles
+                // ggml-opencl and links the loader into liblai_runtime.so.
+                val openclIncludeDir = providers.gradleProperty("lai.openclIncludeDir").orNull
+                val openclLibrary = providers.gradleProperty("lai.openclLibrary").orNull
+                if (!openclIncludeDir.isNullOrBlank() && !openclLibrary.isNullOrBlank()) {
+                    arguments += listOf(
+                        "-DLAI_OPENCL_INCLUDE_DIR=$openclIncludeDir",
+                        "-DLAI_OPENCL_LIBRARY=$openclLibrary",
+                    )
+                }
                 // ggml-vulkan.cpp includes <vulkan/vulkan.hpp> and <spirv/unified1/spirv.hpp>,
                 // which the NDK sysroot and apt packages do not expose to the cross-compiler
                 // (apt installs them under /usr/include, hidden by NDK sysroot isolation). CI

@@ -69,5 +69,6 @@ std::vector<std::unique_ptr<Backend>> create_backends();
 std::unique_ptr<Backend> create_llama_cpu_backend();
 #endif
 std::unique_ptr<Backend> create_vulkan_backend();
+std::unique_ptr<Backend> create_opencl_backend();
 
 }  // namespace lai
