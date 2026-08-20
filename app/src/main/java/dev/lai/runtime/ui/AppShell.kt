@@ -12,9 +12,8 @@ import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,7 +22,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 
 private enum class ShellDestination(val label: String) {
     Chat("Chat"),
@@ -32,18 +30,19 @@ private enum class ShellDestination(val label: String) {
     Settings("Settings"),
 }
 
+/** Presentation-only adaptive shell foundation; existing LAI state/runtime remain authoritative. */
 @Composable
 fun LaiAppShell(
     modifier: Modifier = Modifier,
-    content: @Composable (ShellDestination) -> Unit = {},
+    content: @Composable (String) -> Unit = {},
 ) {
     var destination by rememberSaveable { mutableStateOf(ShellDestination.Chat) }
 
-    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
+    Scaffold(modifier = modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxSize()) {
             NavigationRail {
                 ShellDestination.entries.forEach { item ->
-                    NavigationBarItem(
+                    NavigationRailItem(
                         selected = destination == item,
                         onClick = { destination = item },
                         icon = {
@@ -66,9 +65,7 @@ fun LaiAppShell(
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = "lai-shell-content",
                 modifier = Modifier.fillMaxSize(),
-            ) { selected ->
-                content(selected)
-            }
+            ) { selected -> content(selected.label) }
         }
     }
 }
