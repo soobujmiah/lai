@@ -137,7 +137,9 @@ the standard Qualcomm path), then `/vendor/lib64/libOpenCL.so`,
 one library name per `.icd` file, skipping dlopen failures). `OpenCLBackend::available()`
 additionally dlopens `libOpenCL.so` directly and logs the linker result, and the probe logs
 every registered ggml device, so any remaining failure is diagnosable from
-`adb logcat -s LAI-llama` without a rebuild.
+`adb logcat -s LAI-llama` without a rebuild. Device ground truth for this phone (vendor lib
+path, public.libraries entry, absent ICD directories) is recorded permanently in
+[`device-results/2026-08-20-redmi-turbo-4-pro-opencl-device-facts.md`](device-results/2026-08-20-redmi-turbo-4-pro-opencl-device-facts.md).
 
 Selection rules are identical to Vulkan:
 

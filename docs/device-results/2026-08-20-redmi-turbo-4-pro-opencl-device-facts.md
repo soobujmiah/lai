@@ -1,0 +1,64 @@
+# Redmi Turbo 4 Pro — Adreno 825 OpenCL device facts (collected via Shizuku shell)
+
+Collection date: 2026-08-20 (16:32 Asia/Dhaka)
+Collected from: Shizuku `rish` interactive shell (uid 2000), build 0.1.190 session
+Purpose: one-time capture of the device's OpenCL layout so vendor-discovery work never
+needs re-collection over adb. Treat these as the ground truth for the Adreno OpenCL track
+(docs/BUILD_AND_RELEASE.md § "GPU enablement — Adreno OpenCL track").
+
+## Device identity
+
+| Field | Value |
+|---|---|
+| Model | Xiaomi 25053RT47C (Redmi Turbo 4 Pro), device codename `onyx` |
+| OS | Android 16, kernel `6.6.77-android15-8-g4a507830d890-ab13636` |
+| SoC | QTI SM8735 (Snapdragon 8s Gen 4), Adreno 825 |
+| RAM | 12 GB (11233 MiB usable) |
+
+## OpenCL layout — what EXISTS on this device
+
+- `/vendor/lib64/libOpenCL.so` — **present**, 95,800 bytes, `-rw-r--r-- root:root`.
+  Small size indicates Qualcomm's shim/loader library; the real driver hangs off it.
+- `/vendor/etc/public.libraries.txt` — **contains `libOpenCL.so`** (alongside
+  `libadsprpc.so`, `libcdsprpc.so`, `libsdsprpc.so`, `libfastcvopt.so`, `libSNPE.so`,
+  Xiaomi camera libs). **Consequence: an app process CAN `dlopen("libOpenCL.so")`**
+  through the public-library namespace — this is the canonical path for OpenCL on this
+  device.
+- `/system/lib64/libOpenCL.so` — absent.
+
+## OpenCL layout — what does NOT exist on this device
+
+- No `.icd` vendor files anywhere readable under `/vendor/etc` (find run as shell uid;
+  a few `hal_uuid_map_*.xml` and SELinux contexts files deny even shell, but no OpenCL
+  drivers/vendors directory surfaced).
+- `/vendor/Khronos/OpenCL/vendors` — **does not exist** (this is the ONLY default search
+  path of the Khronos ICD loader on Android per `icd_platform.h` — the reason the
+  statically linked loader found zero platforms in builds #188/#190).
+- `/system/vendor/Khronos/OpenCL/vendors` — does not exist either.
+
+## Diagnostic lines that prove each layer (from `logcat -s LAI-llama`)
+
+| Line | Meaning |
+|---|---|
+| `opencl: dlopen(libOpenCL.so) OK` | public-library namespace exposes the vendor driver to the app |
+| `opencl: dlopen(libOpenCL.so) failed: …` | linker-namespace problem (names the exact error) |
+| `opencl: no system ICD directory — synthesized 4 vendor entries at …` | LAI vendor-directory synthesis ran |
+| `opencl probe: device N type=… name='GPUOpenCL' description='Adreno (TM) 825'` | ggml registered the OpenCL GPU device — backend available |
+| `opencl: compiled but no OpenCL GPU device registered` | ICD loader enumerated zero platforms |
+| `device: pinned offload to 'GPUOpenCL' (+ CPU for the remainder)` | model load targets the Adreno device |
+
+## Session history (build → finding)
+
+- **#188** (`e210732`): OpenCL compiled+linked (verified by artifact symbol inspection),
+  probe found zero platforms — Khronos ICD loader default path empty on this device.
+- **#190** (`fda2c24`): vendor-directory synthesis shipped, but logcat showed
+  `opencl: GGML_OPENCL not compiled` — root cause was NOT the device: a workspace
+  snapshot regression had silently rolled back `.github/workflows/android_build.yml` in
+  `fda2c24` (the OpenCL fetch/build CI step was missing), so the build compiled without
+  ggml-opencl. Workflow restored from `e210732` in the follow-up commit; see
+  CURRENT_STATUS snapshot notes.
+
+## Next evidence needed (one app restart + `logcat -d -s LAI-llama | grep -i opencl`)
+
+With a build that actually contains ggml-opencl again: the table above names the exact
+remaining stage if anything fails (dlopen vs ICD compliance vs probe).
