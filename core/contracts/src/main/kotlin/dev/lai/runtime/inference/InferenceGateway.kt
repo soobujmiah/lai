@@ -2,23 +2,6 @@ package dev.lai.runtime.inference
 
 import kotlinx.coroutines.flow.Flow
 
-/** Evidence state for a registered provider. Only MEASURED providers are exposed as usable. */
-enum class ProviderEvidence { UNQUALIFIED, MEASURED, FAILED }
-
-data class ProviderDescriptor(
-    val id: String,
-    val backends: Set<BackendDescriptor>,
-    val evidence: ProviderEvidence,
-    val networkCapable: Boolean = false,
-)
-
-data class InferenceProvenance(
-    val providerId: String,
-    val requestedBackend: BackendId?,
-    val actualBackend: BackendId,
-    val evidence: ProviderEvidence,
-)
-
 /**
  * Provider-neutral routing boundary. The gateway deliberately implements the stable
  * InferenceEngine contract so existing application callers can migrate without changing
