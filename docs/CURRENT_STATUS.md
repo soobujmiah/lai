@@ -38,3 +38,29 @@ QNN/HTP NPU (licensed QAIRT), `core:tokenization` (SentencePiece unigram), `core
 3. **HyperOS/Xiaomi OTA** → re-grep the linker config; the dormant OpenCL backend self-activates if published.
 
 CPU remains the device-validated shipped default; no build is needed until one of the triggers above happens.
+
+## 2026-08-21 — Phase 2 UI integration status
+
+Completed in this slice:
+
+- Audited current `main` after PR #15 merge (`022b1da`).
+- Preserved existing `MainViewModel`, `MainUiState`, runtime, model, workspace, Accessibility/Shizuku, tool approval, chat/history, streaming and cancellation responsibilities.
+- Bound Models, Workspace, and Providers screens to real `MainUiState` via presentation adapters instead of placeholder state.
+- Added adaptive Material 3 navigation in `LaiApp` using bottom navigation on compact layouts and rail navigation on expanded layouts.
+- Added real Models actions for catalog refresh, install recommended/supported model, load, unload, and delete.
+- Added real Workspace actions for SAF grant, revoke, refresh, and bounded model scanning while keeping path/file details private.
+- Added Provider status UI that documents current local runtime/CPU/GPU/cloud boundaries without claiming fake cloud or GPU support.
+- Removed duplicate provider/model/workspace presentation types that would otherwise conflict at compile time.
+
+Validation in this environment:
+
+- `bash scripts/validate_repo.sh` passed.
+- `./gradlew` could not be run because the repository does not currently commit a Gradle wrapper.
+- A downloaded Gradle 9.5.0 was attempted with a downloaded JDK 17; the sandbox Gradle daemon was killed during dependency instrumentation before tests could execute. This is an environment limitation, not a passing build.
+- No physical Android device was available here, so Redmi Turbo 4 Pro / Adreno 825 validation is still pending and must not be claimed.
+
+Remaining:
+
+- Run CI Android build/test/lint with the configured GitHub Actions toolchain.
+- Complete physical-device validation, especially CPU fallback, model load/unload, streaming/cancellation, workspace scan, Screen Reader, Automator, and tool approval.
+- Continue polishing Chat and Settings once Models + Workspace pass CI/device validation.
