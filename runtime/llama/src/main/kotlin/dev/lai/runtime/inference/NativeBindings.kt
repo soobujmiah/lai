@@ -2,16 +2,20 @@ package dev.lai.runtime.inference
 
 /** JNI declarations implemented by runtime/llama/src/main/cpp/native_inference.cpp. */
 internal object NativeBindings {
+    private var loadFailure: String? = null
+
     init {
         try {
             System.loadLibrary("lai_llama")
-        } catch (_: UnsatisfiedLinkError) {
-            // Native loading is reported through [loaded].
+        } catch (error: UnsatisfiedLinkError) {
+            loadFailure = error.stackTraceToString()
         }
     }
 
     val loaded: Boolean
         get() = runCatching { nativeRuntimeInfo() }.isSuccess
+
+    fun loadError(): String = loadFailure.orEmpty()
 
     fun lastError(): String = runCatching { nativeLastError() }.getOrDefault("")
 
