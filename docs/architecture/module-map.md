@@ -1,6 +1,6 @@
 # Module map and dependency graph
 
-Last audited: 2026-08-18 · 16 Gradle modules
+Last audited: 2026-08-21 · **16 Gradle modules**
 
 ## Purpose
 
@@ -21,10 +21,11 @@ This is the source-verified module inventory and compile-time dependency map. It
 | `:platform:accessibility` | Android library | Accessibility service, snapshots, actions, screenshot | contracts | no direct test file |
 | `:platform:workspace` | Android library | SAF grant/layout, settings store, discovery | contracts (API), policy | 1 test file |
 | `:platform:shizuku` | Android library | Shizuku state, UserService, elevated argv execution | contracts, policy | no direct test file |
-| `:runtime:llama` | Android/native library | `InferenceEngine`, JNI, C++ backend registry, llama CPU | contracts (API) | compiled in CI; no direct unit test |
+| `:platform:history` | Android library | Local chat-history persistence and repository contract | `core:contracts` | history tests present |
+| `:runtime:llama` | Android/native library | `InferenceEngine`, JNI, C++ backend registry, llama CPU and optional accelerator integration | contracts (API) | compiled in CI; native integration evidence tracked separately |
 | `:runtime:ocr` | Android library | `OcrEngine` seam and honest placeholder | contracts (API) | no direct test file |
 | `:runtime:orchestrator` | Android library | Policy-gated typed tool dispatch | contracts (API), policy, Accessibility, Shizuku, OCR | no direct test file |
-| `:app` | Android application | Composition, lifecycle, Compose, `MainViewModel` | all modules | no current app test source |
+| `:app` | Android application | Composition, lifecycle, Compose, `MainViewModel` | all modules | app-level tests present for selected coordinators |
 
 ## Dependency graph
 
@@ -75,6 +76,17 @@ graph TD
 
 Core owns types, not authority. Android authority belongs only to platform modules. Runtime owns replaceable computation. The app creates concrete objects in `AppContainer`; no service locator is exposed to plugins or model output.
 
+## Accelerator boundary
+
+GPU/NPU implementations remain inside `:runtime:llama` (native/runtime boundary) and must not leak Qualcomm/vendor types into `core`. Device evidence is consumed as backend qualification state, not as a reason to bypass architecture boundaries.
+
+For the current Redmi Turbo 4 Pro investigation:
+
+- `/dev/kgsl-3d0` access from the LAI app identity is **AVAILABLE** evidence;
+- Qualcomm OpenCL library presence is **AVAILABLE** evidence;
+- Vulkan model loading is **AVAILABLE**, but generation remains unvalidated because of the Qualcomm driver crash;
+- no accelerator is `DEVICE_VALIDATED` until real model execution succeeds with reproducible evidence.
+
 ## Lifecycle
 
 Android components are application/activity/Accessibility service/Shizuku provider/UserService. Native llama sessions are handle-based and explicitly destroyed. Repositories live for the application container lifetime. Workspace access exists only while a persisted SAF grant remains valid.
@@ -82,7 +94,7 @@ Android components are application/activity/Accessibility service/Shizuku provid
 ## Data flow and authority flow
 
 - Network: app → download repositories → HTTPS reviewed endpoints.
-- Inference: app → `InferenceEngine` → JNI → C++ backend → llama.cpp.
+- Inference: app → `InferenceEngine` → JNI → C++ backend → llama.cpp / optional accelerator path.
 - Automation: app → `AgentRuntime` → policy → Accessibility/Shizuku.
 - Audit: app → `ToolAuditRepository` → no-backup private file.
 - Workspace: app → SAF repository/store/discovery (settings via `AtomicNamedDocumentReplace`).
@@ -94,12 +106,12 @@ Architecture checks reject forbidden module direction, misplaced network/Android
 
 ## Testing strategy
 
-Unit-test pure decisions in core; use Android fake/provider tests for platform persistence; JNI/native integration in CI; instrumentation and physical tests for authority and device behavior. Current gaps are called out in [`../implementation/testing-plan.md`](../implementation/testing-plan.md).
+Unit-test pure decisions in core; use Android fake/provider tests for platform persistence; JNI/native integration in CI; instrumentation and physical tests for authority and device behavior. Accelerator qualification requires target-device evidence in addition to build success.
 
 ## Extension rules
 
 - New authority → new or explicitly extended platform owner.
-- New inference backend → isolated runtime adapter implementing core contracts.
+- New inference backend → isolated runtime/native adapter implementing core contracts.
 - New provider/gateway abstractions → pure contracts first, concrete adapters second.
 - New product surfaces → feature modules only when state/navigation boundaries are designed.
 - No module is added merely to claim roadmap progress.
