@@ -87,10 +87,13 @@ during Vulkan compute** (device evidence 2026-08-19: process restart on message 
 been qualified. CPU remains the reviewed, reliable backend.
 
 GPU offload uses `LLAMA_LOAD_MODE_NONE` (mmap would force the integrated GPU's host-visible
-buffers back to CPU — 0 layers offloaded). `VulkanBackend` sets `GGML_VK_DISABLE_COOPMAT/_2`
-and `GGML_VK_DISABLE_MMVQ`, and `fetch_llama_cpp.sh` applies `ggml-vulkan-skip-mmvq.patch` so
-the MMVQ family is not compiled when disabled (the env var alone only stopped the kernels being
-used). `std::cerr` is routed to the `LAI-llama` logcat tag and the failing-pipeline name is
+buffers back to CPU — 0 layers offloaded). `VulkanBackend` now applies the same Adreno
+workaround environment for probing and session open: coopmat/2, MMVQ, integer-dot, f16, async,
+multi-add, fusion and graph optimization are disabled, and submissions are forced through the
+graphics queue. `fetch_llama_cpp.sh` applies two LAI patches on top of pinned llama.cpp:
+`ggml-vulkan-skip-mmvq.patch` and `ggml-vulkan-adreno-warptile-clamp.patch` (backport of
+upstream PR #25735, clamping l_/m_ warptile WARP to 64 for subgroupSize > 64 Adreno-style
+matmul). `std::cerr` is routed to the `LAI-llama` logcat tag and the failing-pipeline name is
 captured in-app; a Kotlin-level accelerator failure auto-falls back to CPU — but a native
 driver crash cannot be caught by the app, which is why GPU defaults off on unqualified devices.
 

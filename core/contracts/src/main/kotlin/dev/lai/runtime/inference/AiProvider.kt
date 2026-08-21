@@ -3,8 +3,6 @@ package dev.lai.runtime.inference
 /** Local/remote classification used by routing and egress policy. */
 enum class ProviderKind { LOCAL, REMOTE }
 
-enum class ProviderEvidence { UNQUALIFIED, MEASURED, FAILED }
-
 enum class NetworkPolicy { LOCAL_ONLY, CLOUD_ONLY, PREFER_LOCAL, PREFER_CLOUD, AUTO }
 
 data class AiProviderDescriptor(

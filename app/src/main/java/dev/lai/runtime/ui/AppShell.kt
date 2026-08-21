@@ -19,8 +19,8 @@ import androidx.compose.ui.Modifier
 
 private enum class ShellDestination(val label: String, val glyph: String) {
     Chat("Chat", "C"),
-    Models("Models", "M"),
-    Workspace("Workspace", "W"),
+    ScreenReader("Reader", "R"),
+    Automator("Auto", "A"),
     Settings("Settings", "S"),
 }
 

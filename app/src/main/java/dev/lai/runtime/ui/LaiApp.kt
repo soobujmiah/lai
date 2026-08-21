@@ -58,6 +58,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -73,110 +74,150 @@ import dev.lai.runtime.workspace.WorkspaceGrantState
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+
+private enum class AppDestination(val label: String, val glyph: String) {
+    Chat("Chat", "●"),
+    ScreenReader("Reader", "◉"),
+    Automator("Auto", "◆"),
+    Settings("Settings", "S"),
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun LaiApp(viewModel: MainViewModel) {
     val state by viewModel.state.collectAsState()
-    // Hardware/gesture back must leave Settings as well; otherwise back exits the whole app from
-    // a screen the user thinks of as "inside" something.
-    BackHandler(enabled = state.settingsVisible) { viewModel.toggleSettings() }
-    // Mode-bar visibility must follow where the IME is GOING, not where it currently is.
-    //
-    // Field report (0.9.0): with WindowInsets.isImeVisible (the *current* inset), the bar only
-    // reappeared at the very END of the keyboard's close animation — the composer had already
-    // slid to the screen bottom, then the bar popped in underneath and shoved the whole layout
-    // for a frame ("navigation tab pushed off screen, then comes back").
-    //
-    // imeAnimationTarget flips at the START of the animation in both directions: opening hides
-    // the bar immediately (the keyboard covers its space anyway), closing restores it immediately
-    // so it rides down smoothly with the shrinking imePadding() instead of popping in at the end.
-    // When no animation is running it equals the current inset, so steady-state is unchanged.
+    var destination by remember { mutableStateOf(AppDestination.Chat) }
+
+    LaunchedEffect(state.settingsVisible) {
+        if (state.settingsVisible) destination = AppDestination.Settings
+    }
+
+    BackHandler(enabled = destination != AppDestination.Chat || state.settingsVisible) {
+        if (state.settingsVisible) viewModel.toggleSettings()
+        destination = when (state.mode) {
+            UiMode.CHAT -> AppDestination.Chat
+            UiMode.SCREEN_READER -> AppDestination.ScreenReader
+            UiMode.AUTOMATOR -> AppDestination.Automator
+        }
+    }
+
     val imeVisible = WindowInsets.imeAnimationTarget.getBottom(LocalDensity.current) > 0
-    Scaffold(
-        // Keyboard handling, arrived at over three device reports:
-        //  - imePadding() on the Scaffold lifts the ENTIRE scaffold (content + bottom bar) above the
-        //    keyboard. Padding only the composer row does not work, because when a Scaffold has a
-        //    bottomBar the content's bottom padding is the bottom bar's height, not the IME inset,
-        //    so the composer was laid out behind the navigation bar and the keyboard (build 0.6.84).
-        //  - contentWindowInsets must therefore NOT contain the IME as well, or it is counted twice
-        //    and the composer flies off the top of the screen (build 0.6.83).
-        modifier = Modifier.imePadding(),
-        contentWindowInsets = WindowInsets.safeDrawing.only(
-            WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
-        ),
-        topBar = {
-            TopAppBar(
-                title = { Text("LAI", fontWeight = FontWeight.Bold) },
-                windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
-                navigationIcon = {
-                    // Settings is a full screen, not a mode. It needs an unambiguous way out:
-                    // reusing the same "Settings" button to leave was a guess the user had to make.
-                    if (state.settingsVisible) {
-                        IconButton(onClick = viewModel::toggleSettings) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
+
+    fun select(target: AppDestination) {
+        if (state.settingsVisible && target != AppDestination.Settings) viewModel.toggleSettings()
+        destination = target
+        when (target) {
+            AppDestination.Chat -> viewModel.setMode(UiMode.CHAT)
+            AppDestination.ScreenReader -> viewModel.setMode(UiMode.SCREEN_READER)
+            AppDestination.Automator -> viewModel.setMode(UiMode.AUTOMATOR)
+            AppDestination.Settings -> if (!state.settingsVisible) viewModel.toggleSettings()
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val expanded = maxWidth >= 600.dp
+        Scaffold(
+            modifier = Modifier.imePadding(),
+            contentWindowInsets = WindowInsets.safeDrawing.only(
+                WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
+            ),
+            topBar = {
+                TopAppBar(
+                    title = { Text("LAI", fontWeight = FontWeight.Bold) },
+                    windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                    navigationIcon = {
+                        if (destination != AppDestination.Chat || state.settingsVisible) {
+                            IconButton(onClick = { select(AppDestination.Chat) }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.back),
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        if (destination == AppDestination.Chat && !state.settingsVisible) {
+                            TextButton(
+                                onClick = viewModel::clearConversation,
+                                enabled = !state.busy &&
+                                    state.pendingToolProposal == null &&
+                                    state.messages.any { it.contextEligible },
+                            ) { Text("New") }
+                            TextButton(
+                                onClick = viewModel::toggleChatHistory,
+                                enabled = state.pendingToolProposal == null,
+                            ) { Text(stringResource(R.string.chat_history)) }
+                            IconButton(onClick = viewModel::showQuickSettings) {
+                                Text(
+                                    stringResource(R.string.quick_settings_action),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            }
+                        }
+                    },
+                )
+            },
+            bottomBar = {
+                if (!expanded && !imeVisible) {
+                    NavigationBar {
+                        AppDestination.entries.forEach { item ->
+                            NavigationBarItem(
+                                selected = destination == item || (item == AppDestination.Settings && state.settingsVisible),
+                                onClick = { select(item) },
+                                icon = { Text(item.glyph) },
+                                label = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             )
                         }
                     }
-                },
-                actions = {
-                    // Contextual quick settings belong to Chat only; other modes have no LLM knobs.
-                    if (state.mode == UiMode.CHAT && !state.settingsVisible) {
-                        // Glyph rather than a vector: material-icons-extended would add ~9 MB of
-                        // unused vectors to keep the debug APK honest about its size.
-                        IconButton(onClick = viewModel::showQuickSettings) {
-                            Text(
-                                stringResource(R.string.quick_settings_action),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                    }
-                    if (!state.settingsVisible) {
-                        TextButton(onClick = viewModel::toggleSettings) {
-                            Text(stringResource(R.string.settings))
-                        }
-                    }
-                },
-            )
-        },
-        bottomBar = {
-            if (!state.settingsVisible && !imeVisible) {
-                NavigationBar {
-                    ModeNavigationItem(UiMode.CHAT, state.mode, stringResource(R.string.chat), viewModel::setMode)
-                    ModeNavigationItem(
-                        UiMode.SCREEN_READER,
-                        state.mode,
-                        stringResource(R.string.screen_reader),
-                        viewModel::setMode,
-                    )
-                    ModeNavigationItem(
-                        UiMode.AUTOMATOR,
-                        state.mode,
-                        stringResource(R.string.automator),
-                        viewModel::setMode,
-                    )
                 }
-            }
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when {
-                state.settingsVisible -> SettingsScreen(state, viewModel)
-                state.mode == UiMode.CHAT -> ChatScreen(state, viewModel)
-                state.mode == UiMode.SCREEN_READER -> ScreenReaderScreen(state, viewModel)
-                else -> AutomatorScreen(state, viewModel)
-            }
-            if (
-                state.busy &&
-                state.downloadProgress == null &&
-                state.operation !in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)
-            ) {
-                CircularProgressIndicator(Modifier.align(Alignment.Center))
+            },
+        ) { padding ->
+            Row(Modifier.fillMaxSize().padding(padding)) {
+                if (expanded) {
+                    NavigationRail {
+                        AppDestination.entries.forEach { item ->
+                            NavigationRailItem(
+                                selected = destination == item || (item == AppDestination.Settings && state.settingsVisible),
+                                onClick = { select(item) },
+                                icon = { Text(item.glyph) },
+                                label = { Text(item.label) },
+                            )
+                        }
+                    }
+                }
+                Box(Modifier.weight(1f).fillMaxSize()) {
+                    AnimatedContent(
+                        targetState = destination,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "lai-destination",
+                        modifier = Modifier.fillMaxSize(),
+                    ) { selected ->
+                        when (selected) {
+                            AppDestination.Chat -> ChatScreen(state, viewModel)
+                            AppDestination.ScreenReader -> ScreenReaderScreen(state, viewModel)
+                            AppDestination.Automator -> AutomatorScreen(state, viewModel)
+                            AppDestination.Settings -> SettingsScreen(state, viewModel)
+                        }
+                    }
+                    if (
+                        state.busy &&
+                        state.downloadProgress == null &&
+                        state.operation !in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)
+                    ) {
+                        CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    }
+                }
             }
         }
     }
+
     if (state.chatHistoryVisible) {
         ModalBottomSheet(onDismissRequest = viewModel::toggleChatHistory) {
             Column(
@@ -299,73 +340,102 @@ private fun RowScope.ModeNavigationItem(
 
 @Composable
 private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.home_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(stringResource(R.string.home_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            TextButton(
-                onClick = viewModel::toggleChatHistory,
-                enabled = state.pendingToolProposal == null,
-            ) { Text(stringResource(R.string.chat_history)) }
-            TextButton(
-                onClick = viewModel::clearConversation,
-                enabled = !state.busy && state.pendingToolProposal == null && state.messages.any { it.contextEligible },
-            ) { Text("New chat") }
+    val listState = rememberLazyListState()
+    // Follow the newest text while a reply streams in, so the user never has to chase it.
+    LaunchedEffect(state.messages.size, state.messages.lastOrNull()?.text) {
+        if (state.messages.isNotEmpty()) {
+            listState.animateScrollToItem(state.messages.lastIndex)
         }
-        val listState = rememberLazyListState()
-        // Follow the newest text while a reply streams in, so the user never has to chase it.
-        LaunchedEffect(state.messages.size, state.messages.lastOrNull()?.text) {
-            if (state.messages.isNotEmpty()) {
-                listState.animateScrollToItem(state.messages.lastIndex)
-            }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        if (state.operation in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)) {
+            CompactChatProgress(state.operation)
         }
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Stable keys: only the changed bubble recomposes as tokens stream in.
             items(state.messages, key = { it.id }) { message -> MessageBubble(message) }
+            state.lastGenerationFailure?.let { reason ->
+                item(key = "generation-failure") {
+                    StatusCard("Generation note", reason)
+                }
+            }
         }
-        Row(
-            // No imePadding() here: the Scaffold already applies it for the whole layout.
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = state.input,
-                onValueChange = viewModel::setInput,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.message_hint)) },
-                maxLines = 4,
-                keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() }),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-            )
-            if (state.operation in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)) {
-                Button(
-                    onClick = viewModel::cancelGeneration,
-                    enabled = state.operation == RuntimeOperation.GENERATING,
-                ) {
-                    Text(if (state.operation == RuntimeOperation.CANCELLING) "Stopping…" else "Stop")
+        ChatComposer(state = state, viewModel = viewModel)
+    }
+}
+
+@Composable
+private fun CompactChatProgress(operation: RuntimeOperation) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            if (operation == RuntimeOperation.CANCELLING) "Stopping…" else "Writing…",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp))
+    }
+}
+
+@Composable
+private fun ChatComposer(state: MainUiState, viewModel: MainViewModel) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                // No imePadding() here: the Scaffold already applies it for the whole layout.
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = state.input,
+                    onValueChange = viewModel::setInput,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.message_hint)) },
+                    maxLines = 5,
+                    keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() }),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
+                    enabled = state.operation !in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING) &&
+                        state.pendingToolProposal == null,
+                )
+                if (state.operation in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)) {
+                    Button(
+                        onClick = viewModel::cancelGeneration,
+                        enabled = state.operation == RuntimeOperation.GENERATING,
+                    ) {
+                        Text(if (state.operation == RuntimeOperation.CANCELLING) "Stopping…" else "Stop")
+                    }
+                } else {
+                    Button(
+                        onClick = viewModel::sendMessage,
+                        enabled = state.input.isNotBlank() && !state.busy && state.pendingToolProposal == null,
+                    ) {
+                        Text(stringResource(R.string.send))
+                    }
                 }
-            } else {
-                Button(
-                    onClick = viewModel::sendMessage,
-                    enabled = state.input.isNotBlank() && !state.busy && state.pendingToolProposal == null,
-                ) {
-                    Text(stringResource(R.string.send))
-                }
+            }
+            val helper = when {
+                state.pendingToolProposal != null -> "Review the pending local action before continuing."
+                state.workspace.overrideArmed -> "Custom reply settings apply once to the next message."
+                else -> null
+            }
+            helper?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -378,14 +448,34 @@ private fun MessageBubble(message: ChatMessage) {
         horizontalArrangement = if (message.fromUser) Arrangement.End else Arrangement.Start,
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth(0.86f),
+            modifier = Modifier.fillMaxWidth(0.88f),
             colors = CardDefaults.cardColors(
                 containerColor = if (message.fromUser) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant,
             ),
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(
+                topStart = 20.dp,
+                topEnd = 20.dp,
+                bottomEnd = if (message.fromUser) 6.dp else 20.dp,
+                bottomStart = if (message.fromUser) 20.dp else 6.dp,
+            ),
         ) {
-            Text(message.text, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyLarge)
+            Column(Modifier.padding(horizontal = 15.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    if (message.fromUser) "You" else "LAI",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                if (!message.contextEligible) {
+                    Text(
+                        "Not included in model context",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
@@ -503,6 +593,7 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                 detail = "Internet is used only for the signed model catalog and explicit downloads. Prompts, screens, generations and telemetry stay on this device.",
             )
         }
+        item { ProviderSettingsCard(state) }
         item {
             Card {
                 Row(
@@ -622,6 +713,35 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
             }
         }
         state.notice?.let { notice -> item { StatusCard("Status", notice) } }
+    }
+}
+
+@Composable
+private fun ProviderSettingsCard(state: MainUiState) {
+    Card {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("AI provider", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "Provider and backend details live here, not in Chat. Local CPU remains the safe default; cloud providers require explicit future configuration.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Current route: ${state.schedulerDetail}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                state.runtimeDetail.ifBlank { "Runtime provider status unavailable" },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Cloud providers: not configured • no implicit cloud fallback",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
