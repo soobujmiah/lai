@@ -1,40 +1,52 @@
 # Current Status
 
-**Snapshot:** 2026-08-20 — `main` @ `0f7c8ab` + Adreno OpenCL track (earlier snapshots at `35d90ea`/`9ab9aff`/`17ad75b`)
-**Build:** `Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10` — `validate_repo.sh` PASS (~1.35 MB <128 MB), `16` modules, `189` tests, main green at CI **#185**. Working rule: **default CI builds ONLY the signed release APK** (debug only on PR or explicit `build_type=debug/both`).
+**Snapshot:** 2026-08-21 — GPU/NPU qualification resumed after new stock-app KGSL access evidence.
+**Build:** Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10; `validate_repo.sh` remains the documentation/build gate.
 
-## Implemented — Device-validated or Build-verified
+## Device-validated baseline
 
-*   **CPU LLM:** `llama.cpp` mmap GGUF, `Qwen 1.5B Q4_K_M`, **10–20 tok/s prefill / 2.5–15 tok/s decode**, KV-prefix reuse (`evaluatedPromptTokens` 6–15; TTFT ~0.5–1.4 s), streaming, `45s` Stop watchdog, `storage/LAI/models` auto-import (startup, grant-active, manual grant, manual scan — serialized), `install -r` keeps grant.
-*   **Vulkan GPU (unsupported on this device):** addr2line of the crash handler backtrace (release-183) shows SIGSEGV at `vkCmdBindPipeline+0x4` in `vulkan.adreno.so` while binding the **MUL_MAT** pipeline (ggml-vulkan.cpp:15635) — the core matmul of every token. No env/patch combination avoids it; llama.cpp pin is current (upstream already routes large matmul tiles away from Qualcomm, so the crash sits in the medium/small tile path itself). **Qualcomm driver bug — Vulkan stays opt-in for a qualified device/driver.**
-*   **Adreno OpenCL track (CLOSED on this device — device-policy wall; backend dormant):** the stack itself is proven healthy (OpenCL-Z: platform `QUALCOMM Snapdragon(TM)`, OpenCL 3.0, `Adreno (TM) 825`, FULL_PROFILE) but HyperOS publishes `libOpenCL.so` to **no** app namespace (`/linkerconfig/ld.config.txt` grep empty) — only legacy targetSdk apps bypass that config. The linker trace shows LAI's dlopen refused at the classloader namespace. The backend stays compiled: probe → scheduler evidence → offload will self-activate with zero code change if a future HyperOS build publishes the library. Full chain: [`device-results/2026-08-20-redmi-turbo-4-pro-opencl-device-facts.md`](device-results/2026-08-20-redmi-turbo-4-pro-opencl-device-facts.md).
-*   **CPU KleidiAI headroom (found 2026-08-20):** ChatterUI (newer llama.cpp, KleidiAI enabled) decoded the same Qwen Q4_K_M at ~28 tok/s on this device vs LAI's validated 8–15 tok/s; LAI builds with `GGML_CPU_KLEIDIAI OFF`. The pinned llama.cpp supports it natively (pinned archive v1.24.0 + MD5). One-line flip queued for the next build.
-*   **Thermal/Governor:** `ThermalGovernorPolicy` hysteresis, `setDecodeThreadLimit` atomic between `llama_decode`, adaptive `little 7 idle → big 0-3 burst`, batch 32.
-*   **Tool/Agent (one-shot):** 15 tools, `ToolInstructionGate`, hash-chained `ToolAuditLedger` (`APP_PRIVATE_HASH_CHAIN_V1`), `ToolsDashboard`, Xiaomi lock guide.
-*   **Android:** `AccessibilityAutomationService` (400 nodes, `canTakeScreenshot`), `Shizuku UID 2000` argv allowlist (no raw shell), `Workspace` SAF (depth 4/256/8 GB, SHA streaming).
-*   **Model:** Signed `models-v1.json` **rev 5** (`llama-cpu` preferred; `llama-opencl` + `llama-vulkan` fallbacks pending qualification), SHA-256 + resume, GGUF validate, `Keep copy` export, `Delete` guard.
-*   **Diagnostics:** `LaiLog` (logcat + file + export; debug `DEBUG` / release `INFO`), `LaiLogRedactor` (11 unit tests), uncaught-crash handler, in-app log/JSON export — see [LOGGING.md](LOGGING.md).
-*   **Delivery:** `JDK 17 + API 36 + NDK 27 + CMake 3.22.1`, pinned `llama.cpp ad1de39` + Vulkan-Headers `v1.4.311` + SPIRV-Headers `vulkan-sdk-1.4.357.0`, Actions majors current, R8 `SourceFile/LineNumberTable` + `lai-release-mapping-<run>` artifact, `sbom-*.txt`.
+* **CPU LLM:** device-validated and shipped default. Qwen 1.5B Q4_K_M remains the reliable path.
+* **Vulkan GPU:** application access is proven, model loading on `llama-vulkan` is proven, but generation currently SIGSEGVs at `vkCmdBindPipeline+0x4` inside Qualcomm `/vendor/lib64/hw/vulkan.adreno.so` during ggml `MUL_MAT`. This is a driver/kernel interaction failure, not an app-permission failure.
+* **OpenCL:** Qualcomm OpenCL libraries are present and the legacy OpenCL-Z path proves the Adreno OpenCL stack is healthy. The existing modern-app ggml-opencl path previously failed at Android linker namespace loading. Do not claim OpenCL inference support yet.
+* **KGSL device-node access:** **NEW, OBSERVED 2026-08-21.** On the exact LAI debug package `dev.lai.runtime.debug`, UID 10675, SELinux app context `u:r:untrusted_app:s0:c163,c258,c512,c768`, `run-as` can read/write and successfully `open()` `/dev/kgsl-3d0` (`gpu_device`, mode 0666). This proves the raw Qualcomm KGSL character-device boundary is accessible from LAI's app identity. It does not prove GPU computation.
 
-## Scaffold — Compiles, honestly unavailable
+Evidence: `docs/device-results/2026-08-20-redmi-turbo-4-pro-gpu-npu-access-audit.md` and `devices/redmi-turbo-4-pro` evidence in the user's `skb` knowledge base.
 
-*   **Bangla OCR:** `OcrEngine` contracts (`OcrResult` blocks/polygon/confidence), `Placeholder` fails `OcrModelRequiredException` — blocked on dataset/licence.
-*   **Linux/Terminal:** No PRoot/QEMU.
+## Acceleration strategy — current
 
-## Planned — Not built
+The project must retain GPU acceleration as a first-class goal. CPU-only is not the target architecture.
 
-QNN/HTP NPU (licensed QAIRT), `core:tokenization` (SentencePiece unigram), `core:rag` (BM25 + Granite 107M 384-dim LiteRT embedder), `features:rag` doc store, `core:pipeline` DAG, full `core:agent` loop (`Plan→Memory→Approve→Execute→Verify`), LiteRT backend, Tesseract 5.5.3 `ben.traineddata` full OCR, cloud/remote hybrid, knowledge graph, STT/TTS, benchmark CycloneDX.
+### Immediate qualification tracks
 
-## Evidence States
+1. **Native KGSL probe:** add a minimal native diagnostic probe that opens `/dev/kgsl-3d0` and records safe driver/device results. Do not issue undocumented destructive ioctls.
+2. **Qualcomm OpenCL qualification:** in the same native process, use `dlopen()` (never execute `.so` directly) for the vendor OpenCL implementation, resolve `clGetPlatformIDs` / `clGetDeviceIDs`, enumerate Adreno 825, then run a tiny compute sanity test if enumeration succeeds. This is exploratory; the existing linker-namespace evidence remains valid for the normal ggml-opencl route.
+3. **Vulkan qualification:** land the upstream ggml-vulkan warptile clamp already identified in the device strategy document, build exactly one `validated_accelerators=llama-vulkan` qualification APK, and capture the real subgroup size plus success/crash outcome.
+4. **QNN/Hexagon:** scope the existing `ggml-hexagon` backend and Qualcomm QNN/HTP route after confirming the SM8735 DSP/HTP architecture and a real app-side loading path. Do not assume vendor library presence equals support.
 
-`AVAILABLE` (loader found) → `SUPPORTED` (model validated) → `ACTIVE` (executing) → `MEASURED` (latency with value) → `UNKNOWN` — unmeasured renders `N/A`. Never claim without log.
+### Evidence rule
 
-## Next Device Test
+`AVAILABLE` → `SUPPORTED` → `ACTIVE` → `MEASURED`.
 
-**No GPU qualification test is currently actionable on this device** — both accelerator paths are closed by external walls, recorded with full evidence: Vulkan = Qualcomm driver bug (`vkCmdBindPipeline` MUL_MAT bind, release-183 addr2line), OpenCL = HyperOS publishes `libOpenCL.so` to no modern-app namespace (2026-08-20 device-facts record). The dormant Vulkan + OpenCL backends remain compiled and will self-activate when the walls move. **Strategy handoff with the complete decision table (incl. the new Vulkan warptile-clamp lever from upstream PR #25735 and the one remaining NPU/NNAPI HAL check): [`device-results/2026-08-20-redmi-turbo-4-pro-gpu-npu-access-audit.md`](device-results/2026-08-20-redmi-turbo-4-pro-gpu-npu-access-audit.md).** Triggers to re-test:
+A device node opening is **AVAILABLE**, not GPU support. A library existing is **AVAILABLE**, not backend support. Only successful model execution with captured evidence can grant `DEVICE_VALIDATED`.
 
-1. **Land the warptile-clamp LAI patch** (dry-run verified against the pin) → one `validated_accelerators=llama-vulkan` qualification build — the only Vulkan lever LAI controls today.
-2. **NNAPI HAL check** (`ls /vendor/bin/hw | grep -iE "neural"`) — decides whether the NPU has a sanctioned side door before any QNN engineering is spent.
-3. **HyperOS/Xiaomi OTA** → re-grep the linker config; the dormant OpenCL backend self-activates if published.
+## Current backend policy
 
-CPU remains the device-validated shipped default; no build is needed until one of the triggers above happens.
+CPU remains the shipped safe default. Vulkan/OpenCL/NPU remain opt-in until device validation. The scheduler must never silently advertise acceleration from library presence alone.
+
+## Documentation requirements for accelerator work
+
+Every device experiment must record:
+
+- exact device/build identity;
+- command or test procedure;
+- raw result/evidence file;
+- Android UID/SELinux context when access control matters;
+- backend/library identity and loading mechanism;
+- failure boundary (permissions, linker, driver, runtime, kernel, model);
+- explicit status transition.
+
+Do not disable SELinux, modify vendor files, lower targetSdk, or use unsupported security bypasses as a qualification shortcut.
+
+## Next action
+
+**Do not stop at the previous “GPU unsupported” conclusion.** The new KGSL result re-opens controlled native GPU investigation. The first implementation milestone is the minimal native KGSL + OpenCL qualification probe; the second is the single Vulkan warptile-clamp qualification build; QNN/Hexagon follows as a separate acceleration path.
