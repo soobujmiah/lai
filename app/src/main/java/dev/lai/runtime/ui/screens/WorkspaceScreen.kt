@@ -41,5 +41,3 @@ fun LaiWorkspaceScreen(
         }
     }
 }
-
-data class LaiProjectUi(val id: String, val name: String, val detail: String)

@@ -2,9 +2,6 @@ package dev.lai.runtime.inference
 
 import kotlinx.coroutines.flow.Flow
 
-/** Evidence state for a registered provider. Only MEASURED providers are exposed as usable. */
-enum class ProviderEvidence { UNQUALIFIED, MEASURED, FAILED }
-
 data class ProviderDescriptor(
     val id: String,
     val backends: Set<BackendDescriptor>,
@@ -64,9 +61,6 @@ class InferenceGateway(
             ?: return Result.failure(IllegalArgumentException("No measured provider supports backend ${backend?.value ?: "auto"}"))
         val actual = backend ?: provider.descriptor.backends.minByOrNull { it.defaultPriority }?.id
             ?: return Result.failure(IllegalStateException("Provider has no backend"))
-        if (provider.descriptor.evidence != ProviderEvidence.MEASURED) {
-            return Result.failure(IllegalStateException("Provider ${provider.descriptor.id} is not measured"))
-        }
         val result = provider.engine.load(modelPath, actual)
         if (result.isSuccess) {
             lastProvenance = InferenceProvenance(

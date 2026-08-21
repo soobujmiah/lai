@@ -29,7 +29,7 @@ class InferenceGatewayTest {
     }
 
     @Test
-    fun `unqualified providers are invisible to capability discovery`() {
+    fun `unqualified providers are invisible to capability discovery`() = runBlocking {
         val measuredEngine = engine()
         val gateway = InferenceGateway(listOf(
             InferenceGateway.ProviderRegistration(
@@ -71,6 +71,6 @@ class InferenceGatewayTest {
             ),
         ))
         gateway.load("model.gguf", BackendId("llama-cpu"))
-        assertEquals("ok", gateway.generate("hello").first().let { (it as InferenceEvent.Token).text })
+        assertEquals("ok", gateway.generate(emptyList(), GenerationConfig()).first().let { (it as InferenceEvent.Token).text })
     }
 }
