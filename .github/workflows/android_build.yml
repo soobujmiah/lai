@@ -2,7 +2,7 @@ name: Android build
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'gpu/opencl-qualification-probe']
     tags: ['v*']
   pull_request:
     branches: [main]
@@ -10,8 +10,8 @@ on:
     inputs:
       build_type:
         description: >-
-          APK variant. Default 'release' builds ONLY the signed release APK (working rule).
-          Choose 'debug' or 'both' only when a debug APK is explicitly needed for debugging.
+          APK variant. Default 'release' builds ONLY the signed release APK.
+          Choose 'debug' or 'both' when debugging is needed.
         required: true
         default: release
         type: choice
@@ -19,11 +19,8 @@ on:
       validated_accelerators:
         description: >-
           Accelerators the scheduler may select (DEVICE_VALIDATED evidence).
-          Default EMPTY = CPU-only (stable; the Adreno 825 Vulkan driver crashes
-          at compute time on this llama.cpp revision — see docs/BUILD_AND_RELEASE).
-          Set llama-opencl to opt into the Adreno OpenCL qualification build, or
-          llama-vulkan for Vulkan experimentation on a qualified device/driver.
-          Comma-separate to grant several (e.g. llama-opencl,llama-vulkan).
+          Default EMPTY = CPU-only. Set llama-opencl only after physical-device
+          qualification; llama-vulkan remains experimental on the affected device.
         required: false
         default: ''
         type: string
@@ -44,10 +41,6 @@ env:
   LLAMA_CPP_COMMIT: 'ad1de39e0708e3ced9c71bb3c82d93a2c046a73f'
   VULKAN_HEADERS_TAG: 'v1.4.311'
   SPIRV_HEADERS_TAG: 'vulkan-sdk-1.4.357.0'
-  # Adreno OpenCL track (docs/BUILD_AND_RELEASE.md): ggml-opencl needs the Khronos
-  # OpenCL headers and the ICD loader (built static for arm64 and linked into
-  # liblai_runtime.so; at runtime the loader dlopens the vendor Adreno driver via
-  # /vendor/etc/OpenCL/drivers/*.icd — the same path every Android OpenCL app uses).
   OPENCL_HEADERS_COMMIT: '15b536b7fbe1098cea462a27db496b287ac89b63'
   OPENCL_ICD_LOADER_COMMIT: '45cdbda4ddd31c324e32a744f112087c42da18f7'
 
@@ -67,33 +60,23 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
-
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Set up Android command-line tools
         uses: android-actions/setup-android@v4
-
       - name: Install remote Android toolchain
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager \
-            "platforms;android-${ANDROID_API}" \
-            "build-tools;${ANDROID_BUILD_TOOLS}" \
-            "ndk;${ANDROID_NDK}" \
-            "cmake;${CMAKE_VERSION}"
-
-      # No Gradle wrapper JAR is committed: this action obtains Gradle only on CI.
+          sdkmanager "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;${ANDROID_NDK}" "cmake;${CMAKE_VERSION}"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
           cache-read-only: ${{ github.event_name == 'pull_request' }}
-
       - name: Decode optional release keystore
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -103,10 +86,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [[ -z "$KEYSTORE_BASE64" ]]; then
-            echo "No release keystore configured; build will use debug signing for device testing."
-            exit 0
-          fi
+          if [[ -z "$KEYSTORE_BASE64" ]]; then exit 0; fi
           KEYSTORE_FILE="${RUNNER_TEMP}/lai-release.jks"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
           chmod 600 "$KEYSTORE_FILE"
@@ -117,21 +97,10 @@ jobs:
             echo "LAI_KEY_PASSWORD=$KEY_PASSWORD"
             echo "LAI_SIGNING_PRODUCTION=true"
           } >> "$GITHUB_ENV"
-
-      # Working rule (docs/BUILD_AND_RELEASE.md): every CI run produces the SIGNED release APK.
-      # On v* tags that is the production keystore from secrets (LAI_SIGNING_PRODUCTION=true).
-      # Otherwise we sign with a DETERMINISTIC test keystore derived from a committed seed
-      # (scripts/ci/generate_test_keystore.py): the SAME certificate every run, so release
-      # builds install over the previous version — the per-run debug keystore would change the
-      # certificate on every build and Android would refuse the update.
       - name: Ensure release signing key (production or deterministic test)
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         shell: bash
         run: |
-          if [[ -n "$LAI_KEYSTORE_FILE" ]]; then
-            echo "Production keystore present; skipping test keystore generation."
-            exit 0
-          fi
           python3 -m pip install --quiet --disable-pip-version-check cryptography
           python3 scripts/ci/generate_test_keystore.py "$RUNNER_TEMP/lai-test-release.p12"
           {
@@ -141,163 +110,84 @@ jobs:
             echo "LAI_KEY_PASSWORD=lai-test-release"
             echo "LAI_SIGNING_PRODUCTION=false"
           } >> "$GITHUB_ENV"
-
       - name: Fetch pinned llama.cpp source
         shell: bash
         run: |
           bash scripts/ci/fetch_llama_cpp.sh "$LLAMA_CPP_COMMIT" "$RUNNER_TEMP/llama.cpp"
           echo "LAI_LLAMA_CPP_DIR=$RUNNER_TEMP/llama.cpp" >> "$GITHUB_ENV"
-
-      # ggml-vulkan.cpp includes <vulkan/vulkan.hpp> (the Vulkan C++ bindings), which neither
-      # the NDK sysroot nor apt libvulkan-dev provides (C API only). Fetch the Khronos headers
-      # pinned to a tag and inject the include dir via -Plai.vulkanHeadersDir.
-      - name: Fetch pinned Vulkan-Headers (vulkan.hpp C++ bindings)
+      - name: Fetch pinned Vulkan-Headers
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/vulkan-headers"
-          curl -fsSL "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/${VULKAN_HEADERS_TAG}.tar.gz" \
-            | tar -xz -C "$RUNNER_TEMP/vulkan-headers" --strip-components=1
+          curl -fsSL "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/${VULKAN_HEADERS_TAG}.tar.gz" | tar -xz -C "$RUNNER_TEMP/vulkan-headers" --strip-components=1
           test -f "$RUNNER_TEMP/vulkan-headers/include/vulkan/vulkan.hpp"
           echo "LAI_VULKAN_HEADERS_DIR=$RUNNER_TEMP/vulkan-headers" >> "$GITHUB_ENV"
-
-      # ggml-vulkan.cpp also includes <spirv/unified1/spirv.hpp> (SPIR-V C++ header). apt
-      # spirv-headers installs it under /usr/include, which the NDK cross-compiler never
-      # searches (sysroot isolation), so fetch the pinned Khronos sources like the others.
-      - name: Fetch pinned SPIRV-Headers (spirv.hpp C++ header)
+      - name: Fetch pinned SPIRV-Headers
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/spirv-headers"
-          curl -fsSL "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/${SPIRV_HEADERS_TAG}.tar.gz" \
-            | tar -xz -C "$RUNNER_TEMP/spirv-headers" --strip-components=1
+          curl -fsSL "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/${SPIRV_HEADERS_TAG}.tar.gz" | tar -xz -C "$RUNNER_TEMP/spirv-headers" --strip-components=1
           test -f "$RUNNER_TEMP/spirv-headers/include/spirv/unified1/spirv.hpp"
           echo "LAI_SPIRV_HEADERS_DIR=$RUNNER_TEMP/spirv-headers" >> "$GITHUB_ENV"
-
-      # ggml-opencl (Adreno OpenCL track): the NDK ships no OpenCL headers or library.
-      # Fetch the pinned Khronos headers, then build the Khronos ICD loader as a STATIC
-      # arm64 library and link it into liblai_runtime.so. No OpenCL bytes are committed —
-      # both sources are fetched by immutable commit SHA on the runner only.
-      - name: Fetch OpenCL headers and build ICD loader (arm64 static)
+      - name: Fetch OpenCL headers and build ICD loader
         shell: bash
         run: |
           set -euo pipefail
           HEADERS_DIR="$RUNNER_TEMP/opencl-headers"
           ICD_DIR="$RUNNER_TEMP/opencl-icd-loader"
           mkdir -p "$HEADERS_DIR" "$ICD_DIR"
-          curl -fsSL "https://github.com/KhronosGroup/OpenCL-Headers/archive/${OPENCL_HEADERS_COMMIT}.tar.gz" \
-            | tar -xz -C "$HEADERS_DIR" --strip-components=1
-          test -f "$HEADERS_DIR/CL/cl.h" || { echo "OpenCL headers incomplete" >&2; exit 1; }
-          curl -fsSL "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/${OPENCL_ICD_LOADER_COMMIT}.tar.gz" \
-            | tar -xz -C "$ICD_DIR" --strip-components=1
+          curl -fsSL "https://github.com/KhronosGroup/OpenCL-Headers/archive/${OPENCL_HEADERS_COMMIT}.tar.gz" | tar -xz -C "$HEADERS_DIR" --strip-components=1
+          curl -fsSL "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/${OPENCL_ICD_LOADER_COMMIT}.tar.gz" | tar -xz -C "$ICD_DIR" --strip-components=1
           NDK_ROOT="${ANDROID_HOME}/ndk/${ANDROID_NDK}"
-          cmake -S "$ICD_DIR" -B "$ICD_DIR/build" \
-            -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=28 \
-            -DANDROID_STL=c++_shared \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DBUILD_TESTING=OFF \
-            -DOPENCL_ICD_LOADER_HEADERS_DIR="$HEADERS_DIR"
+          cmake -S "$ICD_DIR" -B "$ICD_DIR/build" -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=28 -DANDROID_STL=c++_shared -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DOPENCL_ICD_LOADER_HEADERS_DIR="$HEADERS_DIR"
           cmake --build "$ICD_DIR/build" -- -j"$(nproc)"
-          test -f "$ICD_DIR/build/libOpenCL.a" || { echo "ICD loader static lib missing" >&2; exit 1; }
-          {
-            echo "LAI_OPENCL_INCLUDE_DIR=$HEADERS_DIR"
-            echo "LAI_OPENCL_LIBRARY=$ICD_DIR/build/libOpenCL.a"
-          } >> "$GITHUB_ENV"
-
-      - name: Install Vulkan build dependencies (SPIRV-Headers, glslang)
-        timeout-minutes: 12
+          test -f "$ICD_DIR/build/libOpenCL.a"
+          echo "LAI_OPENCL_INCLUDE_DIR=$HEADERS_DIR" >> "$GITHUB_ENV"
+          echo "LAI_OPENCL_LIBRARY=$ICD_DIR/build/libOpenCL.a" >> "$GITHUB_ENV"
+      - name: Install Vulkan build dependencies
         shell: bash
         run: |
-          # apt-get update can hang/crawl with no output on flaky runner networks and burn the whole
-          # job budget (2026-08-18 runs #150/#155). Bound it hard with `timeout` and fall back to
-          # the image's preloaded package lists, which already contain every package we need.
-          if timeout 90 sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 -qq; then
-            echo "apt-get update OK"
-          else
-            echo "apt-get update failed or timed out; proceeding with existing package lists" >&2
-          fi
-          for attempt in 1 2 3; do
-            if timeout 240 sudo apt-get install -y -qq --no-install-recommends glslc spirv-headers spirv-tools glslang-tools libvulkan-dev 2>&1 | tail -n 20; then
-              break
-            fi
-            echo "apt-get install attempt ${attempt} failed; retrying in 15s" >&2
-            sleep 15
-          done
-          command -v glslc || { echo "glslc is required for GGML_VULKAN shader compilation but was not installed" >&2; exit 1; }
-          pkg-config --modversion vulkan 2>&1 || echo "vulkan pkg-config not found, but headers should be in /usr/include/vulkan"
-
+          timeout 90 sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 -qq || true
+          for attempt in 1 2 3; do timeout 240 sudo apt-get install -y -qq --no-install-recommends glslc spirv-headers spirv-tools glslang-tools libvulkan-dev && break || sleep 15; done
+          command -v glslc
       - name: Unit tests and lint
         run: >-
           gradle --no-daemon --stacktrace coverageCheck :platform:audit:testDebugUnitTest :platform:download:testDebugUnitTest :platform:workspace:testDebugUnitTest :platform:history:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug
-          -Plai.enableLlamaCpp=ON
-          -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
-          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
-          -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
-          -Plai.openclIncludeDir="$LAI_OPENCL_INCLUDE_DIR"
-          -Plai.openclLibrary="$LAI_OPENCL_LIBRARY"
+          -Plai.enableLlamaCpp=ON -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
+          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR" -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
+          -Plai.openclIncludeDir="$LAI_OPENCL_INCLUDE_DIR" -Plai.openclLibrary="$LAI_OPENCL_LIBRARY"
           -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
-
-      - name: Build debug APK and native arm64 library
-        # Debug is NOT built by default (working rule: signed-only). Built for pull-request
-        # validation and only when a debug APK is explicitly requested via build_type.
-        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'release') }}
+      - name: Build debug APK
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'release') }}
         run: >-
           gradle --no-daemon --stacktrace :app:assembleDebug
-          -Plai.versionCode=${{ github.run_number }}
-          -Plai.versionName=0.6.${{ github.run_number }}
-          -Plai.enableLlamaCpp=ON
-          -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
-          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
-          -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
-          -Plai.openclIncludeDir="$LAI_OPENCL_INCLUDE_DIR"
-          -Plai.openclLibrary="$LAI_OPENCL_LIBRARY"
+          -Plai.versionCode=${{ github.run_number }} -Plai.versionName=0.6.${{ github.run_number }}
+          -Plai.enableLlamaCpp=ON -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
+          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR" -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
+          -Plai.openclIncludeDir="$LAI_OPENCL_INCLUDE_DIR" -Plai.openclLibrary="$LAI_OPENCL_LIBRARY"
           -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
-
-      # WORKING RULE (docs/BUILD_AND_RELEASE.md): build ONLY the signed release APK by default.
-      # Push/tags -> signed release (production key on tags, deterministic test key otherwise).
-      # Dispatch -> follow build_type (default release). Pull requests stay debug-only (CI check).
-      - name: Build release APK and native arm64 library
+      - name: Build release APK
         if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'debug') }}
-        shell: bash
         run: |
           VERSION_NAME="${GITHUB_REF_NAME#v}"
           if [[ "$VERSION_NAME" == "$GITHUB_REF_NAME" ]]; then VERSION_NAME="0.1.${GITHUB_RUN_NUMBER}"; fi
           gradle --no-daemon --stacktrace :app:assembleRelease \
-            -Plai.versionCode="${GITHUB_RUN_NUMBER}" \
-            -Plai.versionName="$VERSION_NAME" \
-            -Plai.enableLlamaCpp=ON \
-            -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR" \
-          -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR" \
-          -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR" \
-          -Plai.openclIncludeDir="$LAI_OPENCL_INCLUDE_DIR" \
-          -Plai.openclLibrary="$LAI_OPENCL_LIBRARY" \
-          -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
-
-      - name: Inventory native and APK artifacts
+            -Plai.versionCode="${GITHUB_RUN_NUMBER}" -Plai.versionName="$VERSION_NAME" \
+            -Plai.enableLlamaCpp=ON -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR" \
+            -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR" -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR" \
+            -Plai.openclIncludeDir="$LAI_OPENCL_INCLUDE_DIR" -Plai.openclLibrary="$LAI_OPENCL_LIBRARY" \
+            -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
+      - name: Inventory artifacts
         if: always()
         shell: bash
-        run: |
-          find app runtime -type f \( -name '*.apk' -o -name 'liblai_runtime.so' \) -print 2>/dev/null || true
-
-      - name: Generate dependency SBOM (lightweight)
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p app/build/sbom
-          gradle --no-daemon :app:dependencies --configuration releaseRuntimeClasspath > app/build/sbom/sbom-releaseRuntimeClasspath.txt || echo "sbom generation skipped"
-          gradle --no-daemon dependencies > app/build/sbom/sbom-all.txt || true
-          ls -lh app/build/sbom/ 2>/dev/null || true
-
+        run: find app runtime -type f \( -name '*.apk' -o -name 'liblai_runtime.so' \) -print 2>/dev/null || true
       - name: Upload debug APK
-        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'release') }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_type != 'release') }}
         uses: actions/upload-artifact@v7
         with:
           name: lai-debug-${{ github.run_number }}
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          retention-days: 14
-
       - name: Upload release APK
         if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'debug') }}
         uses: actions/upload-artifact@v7
@@ -305,69 +195,10 @@ jobs:
           name: lai-release-${{ github.run_number }}
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
-          retention-days: 30
-
-      # R8 mapping for the minified signed build: stack traces from the field are de-obfuscated
-      # with this file (docs/LOGGING.md). Keep it as long as the APK can be tested.
-      - name: Upload release R8 mapping
-        if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.build_type != 'debug') }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: lai-release-mapping-${{ github.run_number }}
-          path: app/build/outputs/mapping/release/*.txt
-          if-no-files-found: warn
-          retention-days: 90
-
-      # Unstripped native lib for offline addr2line of native crash backtraces (load-base-relative
-      # offsets are captured by the LAI crash handler into the diagnostic log).
-      - name: Upload unstripped native library
-        if: ${{ !cancelled() }}
-        shell: bash
-        run: |
-          LIB=$(find runtime/llama/build -path '*obj/arm64-v8a/liblai_runtime.so' | head -1 || true)
-          if [[ -n "$LIB" ]]; then
-            mkdir -p app/build/native
-            cp "$LIB" app/build/native/liblai_runtime-unsymbolized.so
-            echo "unstripped lib: $LIB"
-          else
-            echo "unstripped lib not found (ok)"
-          fi
-      - name: Upload unstripped native library artifact
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: lai-native-unstripped-${{ github.run_number }}
-          path: app/build/native/*.so
-          if-no-files-found: ignore
-          retention-days: 30
-
       - name: Upload SBOM
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: sbom-${{ github.run_number }}
-          path: app/build/sbom/sbom*.txt
+          name: lai-sbom-${{ github.run_number }}
+          path: app/build/sbom/
           if-no-files-found: ignore
-          retention-days: 14
-
-      - name: Upload lint report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: lint-${{ github.run_number }}
-          path: app/build/reports/lint-results-debug.html
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" --title "LAI $GITHUB_REF_NAME" --generate-notes
-          gh release upload "$GITHUB_REF_NAME" app/build/outputs/apk/release/*.apk --clobber
-        # The job receives write permission below only for tags.
-    permissions:
-      contents: write
