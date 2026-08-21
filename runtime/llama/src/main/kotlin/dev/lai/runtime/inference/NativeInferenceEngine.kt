@@ -40,6 +40,7 @@ internal class NativeBindings private constructor() {
         @JvmStatic external fun lastError(): String
         @JvmStatic external fun installNativeCrashHandler(logFilePath: String?)
         @JvmStatic external fun configureOpenCLVendors(baseDir: String?)
+        @JvmStatic external fun qualifyOpenCL(): String
     }
 }
 
@@ -49,33 +50,20 @@ private data class NativeRuntimeInfo(val backends: List<String> = emptyList(), v
 class NativeInferenceEngine : InferenceEngine {
     @Volatile private var session: Long = 0
 
-    /**
-     * Installs the native signal handler (SIGSEGV/SIGABRT/SIGBUS/SIGILL/SIGFPE) so that GPU /
-     * driver crashes — which are native and uncatchable by Kotlin — write a backtrace into the
-     * diagnostic log file (see LaiLog) and logcat. Call once at startup after the log path is
-     * known; safe no-op if the native library is not loaded.
-     */
     fun installNativeCrashHandler(logFilePath: String?) {
         if (NativeBindings.loaded) NativeBindings.installNativeCrashHandler(logFilePath)
     }
 
-    /**
-     * Android OpenCL vendor discovery for the Adreno track. The statically linked Khronos
-     * ICD loader only searches /system/vendor/Khronos/OpenCL/vendors by default, which most
-     * Qualcomm devices do not populate; this native call synthesizes a vendor directory in
-     * app-private storage (bare soname `libOpenCL.so` resolved through the public-library
-     * namespace, plus absolute vendor paths) and points OCL_ICD_VENDORS at it. Must run
-     * BEFORE any backend capability probe. Safe no-op when the native library is not loaded.
-     */
     fun configureOpenCLVendors(baseDir: String?) {
         if (NativeBindings.loaded) NativeBindings.configureOpenCLVendors(baseDir)
     }
 
-    /**
-     * Thermal governor hook: records a decode-thread budget that the native decode loop applies
-     * at its next safe point (between llama_decode calls). Safe to call from any thread at any
-     * time; a no-op when no model is loaded.
-     */
+    /** Runs the non-production Qualcomm OpenCL qualification probe and returns its JSON evidence. */
+    fun qualifyOpenCL(): Result<String> = runCatching {
+        check(NativeBindings.loaded) { "Native library could not be loaded" }
+        NativeBindings.qualifyOpenCL()
+    }
+
     fun setDecodeThreadLimit(decodeThreads: Int) {
         val handle = session
         if (handle != 0L && NativeBindings.loaded && decodeThreads > 0) {
@@ -112,98 +100,41 @@ class NativeInferenceEngine : InferenceEngine {
         }
         close()
         val handle = NativeBindings.createSession(modelPath, nativeBackend, contextSize)
-        if (handle == 0L) {
-            Result.failure(IllegalStateException(NativeBindings.lastError()))
-        } else {
-            session = handle
-            Result.success(Unit)
-        }
+        if (handle == 0L) Result.failure(IllegalStateException(NativeBindings.lastError()))
+        else { session = handle; Result.success(Unit) }
     }
 
-    override fun generate(
-        conversation: List<ConversationMessage>,
-        config: GenerationConfig,
-    ): Flow<InferenceEvent> = callbackFlow {
+    override fun generate(conversation: List<ConversationMessage>, config: GenerationConfig): Flow<InferenceEvent> = callbackFlow {
         val handle = session
-        if (handle == 0L) {
-            trySend(InferenceEvent.Failed("No model is loaded"))
-            close()
-            return@callbackFlow
-        }
-        if (conversation.none { it.content.isNotBlank() }) {
-            trySend(InferenceEvent.Failed("Conversation is empty"))
-            close()
-            return@callbackFlow
-        }
+        if (handle == 0L) { trySend(InferenceEvent.Failed("No model is loaded")); close(); return@callbackFlow }
+        if (conversation.none { it.content.isNotBlank() }) { trySend(InferenceEvent.Failed("Conversation is empty")); close(); return@callbackFlow }
         val roles = conversation.map { it.role.name.lowercase() }.toTypedArray()
         val contents = conversation.map { it.content }.toTypedArray()
         val cancelled = AtomicBoolean(false)
         val worker = launch(Dispatchers.Default) {
-            val values = NativeBindings.generate(
-                session = handle,
-                roles = roles,
-                contents = contents,
-                maxNewTokens = config.maxNewTokens.coerceIn(1, 4096),
-                temperature = config.temperature.coerceIn(0f, 2f),
-                topP = config.topP.coerceIn(0.05f, 1f),
-                seed = config.seed,
-                callback = object : NativeTokenCallback {
+            val values = NativeBindings.generate(handle, roles, contents, config.maxNewTokens.coerceIn(1, 4096), config.temperature.coerceIn(0f, 2f), config.topP.coerceIn(0.05f, 1f), config.seed,
+                object : NativeTokenCallback {
                     override fun onToken(text: String) {
-                        if (cancelled.get()) return
-                        // MUST NOT be trySend: this flow is consumed by a collector that does real
-                        // work per token (state copy + recomposition). On the default RENDEZVOUS
-                        // channel trySend fails whenever the collector is mid-frame, and the token
-                        // is silently discarded - which is why replies arrived empty on device.
-                        // The buffered channel below plus a blocking put keeps every token and
-                        // applies natural backpressure to the native decode loop instead.
-                        // A failure here means the collector is gone (flow closed/cancelled);
-                        // latch cancellation so the native decode loop stops promptly.
-                        if (channel.trySendBlocking(InferenceEvent.Token(text)).isFailure) {
-                            cancelled.set(true)
-                        }
+                        if (!cancelled.get() && channel.trySendBlocking(InferenceEvent.Token(text)).isFailure) cancelled.set(true)
                     }
-
                     override fun isCancelled(): Boolean = cancelled.get()
-                },
-            )
+                })
             if (!cancelled.get()) {
                 if (values != null && values.size >= METRIC_COUNT) {
-                    val metrics = GenerationMetrics(
-                        promptTokens = values[0].toInt(),
-                        generatedTokens = values[1].toInt(),
-                        promptEvaluationMs = values[2] / 1000,
-                        timeToFirstTokenMs = values[3] / 1000,
-                        decodeMs = values[4] / 1000,
-                        totalMs = values[5] / 1000,
-                        evaluatedPromptTokens = values[6].toInt(),
-                    )
+                    val metrics = GenerationMetrics(values[0].toInt(), values[1].toInt(), values[2] / 1000, values[3] / 1000, values[4] / 1000, values[5] / 1000, values[6].toInt())
                     channel.trySendBlocking(InferenceEvent.Completed(metrics.generatedTokens, metrics))
-                } else {
-                    channel.trySendBlocking(
-                        InferenceEvent.Failed(NativeBindings.lastError().ifBlank { "Native inference failed" }),
-                    )
-                }
+                } else channel.trySendBlocking(InferenceEvent.Failed(NativeBindings.lastError().ifBlank { "Native inference failed" }))
             }
             close()
         }
-        awaitClose {
-            cancelled.set(true)
-            worker.cancel()
-        }
-    }
-        // Buffer so a brief UI stall never costs a token. Combined with the blocking send above
-        // the native decode loop is throttled by backpressure instead of dropping output.
-        .buffer(TOKEN_BUFFER_CAPACITY)
+        awaitClose { cancelled.set(true); worker.cancel() }
+    }.buffer(TOKEN_BUFFER_CAPACITY)
 
     override suspend fun countTokens(conversation: List<ConversationMessage>): Result<Int> = withContext(Dispatchers.Default) {
         val handle = session
         if (handle == 0L) return@withContext Result.failure(IllegalStateException("No model is loaded"))
         runCatching {
-            val count = NativeBindings.countTokens(
-                handle,
-                conversation.map { it.role.name.lowercase() }.toTypedArray(),
-                conversation.map { it.content }.toTypedArray(),
-            )
+            val count = NativeBindings.countTokens(handle, conversation.map { it.role.name.lowercase() }.toTypedArray(), conversation.map { it.content }.toTypedArray())
             check(count >= 0) { NativeBindings.lastError().ifBlank { "Token counting failed" } }
             count
         }
@@ -216,24 +147,9 @@ class NativeInferenceEngine : InferenceEngine {
     }
 
     private fun descriptorForNativeBackend(name: String): BackendDescriptor? = when (name) {
-        "cpu" -> BackendDescriptor(
-            id = BackendId("llama-cpu"),
-            computeClass = ComputeClass.CPU,
-            supportedModelFormats = setOf("gguf"),
-            defaultPriority = 100,
-        )
-        "vulkan" -> BackendDescriptor(
-            id = BackendId("llama-vulkan"),
-            computeClass = ComputeClass.GPU,
-            supportedModelFormats = setOf("gguf"),
-            defaultPriority = 200,
-        )
-        "opencl" -> BackendDescriptor(
-            id = BackendId("llama-opencl"),
-            computeClass = ComputeClass.GPU,
-            supportedModelFormats = setOf("gguf"),
-            defaultPriority = 200,
-        )
+        "cpu" -> BackendDescriptor(BackendId("llama-cpu"), ComputeClass.CPU, setOf("gguf"), 100)
+        "vulkan" -> BackendDescriptor(BackendId("llama-vulkan"), ComputeClass.GPU, setOf("gguf"), 200)
+        "opencl" -> BackendDescriptor(BackendId("llama-opencl"), ComputeClass.GPU, setOf("gguf"), 200)
         else -> null
     }
 
@@ -247,8 +163,6 @@ class NativeInferenceEngine : InferenceEngine {
     companion object {
         private const val DEFAULT_CONTEXT_SIZE = 4096
         private const val METRIC_COUNT = 7
-
-        /** Bounded token backlog before the native decode loop is throttled by backpressure. */
         private const val TOKEN_BUFFER_CAPACITY = 256
     }
 }
