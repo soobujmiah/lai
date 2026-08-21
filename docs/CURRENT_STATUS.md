@@ -72,3 +72,7 @@ Removed generic model/runtime/workspace status from the Chat surface after devic
 ### 2026-08-21 update — Models/Workspace/Provider moved under Settings
 
 Removed standalone Models, Workspace and Provider destinations from navigation. Their functionality remains reachable from Settings only: Settings contains model setup/load/unload/delete, workspace grant/scan/revoke, and provider/backend status. Chat remains conversation-only.
+
+### 2026-08-21 update — Chat action/progress cleanup
+
+Chat now shows a single compact progress bar during generation/cancellation. The large chat header and duplicate thinking progress card were removed, and New/History moved to the top app bar.

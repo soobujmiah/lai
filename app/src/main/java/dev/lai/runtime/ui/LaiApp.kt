@@ -144,16 +144,21 @@ fun LaiApp(viewModel: MainViewModel) {
                     },
                     actions = {
                         if (destination == AppDestination.Chat && !state.settingsVisible) {
+                            TextButton(
+                                onClick = viewModel::clearConversation,
+                                enabled = !state.busy &&
+                                    state.pendingToolProposal == null &&
+                                    state.messages.any { it.contextEligible },
+                            ) { Text("New") }
+                            TextButton(
+                                onClick = viewModel::toggleChatHistory,
+                                enabled = state.pendingToolProposal == null,
+                            ) { Text(stringResource(R.string.chat_history)) }
                             IconButton(onClick = viewModel::showQuickSettings) {
                                 Text(
                                     stringResource(R.string.quick_settings_action),
                                     style = MaterialTheme.typography.titleMedium,
                                 )
-                            }
-                        }
-                        if (!state.settingsVisible && destination != AppDestination.Settings) {
-                            TextButton(onClick = { select(AppDestination.Settings) }) {
-                                Text(stringResource(R.string.settings))
                             }
                         }
                     },
@@ -344,9 +349,8 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        ChatHeader(state = state, viewModel = viewModel)
-        if (state.operation == RuntimeOperation.GENERATING) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (state.operation in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)) {
+            CompactChatProgress(state.operation)
         }
         LazyColumn(
             state = listState,
@@ -354,19 +358,8 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (state.pendingToolProposal != null) {
-                item(key = "pending-tool") {
-                    StatusCard(
-                        title = stringResource(R.string.review_local_action),
-                        detail = "A local action is waiting for your one-time approval. Chat input pauses until you approve or deny it.",
-                    )
-                }
-            }
             // Stable keys: only the changed bubble recomposes as tokens stream in.
             items(state.messages, key = { it.id }) { message -> MessageBubble(message) }
-            if (state.operation == RuntimeOperation.GENERATING && state.messages.lastOrNull()?.text.isNullOrBlank()) {
-                item(key = "thinking") { ThinkingBubble() }
-            }
             state.lastGenerationFailure?.let { reason ->
                 item(key = "generation-failure") {
                     StatusCard("Generation note", reason)
@@ -378,35 +371,17 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
 }
 
 @Composable
-private fun ChatHeader(state: MainUiState, viewModel: MainViewModel) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+private fun CompactChatProgress(operation: RuntimeOperation) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.home_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        stringResource(R.string.home_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(
-                    onClick = viewModel::toggleChatHistory,
-                    enabled = state.pendingToolProposal == null,
-                ) { Text(stringResource(R.string.chat_history)) }
-                TextButton(
-                    onClick = viewModel::clearConversation,
-                    enabled = !state.busy && state.pendingToolProposal == null && state.messages.any { it.contextEligible },
-                ) { Text("New") }
-            }
-        }
+        Text(
+            if (operation == RuntimeOperation.CANCELLING) "Stopping…" else "Writing…",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp))
     }
 }
 
@@ -416,7 +391,7 @@ private fun ChatComposer(state: MainUiState, viewModel: MainViewModel) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
-        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 // No imePadding() here: the Scaffold already applies it for the whole layout.
                 modifier = Modifier.fillMaxWidth(),
@@ -450,16 +425,18 @@ private fun ChatComposer(state: MainUiState, viewModel: MainViewModel) {
                     }
                 }
             }
-            Text(
-                when {
-                    state.pendingToolProposal != null -> "Review the pending local action before continuing."
-                    state.operation == RuntimeOperation.GENERATING -> "LAI is writing a reply. You can stop generation at any time."
-                    state.workspace.overrideArmed -> "Custom reply settings apply once to the next message."
-                    else -> "Private by default. Messages stay on device unless you explicitly configure another provider."
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            val helper = when {
+                state.pendingToolProposal != null -> "Review the pending local action before continuing."
+                state.workspace.overrideArmed -> "Custom reply settings apply once to the next message."
+                else -> null
+            }
+            helper?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -498,22 +475,6 @@ private fun MessageBubble(message: ChatMessage) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThinkingBubble() {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-        Card(
-            modifier = Modifier.fillMaxWidth(0.62f),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(20.dp),
-        ) {
-            Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("LAI is preparing…", style = MaterialTheme.typography.bodyMedium)
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
         }
     }

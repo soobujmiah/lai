@@ -108,3 +108,7 @@ Device feedback showed that model/runtime status inside Chat duplicated informat
 ### 2026-08-21 Navigation simplification: model/workspace/provider only in Settings
 
 Device feedback requested that Models, Workspace and Provider not appear as separate app tabs. The active adaptive shell now exposes only Chat, Screen Reader, Automator and Settings. Model management, SAF workspace controls and provider/backend status remain available inside Settings, where advanced setup belongs, and are no longer standalone destinations.
+
+### 2026-08-21 Chat polish: single compact progress and professional actions
+
+Device feedback showed two generation indicators and an oversized chat header. Chat now has one compact 2 dp progress indicator, only while generating or cancelling. New-chat and History actions moved into the top app bar for a more standard Android placement, while the conversation page itself stays focused on messages and the composer.
