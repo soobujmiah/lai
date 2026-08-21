@@ -11,9 +11,6 @@ class LaiApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // Centralized diagnostics are configured before anything else can log: debug builds log
-        // at DEBUG, signed release builds at INFO (see docs/LOGGING.md). A crash handler records
-        // fatal stack traces into the diagnostic log file for later extraction.
         LaiLog.configure(this, debugBuild = BuildConfig.DEBUG)
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler(
@@ -24,13 +21,7 @@ class LaiApplication : Application() {
         )
         LaiLog.i("LAI-lifecycle", "LaiApplication onCreate (process start)")
         container = AppContainer(this)
-        // Native (GPU/driver) crashes are uncatchable by Kotlin; install the native signal
-        // handler so any such crash writes a backtrace into the diagnostic log file.
         container.inferenceEngine.installNativeCrashHandler(LaiLog.logFilePath())
-        // Adreno OpenCL track: point the statically linked Khronos ICD loader at a vendor
-        // directory that resolves the Adreno OpenCL driver on Qualcomm devices (the loader's
-        // default Android path is usually empty). Must run before any backend probe — see
-        // docs/BUILD_AND_RELEASE.md "GPU enablement — Adreno OpenCL track".
         container.inferenceEngine.configureOpenCLVendors(filesDir.absolutePath)
         LaiLog.i("LAI-lifecycle", "OpenCL vendor discovery configured under ${filesDir.name}")
     }
