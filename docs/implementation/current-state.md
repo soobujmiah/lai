@@ -3,46 +3,64 @@
 **Audit update:** 2026-08-21  
 **Source baseline:** current `main` source is authoritative.  
 
-This document is a source-of-truth status record. Status describes checked-in implementation, while device/CI evidence is stated separately.
+This document is a source-of-truth status record. Status describes checked-in implementation; device/CI evidence is stated separately.
 
-## M1 conclusion
+## Reconciled state
 
-The previously planned SAF settings reliability work is already implemented in the current source:
+The previous M1 SAF-settings task is already implemented in the current source. The remaining responsibility is source/documentation/CI reconciliation, followed by the newly authorized accelerator qualification work described below.
 
-- typed settings v1 and validation/migration exist;
-- `AtomicNamedDocumentReplace` implements temp-file, backup, finalize, and recovery behavior;
-- `WorkspaceSettingsStore` integrates the atomic replacement helper;
-- dedicated tests cover the atomic replacement path.
+### Existing implementation
 
-Therefore, M1 must not be reimplemented as duplicate code. The remaining M1 responsibility is **source/documentation/CI reconciliation**.
+- typed settings v1, validation/migration, and atomic SAF replacement/recovery exist;
+- `platform:history` is part of the 16-module Gradle graph;
+- CPU inference is the validated production path;
+- native llama integration contains CPU plus optional Vulkan/OpenCL integration points;
+- CI/build scripts contain llama.cpp and Vulkan patching infrastructure;
+- device qualification remains separate from compilation support.
 
-## Current engineering rules
+## Accelerator qualification state
+
+The project retains GPU acceleration as a first-class goal. CPU-only is not the target architecture.
+
+| Capability | Current state | Meaning |
+|---|---|---|
+| CPU | **DEVICE_VALIDATED** | Reliable shipped baseline on Redmi Turbo 4 Pro / SM8735. |
+| Vulkan | **AVAILABLE / EXPERIMENTAL** | Model loading on `llama-vulkan` works, but generation crashes in Qualcomm `vulkan.adreno.so` at `vkCmdBindPipeline+0x4`. Not device-validated. |
+| Qualcomm OpenCL stack | **AVAILABLE** | Vendor libraries exist; prior OpenCL-Z evidence shows the Adreno stack is healthy. Normal modern-app ggml-opencl loading hit an Android linker-namespace boundary. A native `dlopen()` qualification route is now under investigation. |
+| KGSL | **AVAILABLE** | The exact installed `dev.lai.runtime.debug` app identity successfully opened `/dev/kgsl-3d0` from its app context on 2026-08-21. The observed UID is installation-specific and must never be hard-coded. This proves device-node access, not GPU computation. |
+| QNN/HTP | **PLANNED / QUALIFICATION LATER** | Requires real app-side runtime loading/execution evidence and applicable QAIRT licensing. |
+
+Evidence progression is mandatory:
+
+`AVAILABLE → SUPPORTED → ACTIVE → MEASURED`
+
+A device node or library being present is never enough to grant `DEVICE_VALIDATED`.
+
+## Next implementation gate
+
+Before production backend changes, the first accelerator implementation is a **minimal native KGSL + OpenCL qualification probe**:
+
+1. open `/dev/kgsl-3d0` and record safe results;
+2. use `dlopen()`/`dlsym()` in the LAI native process for the Qualcomm OpenCL implementation;
+3. enumerate platforms/devices and identify Adreno 825;
+4. if enumeration succeeds, run a tiny non-destructive GPU compute sanity test and capture timing/results;
+5. separately perform one controlled Vulkan qualification build using the documented warptile/subgroup mitigation and capture the real success/crash boundary;
+6. preserve CPU fallback and do not advertise acceleration from library/device-node presence alone.
+
+## Engineering rules
 
 - Preserve existing working functionality.
 - Treat checked-in source as authoritative over stale planning snapshots.
-- Do not claim Vulkan, OpenCL, QNN, or another accelerator as device-qualified without reproducible evidence.
-- Avoid new dependencies unless an approved implementation task requires them.
+- No vendor-specific types in `core`.
+- New inference backends belong behind the runtime/native boundary and existing backend contracts.
 - Every implementation change needs an explicit test/verification path.
+- Do not disable SELinux, modify vendor files, lower targetSdk, or hard-code app UIDs as a qualification shortcut.
+- Shared libraries are loaded through a process (`dlopen`/linker); executing a `.so` directly is not a valid runtime test.
 
-## Next engineering gate
+## Documentation sources
 
-Before starting the next accelerator milestone, verify:
+See `docs/CURRENT_STATUS.md`, `docs/DEVELOPMENT_STATE.md`, `docs/ARCHITECTURE.md`, `docs/architecture/module-map.md`, `docs/MASTER_ROADMAP.md`, `docs/VENDOR_BACKEND_STRATEGY.md`, `docs/implementation/IMPLEMENTATION_PREPARATION.md`, and the dated device-result files for evidence and phase gates.
 
-1. current CI baseline is green;
-2. architecture/module documentation matches the source;
-3. acceleration claims are evidence-backed;
-4. the selected implementation target has tests and a reproducible verification procedure.
-
-The next implementation task should then be selected from the current source state rather than from obsolete M1 planning text.
-
-## Important current source facts
-
-- The Gradle graph contains 16 modules, including `platform:history`.
-- The native runtime has CPU inference plus Vulkan/OpenCL integration points; llama.cpp and optional acceleration are controlled by the native CMake configuration.
-- The current CMake keeps `GGML_CPU_KLEIDIAI` disabled by default.
-- The current CI/build scripts already contain llama.cpp/Vulkan patching infrastructure.
-- Device qualification remains separate from compilation support.
-
-## Evidence policy
+## Verification policy
 
 A source change is not a device qualification claim. Device/backend readiness requires reproducible runtime evidence on the target hardware, with correctness and stability checks in addition to compilation success.
