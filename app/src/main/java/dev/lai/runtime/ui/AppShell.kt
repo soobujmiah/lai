@@ -6,12 +6,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.SmartToy
-import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
@@ -23,11 +17,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 
-private enum class ShellDestination(val label: String) {
-    Chat("Chat"),
-    Models("Models"),
-    Workspace("Workspace"),
-    Settings("Settings"),
+private enum class ShellDestination(val label: String, val glyph: String) {
+    Chat("Chat", "C"),
+    Models("Models", "M"),
+    Workspace("Workspace", "W"),
+    Settings("Settings", "S"),
 }
 
 /** Presentation-only adaptive shell foundation; existing LAI state/runtime remain authoritative. */
@@ -45,17 +39,7 @@ fun LaiAppShell(
                     NavigationRailItem(
                         selected = destination == item,
                         onClick = { destination = item },
-                        icon = {
-                            Icon(
-                                imageVector = when (item) {
-                                    ShellDestination.Chat -> Icons.Outlined.ChatBubbleOutline
-                                    ShellDestination.Models -> Icons.Outlined.SmartToy
-                                    ShellDestination.Workspace -> Icons.Outlined.FolderOpen
-                                    ShellDestination.Settings -> Icons.Outlined.Settings
-                                },
-                                contentDescription = item.label,
-                            )
-                        },
+                        icon = { Text(item.glyph) },
                         label = { Text(item.label) },
                     )
                 }
