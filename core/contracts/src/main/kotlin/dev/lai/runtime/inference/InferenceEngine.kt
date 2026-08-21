@@ -19,5 +19,10 @@ interface InferenceEngine : AutoCloseable {
 
     suspend fun countTokens(conversation: List<ConversationMessage>): Result<Int>
 
+    /** Optional native-runtime hooks; non-native engines keep the safe no-op defaults. */
+    fun installNativeCrashHandler(logFilePath: String) {}
+    fun configureOpenCLVendors(baseDir: String) {}
+    fun setDecodeThreadLimit(decodeThreads: Int) {}
+
     override fun close()
 }
