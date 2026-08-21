@@ -58,6 +58,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -73,110 +74,171 @@ import dev.lai.runtime.workspace.WorkspaceGrantState
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import dev.lai.runtime.ui.screens.LaiModelsScreen
+import dev.lai.runtime.ui.screens.LaiProvidersScreen
+import dev.lai.runtime.ui.screens.LaiWorkspaceScreen
+
+private enum class AppDestination(val label: String, val glyph: String) {
+    Chat("Chat", "●"),
+    ScreenReader("Reader", "◉"),
+    Automator("Auto", "◆"),
+    Models("Models", "M"),
+    Workspace("Workspace", "W"),
+    Providers("Providers", "P"),
+    Settings("Settings", "S"),
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun LaiApp(viewModel: MainViewModel) {
     val state by viewModel.state.collectAsState()
-    // Hardware/gesture back must leave Settings as well; otherwise back exits the whole app from
-    // a screen the user thinks of as "inside" something.
-    BackHandler(enabled = state.settingsVisible) { viewModel.toggleSettings() }
-    // Mode-bar visibility must follow where the IME is GOING, not where it currently is.
-    //
-    // Field report (0.9.0): with WindowInsets.isImeVisible (the *current* inset), the bar only
-    // reappeared at the very END of the keyboard's close animation — the composer had already
-    // slid to the screen bottom, then the bar popped in underneath and shoved the whole layout
-    // for a frame ("navigation tab pushed off screen, then comes back").
-    //
-    // imeAnimationTarget flips at the START of the animation in both directions: opening hides
-    // the bar immediately (the keyboard covers its space anyway), closing restores it immediately
-    // so it rides down smoothly with the shrinking imePadding() instead of popping in at the end.
-    // When no animation is running it equals the current inset, so steady-state is unchanged.
+    var destination by remember { mutableStateOf(AppDestination.Chat) }
+
+    LaunchedEffect(state.settingsVisible) {
+        if (state.settingsVisible) destination = AppDestination.Settings
+    }
+
+    BackHandler(enabled = destination != AppDestination.Chat || state.settingsVisible) {
+        if (state.settingsVisible) viewModel.toggleSettings()
+        destination = when (state.mode) {
+            UiMode.CHAT -> AppDestination.Chat
+            UiMode.SCREEN_READER -> AppDestination.ScreenReader
+            UiMode.AUTOMATOR -> AppDestination.Automator
+        }
+    }
+
     val imeVisible = WindowInsets.imeAnimationTarget.getBottom(LocalDensity.current) > 0
-    Scaffold(
-        // Keyboard handling, arrived at over three device reports:
-        //  - imePadding() on the Scaffold lifts the ENTIRE scaffold (content + bottom bar) above the
-        //    keyboard. Padding only the composer row does not work, because when a Scaffold has a
-        //    bottomBar the content's bottom padding is the bottom bar's height, not the IME inset,
-        //    so the composer was laid out behind the navigation bar and the keyboard (build 0.6.84).
-        //  - contentWindowInsets must therefore NOT contain the IME as well, or it is counted twice
-        //    and the composer flies off the top of the screen (build 0.6.83).
-        modifier = Modifier.imePadding(),
-        contentWindowInsets = WindowInsets.safeDrawing.only(
-            WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
-        ),
-        topBar = {
-            TopAppBar(
-                title = { Text("LAI", fontWeight = FontWeight.Bold) },
-                windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
-                navigationIcon = {
-                    // Settings is a full screen, not a mode. It needs an unambiguous way out:
-                    // reusing the same "Settings" button to leave was a guess the user had to make.
-                    if (state.settingsVisible) {
-                        IconButton(onClick = viewModel::toggleSettings) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
+
+    fun select(target: AppDestination) {
+        if (state.settingsVisible && target != AppDestination.Settings) viewModel.toggleSettings()
+        destination = target
+        when (target) {
+            AppDestination.Chat -> viewModel.setMode(UiMode.CHAT)
+            AppDestination.ScreenReader -> viewModel.setMode(UiMode.SCREEN_READER)
+            AppDestination.Automator -> viewModel.setMode(UiMode.AUTOMATOR)
+            AppDestination.Settings -> if (!state.settingsVisible) viewModel.toggleSettings()
+            AppDestination.Models,
+            AppDestination.Workspace,
+            AppDestination.Providers -> Unit
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val expanded = maxWidth >= 600.dp
+        Scaffold(
+            modifier = Modifier.imePadding(),
+            contentWindowInsets = WindowInsets.safeDrawing.only(
+                WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
+            ),
+            topBar = {
+                TopAppBar(
+                    title = { Text("LAI", fontWeight = FontWeight.Bold) },
+                    windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                    navigationIcon = {
+                        if (destination != AppDestination.Chat || state.settingsVisible) {
+                            IconButton(onClick = { select(AppDestination.Chat) }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.back),
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        if (destination == AppDestination.Chat && !state.settingsVisible) {
+                            IconButton(onClick = viewModel::showQuickSettings) {
+                                Text(
+                                    stringResource(R.string.quick_settings_action),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            }
+                        }
+                        if (!state.settingsVisible && destination != AppDestination.Settings) {
+                            TextButton(onClick = { select(AppDestination.Settings) }) {
+                                Text(stringResource(R.string.settings))
+                            }
+                        }
+                    },
+                )
+            },
+            bottomBar = {
+                if (!expanded && !imeVisible) {
+                    NavigationBar {
+                        AppDestination.entries.forEach { item ->
+                            NavigationBarItem(
+                                selected = destination == item || (item == AppDestination.Settings && state.settingsVisible),
+                                onClick = { select(item) },
+                                icon = { Text(item.glyph) },
+                                label = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             )
                         }
                     }
-                },
-                actions = {
-                    // Contextual quick settings belong to Chat only; other modes have no LLM knobs.
-                    if (state.mode == UiMode.CHAT && !state.settingsVisible) {
-                        // Glyph rather than a vector: material-icons-extended would add ~9 MB of
-                        // unused vectors to keep the debug APK honest about its size.
-                        IconButton(onClick = viewModel::showQuickSettings) {
-                            Text(
-                                stringResource(R.string.quick_settings_action),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                    }
-                    if (!state.settingsVisible) {
-                        TextButton(onClick = viewModel::toggleSettings) {
-                            Text(stringResource(R.string.settings))
-                        }
-                    }
-                },
-            )
-        },
-        bottomBar = {
-            if (!state.settingsVisible && !imeVisible) {
-                NavigationBar {
-                    ModeNavigationItem(UiMode.CHAT, state.mode, stringResource(R.string.chat), viewModel::setMode)
-                    ModeNavigationItem(
-                        UiMode.SCREEN_READER,
-                        state.mode,
-                        stringResource(R.string.screen_reader),
-                        viewModel::setMode,
-                    )
-                    ModeNavigationItem(
-                        UiMode.AUTOMATOR,
-                        state.mode,
-                        stringResource(R.string.automator),
-                        viewModel::setMode,
-                    )
                 }
-            }
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when {
-                state.settingsVisible -> SettingsScreen(state, viewModel)
-                state.mode == UiMode.CHAT -> ChatScreen(state, viewModel)
-                state.mode == UiMode.SCREEN_READER -> ScreenReaderScreen(state, viewModel)
-                else -> AutomatorScreen(state, viewModel)
-            }
-            if (
-                state.busy &&
-                state.downloadProgress == null &&
-                state.operation !in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)
-            ) {
-                CircularProgressIndicator(Modifier.align(Alignment.Center))
+            },
+        ) { padding ->
+            Row(Modifier.fillMaxSize().padding(padding)) {
+                if (expanded) {
+                    NavigationRail {
+                        AppDestination.entries.forEach { item ->
+                            NavigationRailItem(
+                                selected = destination == item || (item == AppDestination.Settings && state.settingsVisible),
+                                onClick = { select(item) },
+                                icon = { Text(item.glyph) },
+                                label = { Text(item.label) },
+                            )
+                        }
+                    }
+                }
+                Box(Modifier.weight(1f).fillMaxSize()) {
+                    AnimatedContent(
+                        targetState = destination,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "lai-destination",
+                        modifier = Modifier.fillMaxSize(),
+                    ) { selected ->
+                        when (selected) {
+                            AppDestination.Chat -> ChatScreen(state, viewModel)
+                            AppDestination.ScreenReader -> ScreenReaderScreen(state, viewModel)
+                            AppDestination.Automator -> AutomatorScreen(state, viewModel)
+                            AppDestination.Models -> LaiModelsScreen(
+                                state = state,
+                                onRefreshSupported = viewModel::refreshSupportedModels,
+                                onInstallRecommended = viewModel::installRecommendedModel,
+                                onInstall = viewModel::installSupportedModel,
+                                onLoad = viewModel::loadModel,
+                                onUnload = viewModel::unloadModel,
+                                onDelete = viewModel::deleteModel,
+                            )
+                            AppDestination.Workspace -> LaiWorkspaceScreen(
+                                state = state,
+                                onGrantWorkspace = viewModel::grantWorkspace,
+                                onRevokeWorkspace = viewModel::revokeWorkspace,
+                                onRefreshWorkspace = viewModel::refreshWorkspace,
+                                onScanWorkspace = viewModel::scanWorkspaceModels,
+                            )
+                            AppDestination.Providers -> LaiProvidersScreen(state = state)
+                            AppDestination.Settings -> SettingsScreen(state, viewModel)
+                        }
+                    }
+                    if (
+                        state.busy &&
+                        state.downloadProgress == null &&
+                        state.operation !in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)
+                    ) {
+                        CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    }
+                }
             }
         }
     }
+
     if (state.chatHistoryVisible) {
         ModalBottomSheet(onDismissRequest = viewModel::toggleChatHistory) {
             Column(
