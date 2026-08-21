@@ -5,7 +5,7 @@ import dev.lai.runtime.model.ReviewedModel
 import dev.lai.runtime.ui.MainUiState
 
 /**
- * Presentation adapters keep the new Material 3 surfaces independent from runtime/domain models.
+ * Presentation adapters keep Material 3 surfaces independent from runtime/domain models.
  * No inference, storage, network, or platform authority belongs in these adapters.
  */
 fun MainUiState.toModelsUi(): List<LaiModelUi> = buildList {
@@ -24,9 +24,9 @@ private fun InstalledModel.toUi(active: Boolean): LaiModelUi = LaiModelUi(
 
 private fun ReviewedModel.toUi(): LaiModelUi = LaiModelUi(
     id = id,
-    name = name,
-    detail = "$publisher • ${formatBytes(approxBytes)}",
-    status = "Available",
+    name = displayName,
+    detail = "$architecture • $quantization • ${formatBytes(bytes)}",
+    status = if (reviewState.isNotEmpty()) "Reviewed" else "Available",
 )
 
 private fun formatBytes(bytes: Long): String = when {
@@ -35,10 +35,18 @@ private fun formatBytes(bytes: Long): String = when {
     else -> "%.0f KB".format(bytes / 1024.0)
 }
 
-fun MainUiState.toWorkspaceUi(): List<LaiProjectUi> = workspace.recentDocuments.map { document ->
+/**
+ * Workspace intentionally exposes only coarse, non-identifying status. Raw paths and document
+ * names stay behind the workspace authority boundary.
+ */
+fun MainUiState.toWorkspaceUi(): List<LaiProjectUi> = listOf(
     LaiProjectUi(
-        id = document.id,
-        name = document.displayName,
-        detail = document.uri,
-    )
-}
+        id = "workspace",
+        name = if (workspace.granted) "Workspace" else "Workspace access",
+        detail = when {
+            workspace.granted -> "${workspace.reviewedModelCount} reviewed • " +
+                "${workspace.localUnreviewedModelCount} local unreviewed"
+            else -> workspace.discoveryStatus
+        },
+    ),
+)
