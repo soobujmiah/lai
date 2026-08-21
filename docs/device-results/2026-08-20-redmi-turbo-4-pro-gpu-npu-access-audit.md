@@ -32,16 +32,14 @@ is a driver bug, not an access denial). OpenCL was the only locked door.
   graphics-queue forcing). Upstream already disables large tiles on Qualcomm
   (`mul_mat_l=false` for `VK_VENDOR_ID_QUALCOMM`), so the crash is in the medium/small
   tile path.
-- **NEW lever identified 2026-08-20 (not yet landed):** upstream issue
-  ggml-org/llama.cpp#25734 + PR #25735 ("clamp l_/m_ warptile WM to <= BM, fix wrong
-  matmul on subgroupSize > 64") — still OPEN upstream, but the diff **applies cleanly to
-  LAI's pinned commit ad1de39 (dry-run verified, offset-only)**. If Adreno 825 reports
+- **Lever landed in LAI on 2026-08-21:** upstream issue ggml-org/llama.cpp#25734 + PR
+  #25735 ("clamp l_/m_ warptile WM to <= BM, fix wrong matmul on subgroupSize > 64") is
+  backported as `scripts/ci/ggml-vulkan-adreno-warptile-clamp.patch` and applied by
+  `scripts/ci/fetch_llama_cpp.sh` after `ggml-vulkan-skip-mmvq.patch`. If Adreno 825 reports
   subgroupSize=128, the medium warptile is degenerate (WM=128 > BM=64 → div-by-zero,
   shared-mem overrun in `mul_mm.comp`) — a plausible root cause for the bind/dispatch
   crash. If subgroupSize<=64 the clamp is a harmless no-op.
-  - Action: land as LAI patch `scripts/ci/ggml-vulkan-clamp-warptile.patch` (same
-    mechanism as `ggml-vulkan-skip-mmvq.patch`), wire into `fetch_llama_cpp.sh`, then ONE
-    qualification build `validated_accelerators=llama-vulkan`.
+  - Action: run ONE qualification build `validated_accelerators=llama-vulkan`.
   - Evidence to capture in that test: `logcat -s LAI-llama` init line
     `ggml_vulkan: 0 = Adreno (TM) 825 … subgroup size …` (records the device's real
     subgroup size either way) + crash-or-success outcome.
@@ -92,7 +90,7 @@ Not pursued.
 | Trigger | Action |
 |---|---|
 | Now (no user GO yet) | Nothing builds. CPU is the shipped, device-validated default and is enough for daily use |
-| User says GO on Vulkan retry | Land warptile-clamp LAI patch (§1) → one `validated_accelerators=llama-vulkan` build → device test captures subgroup size + outcome |
+| User says GO on Vulkan retry | Warptile-clamp LAI patch is landed (§1) → one `validated_accelerators=llama-vulkan` build → device test captures subgroup size + outcome |
 | Crash persists after clamp | Vulkan path parks until driver OTA; keep the evidence in this file |
 | NNAPI check (§3) shows a HAL/service | Scope the NPU adapter (roadmap QNN phase), starting with the QAIRT intake plan |
 | HyperOS OTA installed | Rerun the three greps from the OpenCL facts file + §3 check; dormant OpenCL backend self-activates if published |

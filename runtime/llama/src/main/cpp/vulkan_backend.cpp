@@ -18,6 +18,25 @@ constexpr const char* kLogTag = "LAI-llama";
 
 #ifdef LAI_HAS_VULKAN
 
+void configure_adreno_vulkan_env() {
+    // Adreno driver workarounds (SM8735 / Adreno 825, device evidence in SKB and LAI).
+    // Keep these identical for availability probing and session open; ggml-vulkan reads several
+    // switches while the Vulkan device is first created, so inconsistent setup can accidentally
+    // re-enable an unsafe shader path.
+    setenv("GGML_VK_DISABLE_COOPMAT", "1", 1);
+    setenv("GGML_VK_DISABLE_COOPMAT2", "1", 1);
+    setenv("GGML_VK_DISABLE_MMVQ", "1", 1);
+    setenv("GGML_VK_DISABLE_INTEGER_DOT_PRODUCT", "1", 1);
+    setenv("GGML_VK_DISABLE_F16", "1", 1);
+    setenv("GGML_VK_DISABLE_ASYNC", "1", 1);
+    // Route through the graphics queue on Adreno. SKB records compute-queue sensitivity and a
+    // vendor-driver crash at vkCmdBindPipeline during ggml MUL_MAT.
+    setenv("GGML_VK_ALLOW_GRAPHICS_QUEUE", "1", 1);
+    setenv("GGML_VK_DISABLE_MULTI_ADD", "1", 1);
+    setenv("GGML_VK_DISABLE_FUSION", "1", 1);
+    setenv("GGML_VK_DISABLE_GRAPH_OPTIMIZE", "1", 1);
+}
+
 // Returns the first GPU-class device registered by ggml — on this build that is the
 // Vulkan backend driving the Adreno 825. ggml-vulkan classifies an integrated GPU
 // (every Android Adreno/Mali) as GGML_BACKEND_DEVICE_TYPE_IGPU, not GPU — both must be
@@ -62,20 +81,7 @@ public:
         }
         dlclose(handle);
 #ifdef LAI_HAS_VULKAN
-        // Same Adreno workarounds as open(): keep the env consistent no matter which entry point
-        // first touches the ggml Vulkan device.
-        setenv("GGML_VK_DISABLE_COOPMAT", "1", 1);
-        setenv("GGML_VK_DISABLE_COOPMAT2", "1", 1);
-        setenv("GGML_VK_DISABLE_MMVQ", "1", 1);
-        setenv("GGML_VK_DISABLE_INTEGER_DOT_PRODUCT", "1", 1);
-        setenv("GGML_VK_DISABLE_F16", "1", 1);
-        setenv("GGML_VK_DISABLE_ASYNC", "1", 1);
-        // Adreno 825: the compute-only queue is a known source of driver bugs; route Vulkan
-        // submissions through the (more battle-tested) graphics queue instead.
-        setenv("GGML_VK_ALLOW_GRAPHICS_QUEUE", "1", 1);
-        setenv("GGML_VK_DISABLE_MULTI_ADD", "1", 1);
-        setenv("GGML_VK_DISABLE_FUSION", "1", 1);
-        setenv("GGML_VK_DISABLE_GRAPH_OPTIMIZE", "1", 1);
+        configure_adreno_vulkan_env();
         initialize_llama_once();
         const ggml_backend_dev_t device = find_gpu_device();
         if (device == nullptr) {
@@ -96,22 +102,7 @@ public:
         std::string& error
     ) override {
 #ifdef LAI_HAS_VULKAN
-        // Adreno driver workarounds (SM8735 / Adreno 825, device evidence 2026-08-19).
-        // ggml-vulkan reads these env vars when the device is first created; set them before any
-        // Vulkan use so the safest shader paths are used:
-        //  - GGML_VK_DISABLE_COOPMAT/_2: driver advertises VK_KHR_cooperative_matrix but cannot
-        //    compile the coopmat pipelines (ErrorUnknown at init).
-        //  - GGML_VK_DISABLE_MMVQ: the single-token quantized mat-vec family fails to compile
-        //    (LAI patch ggml-vulkan-skip-mmvq.patch then skips compiling it entirely).
-        //  - GGML_VK_DISABLE_INTEGER_DOT_PRODUCT / _F16 / _ASYNC: suspected runtime-crash
-        //    triggers during Vulkan compute (driver crashes natively on message send in 0.1.175).
-        //    These only reduce GPU-path throughput; the CPU backend is unaffected.
-        setenv("GGML_VK_DISABLE_COOPMAT", "1", 1);
-        setenv("GGML_VK_DISABLE_COOPMAT2", "1", 1);
-        setenv("GGML_VK_DISABLE_MMVQ", "1", 1);
-        setenv("GGML_VK_DISABLE_INTEGER_DOT_PRODUCT", "1", 1);
-        setenv("GGML_VK_DISABLE_F16", "1", 1);
-        setenv("GGML_VK_DISABLE_ASYNC", "1", 1);
+        configure_adreno_vulkan_env();
         initialize_llama_once();
         const ggml_backend_dev_t device = find_gpu_device();
         if (device == nullptr) {
