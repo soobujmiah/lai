@@ -31,9 +31,9 @@ QNN/HTP NPU (licensed QAIRT), `core:tokenization` (SentencePiece unigram), `core
 
 ## Next Device Test
 
-**GPU qualification is now actionable as one controlled Vulkan retry.** The warptile-clamp lever from upstream PR #25735 is landed as an LAI patch and verified to apply to pinned llama.cpp. Next test: build with `validated_accelerators=llama-vulkan`, load the reviewed Qwen model, capture `logcat -s LAI-llama` including the `ggml_vulkan` subgroup-size line, then run short generation, stop/cancel, unload, and CPU fallback. If the Qualcomm crash persists, park Vulkan until a driver OTA. OpenCL remains blocked by the HyperOS app-namespace wall unless Xiaomi publishes `libOpenCL.so` to modern apps. **Strategy handoff:** [`device-results/2026-08-20-redmi-turbo-4-pro-gpu-npu-access-audit.md`](device-results/2026-08-20-redmi-turbo-4-pro-gpu-npu-access-audit.md).
+**No further Vulkan retry is actionable right now.** The controlled `0.6.217-debug` qualification build landed the upstream PR #25735 warptile clamp and selected `llama-vulkan`, but generation still crashed in Qualcomm's proprietary `vulkan.adreno.so` at `vkCmdBindPipeline+0x4`. Park ggml Vulkan on Redmi Turbo 4 Pro until a Qualcomm/Xiaomi driver OTA or a major upstream ggml-vulkan Adreno fix beyond PR #25735. OpenCL remains blocked by the HyperOS app-namespace wall unless Xiaomi publishes `libOpenCL.so` to modern apps. **Strategy handoff:** [`device-results/2026-08-20-redmi-turbo-4-pro-gpu-npu-access-audit.md`](device-results/2026-08-20-redmi-turbo-4-pro-gpu-npu-access-audit.md).
 
-CPU remains the device-validated shipped default until that physical Vulkan qualification succeeds.
+CPU remains the only device-validated shipped backend on this phone.
 
 ## 2026-08-21 — Phase 2 UI integration status
 
@@ -80,3 +80,7 @@ Chat now shows a single compact progress bar during generation/cancellation. The
 ### 2026-08-21 update — Vulkan qualification failed on Adreno 825
 
 The `0.6.217-debug` Vulkan qualification build loaded the model on `llama-vulkan`, but generation still crashed inside `vulkan.adreno.so` at `vkCmdBindPipeline+0x4` during ggml graph execution. The warptile-clamp patch did not solve the Redmi Turbo 4 Pro driver failure. CPU remains the only device-validated backend; Vulkan must stay opt-in/unqualified and should not be claimed working.
+
+### 2026-08-21 closeout
+
+Session closed with PR #16 still carrying the Phase 2 UI work and recorded GPU evidence. Required handoff: [`HANDOFF-2026-08-21-phase2-ui-gpu.md`](HANDOFF-2026-08-21-phase2-ui-gpu.md).

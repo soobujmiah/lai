@@ -61,6 +61,13 @@ Head: **`e80bd1e`** · CI: **#172 green** (signed release APK + R8 mapping; debu
 | Model management | Build verified | catalog one-tap install, Load/Unload/Delete, Keep copy export, background WorkManager downloads, auto-import of `storage/LAI/models/*.gguf` (on startup, grant-active, manual grant, and manual scan — serialized to avoid a 3-way `.part` race) |
 | **Diagnostic logging** | Ready | `LaiLog` (logcat + app-private file 512 KiB rotation + in-memory tail in the export) with per-build verbosity: debug `DEBUG`, signed release `INFO`; `LaiLogRedactor` (tokens/api keys/passwords/PEM/AWS redacted, 11 unit tests); uncaught-crash handler; in-app "Export diagnostic log" + `logs[]` in the JSON export; `std::cerr` redirect so ggml errors name the shader |
 
+
+## 2026-08-21 handoff update
+
+Phase 2 UI and Adreno GPU qualification work continued on PR #16 (`phase2/functional-material3-integration`). The active app navigation is now Chat, Screen Reader, Automator and Settings only. Model management, workspace controls and provider/backend status are intentionally under Settings only. Chat is conversation-only with one compact generation progress indicator and top-app-bar New/History actions.
+
+Redmi Turbo 4 Pro Vulkan qualification was attempted with app `0.6.217-debug`, `validated_accelerators=llama-vulkan`, and the upstream PR #25735 warptile-clamp backport. The model loaded on `llama-vulkan`, but generation still crashed/stalled in Qualcomm `vulkan.adreno.so` at `vkCmdBindPipeline+0x4`. CPU remains the only device-validated backend; Vulkan is unqualified/experimental and must not be claimed working. Full closeout: [docs/HANDOFF-2026-08-21-phase2-ui-gpu.md](docs/HANDOFF-2026-08-21-phase2-ui-gpu.md).
+
 ---
 
 ## 2. Current Directory Tree
