@@ -64,3 +64,7 @@ Remaining:
 - Run CI Android build/test/lint with the configured GitHub Actions toolchain.
 - Complete physical-device validation, especially CPU fallback, model load/unload, streaming/cancellation, workspace scan, Screen Reader, Automator, and tool approval.
 - Continue polishing Chat and Settings once Models + Workspace pass CI/device validation.
+
+### 2026-08-21 update — Chat screen migration
+
+After Models/Workspace CI passed on PR #16, the active Chat route was polished without changing the existing ViewModel/runtime flow. Chat now shows active model/runtime status, streaming progress, pending-tool state, generation notes, improved bubbles, and composer guidance while preserving `sendMessage()`, `cancelGeneration()`, `toggleChatHistory()`, `clearConversation()`, tool approval, stable message keys, and IME handling.

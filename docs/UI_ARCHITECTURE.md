@@ -79,3 +79,24 @@ The UI does not mark GPU/Vulkan stable from presence alone. Qualcomm/Adreno acce
 ### Validation notes
 
 Local source/documentation policy was run after this change. Full Android build requires the repository CI toolchain or a local Android SDK/JDK 17 environment. The sandbox used for this change did not include the repository's requested `./gradlew` wrapper or Android SDK; a downloaded Gradle 9.5.0 plus JDK 17 failed in the constrained sandbox when the daemon was killed during dependency instrumentation. CI remains the authoritative Android build validation path.
+
+## 2026-08-21 Chat Material 3 migration slice
+
+Chat has been migrated in-place inside the active `LaiApp` path rather than replaced with a parallel demo screen. The screen still consumes `MainUiState` directly and calls the same `MainViewModel` methods for input, sending, cancellation, history, clearing, and quick settings.
+
+Preserved behavior:
+
+- streaming continues to append to stable-keyed `ChatMessage` rows;
+- cancellation still calls `cancelGeneration()` and keeps the existing runtime semantics;
+- history still opens from `toggleChatHistory()`;
+- the composer still uses the existing `setInput()` and `sendMessage()` flow;
+- pending local tool approvals pause chat input and continue to use the existing approval dialog/audit path;
+- IME handling remains owned by the root scaffold `imePadding()` and existing animation-target bottom-bar logic.
+
+UI changes:
+
+- added a compact conversation header with active model/runtime state, trimming/window notes, History, and New-chat actions;
+- added restrained streaming progress while a reply is being generated;
+- added privacy/model readiness helper text in the composer;
+- polished message bubbles with author labels, asymmetric Material shape, and context-eligibility disclosure for system/non-context rows;
+- surfaced pending-tool and generation-failure states inside the conversation without changing inference semantics.

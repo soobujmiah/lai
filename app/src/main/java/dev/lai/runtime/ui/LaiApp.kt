@@ -361,74 +361,165 @@ private fun RowScope.ModeNavigationItem(
 
 @Composable
 private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.home_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(stringResource(R.string.home_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            TextButton(
-                onClick = viewModel::toggleChatHistory,
-                enabled = state.pendingToolProposal == null,
-            ) { Text(stringResource(R.string.chat_history)) }
-            TextButton(
-                onClick = viewModel::clearConversation,
-                enabled = !state.busy && state.pendingToolProposal == null && state.messages.any { it.contextEligible },
-            ) { Text("New chat") }
+    val listState = rememberLazyListState()
+    // Follow the newest text while a reply streams in, so the user never has to chase it.
+    LaunchedEffect(state.messages.size, state.messages.lastOrNull()?.text) {
+        if (state.messages.isNotEmpty()) {
+            listState.animateScrollToItem(state.messages.lastIndex)
         }
-        val listState = rememberLazyListState()
-        // Follow the newest text while a reply streams in, so the user never has to chase it.
-        LaunchedEffect(state.messages.size, state.messages.lastOrNull()?.text) {
-            if (state.messages.isNotEmpty()) {
-                listState.animateScrollToItem(state.messages.lastIndex)
-            }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        ChatHeader(state = state, viewModel = viewModel)
+        if (state.operation == RuntimeOperation.GENERATING) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Stable keys: only the changed bubble recomposes as tokens stream in.
-            items(state.messages, key = { it.id }) { message -> MessageBubble(message) }
-        }
-        Row(
-            // No imePadding() here: the Scaffold already applies it for the whole layout.
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = state.input,
-                onValueChange = viewModel::setInput,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.message_hint)) },
-                maxLines = 4,
-                keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() }),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-            )
-            if (state.operation in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)) {
-                Button(
-                    onClick = viewModel::cancelGeneration,
-                    enabled = state.operation == RuntimeOperation.GENERATING,
-                ) {
-                    Text(if (state.operation == RuntimeOperation.CANCELLING) "Stopping…" else "Stop")
-                }
-            } else {
-                Button(
-                    onClick = viewModel::sendMessage,
-                    enabled = state.input.isNotBlank() && !state.busy && state.pendingToolProposal == null,
-                ) {
-                    Text(stringResource(R.string.send))
+            if (state.pendingToolProposal != null) {
+                item(key = "pending-tool") {
+                    StatusCard(
+                        title = stringResource(R.string.review_local_action),
+                        detail = "A local action is waiting for your one-time approval. Chat input pauses until you approve or deny it.",
+                    )
                 }
             }
+            state.notice?.let { notice ->
+                item(key = "notice") { StatusCard("Status", notice) }
+            }
+            // Stable keys: only the changed bubble recomposes as tokens stream in.
+            items(state.messages, key = { it.id }) { message -> MessageBubble(message) }
+            if (state.operation == RuntimeOperation.GENERATING && state.messages.lastOrNull()?.text.isNullOrBlank()) {
+                item(key = "thinking") { ThinkingBubble() }
+            }
+            state.lastGenerationFailure?.let { reason ->
+                item(key = "generation-failure") {
+                    StatusCard("Generation note", reason)
+                }
+            }
+        }
+        ChatComposer(state = state, viewModel = viewModel)
+    }
+}
+
+@Composable
+private fun ChatHeader(state: MainUiState, viewModel: MainViewModel) {
+    val activeModel = state.installedModels.firstOrNull { it.id == state.activeModelId }?.displayName
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.home_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        stringResource(R.string.home_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(
+                    onClick = viewModel::toggleChatHistory,
+                    enabled = state.pendingToolProposal == null,
+                ) { Text(stringResource(R.string.chat_history)) }
+                TextButton(
+                    onClick = viewModel::clearConversation,
+                    enabled = !state.busy && state.pendingToolProposal == null && state.messages.any { it.contextEligible },
+                ) { Text("New") }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+            Text(
+                buildString {
+                    append(activeModel ?: "No model loaded")
+                    append(" • ")
+                    append(when (state.operation) {
+                        RuntimeOperation.NO_MODEL -> "Install a model to chat"
+                        RuntimeOperation.IDLE -> "Idle"
+                        RuntimeOperation.READY -> "Ready"
+                        RuntimeOperation.GENERATING -> "Streaming reply"
+                        RuntimeOperation.CANCELLING -> "Stopping generation"
+                        RuntimeOperation.LOADING -> "Loading model"
+                        RuntimeOperation.DOWNLOADING -> "Downloading model"
+                        RuntimeOperation.IMPORTING -> "Importing model"
+                        RuntimeOperation.EXPORTING -> "Exporting model"
+                        RuntimeOperation.READING_SCREEN -> "Reading screen"
+                        RuntimeOperation.AUTOMATING -> "Automation running"
+                        RuntimeOperation.ERROR -> "Needs attention"
+                    })
+                    if (state.trimmedConversationTurns > 0) {
+                        append(" • trimmed ${state.trimmedConversationTurns} old turn(s)")
+                    }
+                    if (state.windowedConversationTurns > 0) {
+                        append(" • memory window ${state.windowedConversationTurns} turn(s)")
+                    }
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatComposer(state: MainUiState, viewModel: MainViewModel) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                // No imePadding() here: the Scaffold already applies it for the whole layout.
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = state.input,
+                    onValueChange = viewModel::setInput,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.message_hint)) },
+                    maxLines = 5,
+                    keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() }),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
+                    enabled = state.operation !in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING) &&
+                        state.pendingToolProposal == null,
+                )
+                if (state.operation in setOf(RuntimeOperation.GENERATING, RuntimeOperation.CANCELLING)) {
+                    Button(
+                        onClick = viewModel::cancelGeneration,
+                        enabled = state.operation == RuntimeOperation.GENERATING,
+                    ) {
+                        Text(if (state.operation == RuntimeOperation.CANCELLING) "Stopping…" else "Stop")
+                    }
+                } else {
+                    Button(
+                        onClick = viewModel::sendMessage,
+                        enabled = state.input.isNotBlank() && !state.busy && state.pendingToolProposal == null,
+                    ) {
+                        Text(stringResource(R.string.send))
+                    }
+                }
+            }
+            Text(
+                when {
+                    state.pendingToolProposal != null -> "Review the pending local action before continuing."
+                    state.activeModelId == null && state.installedModels.isNotEmpty() -> "Load an installed model from Models to generate a real reply."
+                    state.installedModels.isEmpty() -> "Install a reviewed local model from Models to begin."
+                    state.workspace.overrideArmed -> "Custom reply settings apply once to the next message."
+                    else -> "Private by default. Messages stay on device unless you explicitly configure another provider."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -440,14 +531,50 @@ private fun MessageBubble(message: ChatMessage) {
         horizontalArrangement = if (message.fromUser) Arrangement.End else Arrangement.Start,
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth(0.86f),
+            modifier = Modifier.fillMaxWidth(0.88f),
             colors = CardDefaults.cardColors(
                 containerColor = if (message.fromUser) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant,
             ),
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(
+                topStart = 20.dp,
+                topEnd = 20.dp,
+                bottomEnd = if (message.fromUser) 6.dp else 20.dp,
+                bottomStart = if (message.fromUser) 20.dp else 6.dp,
+            ),
         ) {
-            Text(message.text, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyLarge)
+            Column(Modifier.padding(horizontal = 15.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    if (message.fromUser) "You" else "LAI",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                if (!message.contextEligible) {
+                    Text(
+                        "Not included in model context",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThinkingBubble() {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+        Card(
+            modifier = Modifier.fillMaxWidth(0.62f),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(20.dp),
+        ) {
+            Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("LAI is preparing…", style = MaterialTheme.typography.bodyMedium)
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
         }
     }
 }
