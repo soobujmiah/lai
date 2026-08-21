@@ -68,3 +68,7 @@ Remaining:
 ### 2026-08-21 update — Chat screen migration
 
 After Models/Workspace CI passed on PR #16, the active Chat route was polished without changing the existing ViewModel/runtime flow. Chat now shows active model/runtime status, streaming progress, pending-tool state, generation notes, improved bubbles, and composer guidance while preserving `sendMessage()`, `cancelGeneration()`, `toggleChatHistory()`, `clearConversation()`, tool approval, stable message keys, and IME handling.
+
+### 2026-08-21 update — Chat declutter
+
+Removed generic model/runtime/workspace status from the Chat surface after device feedback. Chat remains focused on conversation, streaming/cancellation, history, and tool approval; model/backend/workspace details remain in their dedicated destinations and diagnostics.

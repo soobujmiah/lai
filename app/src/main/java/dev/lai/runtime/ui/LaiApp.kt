@@ -388,9 +388,6 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
                     )
                 }
             }
-            state.notice?.let { notice ->
-                item(key = "notice") { StatusCard("Status", notice) }
-            }
             // Stable keys: only the changed bubble recomposes as tokens stream in.
             items(state.messages, key = { it.id }) { message -> MessageBubble(message) }
             if (state.operation == RuntimeOperation.GENERATING && state.messages.lastOrNull()?.text.isNullOrBlank()) {
@@ -408,7 +405,6 @@ private fun ChatScreen(state: MainUiState, viewModel: MainViewModel) {
 
 @Composable
 private fun ChatHeader(state: MainUiState, viewModel: MainViewModel) {
-    val activeModel = state.installedModels.firstOrNull { it.id == state.activeModelId }?.displayName
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
@@ -436,35 +432,6 @@ private fun ChatHeader(state: MainUiState, viewModel: MainViewModel) {
                     enabled = !state.busy && state.pendingToolProposal == null && state.messages.any { it.contextEligible },
                 ) { Text("New") }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-            Text(
-                buildString {
-                    append(activeModel ?: "No model loaded")
-                    append(" • ")
-                    append(when (state.operation) {
-                        RuntimeOperation.NO_MODEL -> "Install a model to chat"
-                        RuntimeOperation.IDLE -> "Idle"
-                        RuntimeOperation.READY -> "Ready"
-                        RuntimeOperation.GENERATING -> "Streaming reply"
-                        RuntimeOperation.CANCELLING -> "Stopping generation"
-                        RuntimeOperation.LOADING -> "Loading model"
-                        RuntimeOperation.DOWNLOADING -> "Downloading model"
-                        RuntimeOperation.IMPORTING -> "Importing model"
-                        RuntimeOperation.EXPORTING -> "Exporting model"
-                        RuntimeOperation.READING_SCREEN -> "Reading screen"
-                        RuntimeOperation.AUTOMATING -> "Automation running"
-                        RuntimeOperation.ERROR -> "Needs attention"
-                    })
-                    if (state.trimmedConversationTurns > 0) {
-                        append(" • trimmed ${state.trimmedConversationTurns} old turn(s)")
-                    }
-                    if (state.windowedConversationTurns > 0) {
-                        append(" • memory window ${state.windowedConversationTurns} turn(s)")
-                    }
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -512,8 +479,7 @@ private fun ChatComposer(state: MainUiState, viewModel: MainViewModel) {
             Text(
                 when {
                     state.pendingToolProposal != null -> "Review the pending local action before continuing."
-                    state.activeModelId == null && state.installedModels.isNotEmpty() -> "Load an installed model from Models to generate a real reply."
-                    state.installedModels.isEmpty() -> "Install a reviewed local model from Models to begin."
+                    state.operation == RuntimeOperation.GENERATING -> "LAI is writing a reply. You can stop generation at any time."
                     state.workspace.overrideArmed -> "Custom reply settings apply once to the next message."
                     else -> "Private by default. Messages stay on device unless you explicitly configure another provider."
                 },

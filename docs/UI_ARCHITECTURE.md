@@ -100,3 +100,7 @@ UI changes:
 - added privacy/model readiness helper text in the composer;
 - polished message bubbles with author labels, asymmetric Material shape, and context-eligibility disclosure for system/non-context rows;
 - surfaced pending-tool and generation-failure states inside the conversation without changing inference semantics.
+
+### 2026-08-21 Chat model-status decluttering
+
+Device feedback showed that model/runtime status inside Chat duplicated information that belongs in the Models/Providers/Workspace destinations. Chat now keeps conversation, composer, streaming, cancellation, history, pending-tool, and generation-failure UI only. Model readiness and backend details remain available in the dedicated tabs and developer diagnostics instead of being repeated in the chat header or generic chat notices.
