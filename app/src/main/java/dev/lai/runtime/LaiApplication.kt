@@ -21,7 +21,10 @@ class LaiApplication : Application() {
         )
         LaiLog.i("LAI-lifecycle", "LaiApplication onCreate (process start)")
         container = AppContainer(this)
-        container.inferenceEngine.installNativeCrashHandler(LaiLog.logFilePath())
+        // Native crash diagnostics are optional: logging may not have a file yet during startup.
+        LaiLog.logFilePath()?.let { path ->
+            container.inferenceEngine.installNativeCrashHandler(path)
+        }
         container.inferenceEngine.configureOpenCLVendors(filesDir.absolutePath)
         LaiLog.i("LAI-lifecycle", "OpenCL vendor discovery configured under ${filesDir.name}")
     }
