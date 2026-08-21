@@ -29,7 +29,7 @@ class InferenceGatewayTest {
     }
 
     @Test
-    fun `unqualified providers are invisible to capability discovery`() {
+    fun `unqualified providers are invisible to capability discovery`() = runBlocking {
         val measuredEngine = engine()
         val gateway = InferenceGateway(listOf(
             InferenceGateway.ProviderRegistration(
