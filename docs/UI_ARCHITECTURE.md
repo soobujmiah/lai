@@ -104,3 +104,7 @@ UI changes:
 ### 2026-08-21 Chat model-status decluttering
 
 Device feedback showed that model/runtime status inside Chat duplicated information that belongs in the Models/Providers/Workspace destinations. Chat now keeps conversation, composer, streaming, cancellation, history, pending-tool, and generation-failure UI only. Model readiness and backend details remain available in the dedicated tabs and developer diagnostics instead of being repeated in the chat header or generic chat notices.
+
+### 2026-08-21 Navigation simplification: model/workspace/provider only in Settings
+
+Device feedback requested that Models, Workspace and Provider not appear as separate app tabs. The active adaptive shell now exposes only Chat, Screen Reader, Automator and Settings. Model management, SAF workspace controls and provider/backend status remain available inside Settings, where advanced setup belongs, and are no longer standalone destinations.

@@ -72,3 +72,7 @@ After Models/Workspace CI passed on PR #16, the active Chat route was polished w
 ### 2026-08-21 update — Chat declutter
 
 Removed generic model/runtime/workspace status from the Chat surface after device feedback. Chat remains focused on conversation, streaming/cancellation, history, and tool approval; model/backend/workspace details remain in their dedicated destinations and diagnostics.
+
+### 2026-08-21 update — Models/Workspace/Provider moved under Settings
+
+Removed standalone Models, Workspace and Provider destinations from navigation. Their functionality remains reachable from Settings only: Settings contains model setup/load/unload/delete, workspace grant/scan/revoke, and provider/backend status. Chat remains conversation-only.

@@ -81,17 +81,11 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
-import dev.lai.runtime.ui.screens.LaiModelsScreen
-import dev.lai.runtime.ui.screens.LaiProvidersScreen
-import dev.lai.runtime.ui.screens.LaiWorkspaceScreen
 
 private enum class AppDestination(val label: String, val glyph: String) {
     Chat("Chat", "●"),
     ScreenReader("Reader", "◉"),
     Automator("Auto", "◆"),
-    Models("Models", "M"),
-    Workspace("Workspace", "W"),
-    Providers("Providers", "P"),
     Settings("Settings", "S"),
 }
 
@@ -124,9 +118,6 @@ fun LaiApp(viewModel: MainViewModel) {
             AppDestination.ScreenReader -> viewModel.setMode(UiMode.SCREEN_READER)
             AppDestination.Automator -> viewModel.setMode(UiMode.AUTOMATOR)
             AppDestination.Settings -> if (!state.settingsVisible) viewModel.toggleSettings()
-            AppDestination.Models,
-            AppDestination.Workspace,
-            AppDestination.Providers -> Unit
         }
     }
 
@@ -207,23 +198,6 @@ fun LaiApp(viewModel: MainViewModel) {
                             AppDestination.Chat -> ChatScreen(state, viewModel)
                             AppDestination.ScreenReader -> ScreenReaderScreen(state, viewModel)
                             AppDestination.Automator -> AutomatorScreen(state, viewModel)
-                            AppDestination.Models -> LaiModelsScreen(
-                                state = state,
-                                onRefreshSupported = viewModel::refreshSupportedModels,
-                                onInstallRecommended = viewModel::installRecommendedModel,
-                                onInstall = viewModel::installSupportedModel,
-                                onLoad = viewModel::loadModel,
-                                onUnload = viewModel::unloadModel,
-                                onDelete = viewModel::deleteModel,
-                            )
-                            AppDestination.Workspace -> LaiWorkspaceScreen(
-                                state = state,
-                                onGrantWorkspace = viewModel::grantWorkspace,
-                                onRevokeWorkspace = viewModel::revokeWorkspace,
-                                onRefreshWorkspace = viewModel::refreshWorkspace,
-                                onScanWorkspace = viewModel::scanWorkspaceModels,
-                            )
-                            AppDestination.Providers -> LaiProvidersScreen(state = state)
                             AppDestination.Settings -> SettingsScreen(state, viewModel)
                         }
                     }
@@ -658,6 +632,7 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
                 detail = "Internet is used only for the signed model catalog and explicit downloads. Prompts, screens, generations and telemetry stay on this device.",
             )
         }
+        item { ProviderSettingsCard(state) }
         item {
             Card {
                 Row(
@@ -777,6 +752,35 @@ private fun SettingsScreen(state: MainUiState, viewModel: MainViewModel) {
             }
         }
         state.notice?.let { notice -> item { StatusCard("Status", notice) } }
+    }
+}
+
+@Composable
+private fun ProviderSettingsCard(state: MainUiState) {
+    Card {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("AI provider", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "Provider and backend details live here, not in Chat. Local CPU remains the safe default; cloud providers require explicit future configuration.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Current route: ${state.schedulerDetail}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                state.runtimeDetail.ifBlank { "Runtime provider status unavailable" },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Cloud providers: not configured • no implicit cloud fallback",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
