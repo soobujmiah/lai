@@ -76,3 +76,7 @@ Removed standalone Models, Workspace and Provider destinations from navigation. 
 ### 2026-08-21 update — Chat action/progress cleanup
 
 Chat now shows a single compact progress bar during generation/cancellation. The large chat header and duplicate thinking progress card were removed, and New/History moved to the top app bar.
+
+### 2026-08-21 update — Vulkan qualification failed on Adreno 825
+
+The `0.6.217-debug` Vulkan qualification build loaded the model on `llama-vulkan`, but generation still crashed inside `vulkan.adreno.so` at `vkCmdBindPipeline+0x4` during ggml graph execution. The warptile-clamp patch did not solve the Redmi Turbo 4 Pro driver failure. CPU remains the only device-validated backend; Vulkan must stay opt-in/unqualified and should not be claimed working.

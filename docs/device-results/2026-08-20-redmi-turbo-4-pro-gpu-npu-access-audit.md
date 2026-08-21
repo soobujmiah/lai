@@ -160,3 +160,16 @@ Status changes:
   viable by MLC; (2) scope ggml-hexagon integration (backend already present in LAI's
   pinned llama.cpp ad1de39) now that the door is demonstrably open; (3) OpenCL remains
   a separate locked wall (linker trace is app-side evidence), dormant.
+
+## 2026-08-21 qualification result — warptile clamp did not fix Adreno Vulkan
+
+Test artifact: LAI `0.6.217-debug`, built from PR #16 with `validated_accelerators=llama-vulkan`, `ggml-vulkan-adreno-warptile-clamp.patch`, `ggml-vulkan-skip-mmvq.patch`, and the existing Adreno workaround environment.
+
+Observed on Redmi Turbo 4 Pro (`25053RT47C`, SM8735 / Adreno 825):
+
+- Model load selected `llama-vulkan` and completed (`~2.6–3.3 s` load in the supplied diagnostics/logs).
+- First generation produced no tokens and the native crash handler recorded `SIGSEGV` in Qualcomm's proprietary `vulkan.adreno.so`.
+- Crash signature remains `vkCmdBindPipeline+0x4` while ggml/llama is executing the graph (`ggml_backend_graph_compute_async` → `llama_decode`).
+- A later attempt stalled at `AWAITING_FIRST_TOKEN` and LAI attempted CPU fallback, but the process still carried the native crash evidence.
+
+Conclusion: the upstream warptile clamp is now integrated but **does not qualify Vulkan on this Adreno 825 driver**. Vulkan remains unqualified/experimental and must not be shipped as default. The only safe shipped route remains CPU. Re-test Vulkan only after a Qualcomm/Xiaomi driver OTA, a major upstream ggml-vulkan change beyond PR #25735, or a different non-ggml Vulkan backend.
