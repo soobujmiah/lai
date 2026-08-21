@@ -1,12 +1,13 @@
 package dev.lai.runtime.inference
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -48,7 +49,7 @@ class NativeInferenceEngine : InferenceEngine {
             return@channelFlow
         }
         val cancelled = AtomicBoolean(false)
-        val worker = kotlinx.coroutines.CoroutineScope(Dispatchers.Default).launch {
+        val worker = CoroutineScope(Dispatchers.Default).launch {
             try {
                 NativeBindings.generate(
                     handle,
@@ -78,9 +79,10 @@ class NativeInferenceEngine : InferenceEngine {
                 if (!cancelled.get()) trySend(InferenceEvent.Failed(e.message ?: "Generation failed"))
             }
         }
-        awaitCancellation()
-        worker.cancel()
-        awaitClose { cancelled.set(true); worker.cancel() }
+        awaitClose {
+            cancelled.set(true)
+            worker.cancel()
+        }
     }.buffer(TOKEN_BUFFER_CAPACITY)
 
     override suspend fun countTokens(conversation: List<ConversationMessage>): Result<Int> = withContext(Dispatchers.Default) {
