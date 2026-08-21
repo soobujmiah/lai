@@ -44,10 +44,3 @@ fun LaiModelsScreen(
         }
     }
 }
-
-data class LaiModelUi(
-    val id: String,
-    val name: String,
-    val detail: String,
-    val status: String,
-)
