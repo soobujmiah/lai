@@ -2,7 +2,7 @@
 
 **Directive:** *Documentation first, implementation later.* This `docs/` is the **permanent product, architecture, engineering, UX, security, tooling, and roadmap reference** — a future agent shall start from here without history.
 
-**Source of truth:** Current repository (`main` @ `17ad75b` + `c4732fe` + `0263d30`), `PROJECT_STATE.md`, and SM8735 device evidence (0.1.139 `16–22 tok/s`).
+**Source of truth:** Current repository, `PROJECT_STATE.md`, and SM8735 device evidence. Architecture and accepted ADRs constrain implementation.
 
 ## Core
 
@@ -11,6 +11,14 @@
 *   **CURRENT_STATUS.md** — honest `Implemented / Scaffold / Planned` with evidence states
 *   **ARCHITECTURE.md** — `16`-module graph, trust boundaries, data flow, native JNI/C++ boundary (`batch 32`, `little 7 → big 0-3`)
 *   **NPUHUB_VS_LAI_DIFF.md** — private `NpuHub` vs `lai` gap (`9` subsystems to port vs `5` LAI moats)
+
+## GGEN integration
+
+* **architecture/GGEN_INTEGRATION_BOUNDARY.md** — ownership and cross-repository boundary
+* **architecture/GGEN_CAPABILITY_CONTRACT.md** — LAI-side semantic mirror of the GGEN capability protocol
+* **architecture/GGEN_TOOL_CAPABILITY_MAP.md** — capability-to-runtime/tool mapping and first-adapter sequence
+
+GGEN remains an independent user-facing Creative & Document Studio. LAI is an optional provider/runtime. No GGEN source dependency on LAI internals is permitted.
 
 ## Product & Design
 
