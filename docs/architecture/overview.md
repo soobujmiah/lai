@@ -1,88 +1,137 @@
 # LAI architecture overview
 
-Last audited: 2026-08-17 · Source baseline: `c53ec20`
+**Last audited:** 2026-08-24  
+**Status:** Canonical implementation-state overview
 
 ## Purpose
 
-LAI is one Android application for private, Bangla-first, on-device inference and consent-gated Android automation. The architecture separates pure contracts and decisions from Android authority, native inference, orchestration, and UI composition. This document is an audited overview; detailed existing design remains in [`../ARCHITECTURE.md`](../ARCHITECTURE.md), [`../MODULES.md`](../MODULES.md), and the accepted ADRs in [`../adr/`](../adr/).
+LAI is the Android AI/device execution runtime: local inference, runtime model lifecycle, device-aware execution, cloud/custom provider connectivity, privileged Android tools, and bounded agent execution. GGEN is an independent consumer/product layer; LAI does not become a GGEN dependency or creative/document engine.
+
+This overview distinguishes current implementation from roadmap intent. Source code and validation evidence are authoritative for maturity.
 
 ## Responsibilities and layers
 
-```mermaid
-flowchart TB
-  APP[app: Compose + composition root]
-  CORE[core: contracts, policy, scheduler, model]
-  PLATFORM[platform: download, audit, device, accessibility, workspace, shizuku]
-  RUNTIME[runtime: llama, OCR, orchestrator]
-  PLUGINS[plugins: API]
-  APP --> CORE
-  APP --> PLATFORM
-  APP --> RUNTIME
-  APP --> PLUGINS
-  PLATFORM --> CORE
-  RUNTIME --> CORE
-  PLUGINS --> CORE
+```text
+App / UI / composition root
+        |
+        +-- Core contracts + policy + scheduler + model metadata
+        |
+        +-- Platform authority
+        |     download · audit · device · Accessibility · Shizuku · workspace
+        |
+        +-- Runtime
+        |     llama.cpp · OCR · orchestration · future accelerator adapters
+        |
+        +-- Provider/runtime integration
+              local execution · cloud/custom adapters · routing/failover
+
+        +-- Tool / Agent authority
+              typed tools · permission/confirmation · bounded execution · evidence
+
+        <------ versioned capability contract ------>
+                         GGEN
 ```
 
-- **Core:** serializable contracts and pure decisions; no Android authority, transport, JNI, or vendor SDK.
-- **Platform:** narrowly owned Android capabilities and persistence boundaries.
+### Current implementation layers
+
+- **Core:** serializable contracts, policy, scheduler and model decisions.
+- **Platform:** Android authority and persistence boundaries.
 - **Runtime:** replaceable inference/OCR/orchestration implementations.
-- **Plugins:** versioned local-only contract, not a plugin loader or manager.
-- **App:** sole composition root, lifecycle owner, and Compose product shell.
+- **Tools:** typed, policy-gated Android automation capabilities.
+- **App:** composition root and product shell.
+
+Future layers must not be described as implemented until source and evidence establish them.
+
+## Canonical LAI responsibilities
+
+LAI owns:
+
+- local AI execution;
+- model lifecycle for runtime models;
+- CPU/GPU/NPU backend selection and qualification;
+- device/thermal/memory-aware scheduling;
+- cloud/custom provider adapters and connectivity;
+- provider routing/retry/failover;
+- runtime streaming/cancellation semantics;
+- Android tool registry and execution authority;
+- Accessibility/Shizuku/privileged-operation policy;
+- bounded agent planning/execution;
+- runtime security, evidence and audit;
+- runtime diagnostics and secrets.
+
+GGEN owns user-facing creative/document semantics and consumes LAI through a stable capability contract.
 
 ## Principal interfaces
 
-- `InferenceEngine` — load, token count, streamed generation, capabilities, close.
-- `OcrEngine` — bitmap recognition behind a replaceable adapter.
-- `ToolCall` / `ToolResult` / `ToolDefinition` — typed agent protocol.
-- `AutomationCommand` — bounded Accessibility operations.
-- `PrivilegedCommand` — named elevated operation, never raw shell.
-- `WorkspaceSettingsCodec` / workspace contracts — bounded external configuration and discovery decisions.
-- `LaiPlugin` — local-only plugin API v1 contract.
+Current interfaces include `InferenceEngine`, `OcrEngine`, `ToolCall`, `ToolResult`, `ToolDefinition`, `AutomationCommand`, `PrivilegedCommand`, workspace contracts and `LaiPlugin`.
 
-## Dependencies
+A generic cloud gateway/provider manager is an architectural target, not proof of current implementation.
 
-Compile-time direction is inward toward `core`. `app` may compose all reviewed public APIs. Platform modules cannot depend on app or runtime; runtime modules implement core contracts; only `platform:download` owns network transport. The exact audited graph is in [`module-map.md`](module-map.md).
+## Current maturity snapshot
+
+- **CPU local inference:** implemented and device-validated baseline.
+- **Vulkan/GPU acceleration:** experimental/qualification-blocked where current device evidence requires it; do not claim production readiness from source presence.
+- **QNN/NPU:** planned/experimental only where source and device evidence establish the exact state; no blanket production claim.
+- **OCR:** runtime contract/adapter exists; production completeness depends on the specific engine/model/device evidence.
+- **Android Accessibility/Shizuku authority:** implemented capabilities exist, subject to permission/policy state.
+- **Agent:** bounded/one-shot execution exists; autonomous multi-step agent runtime remains planned.
+- **Plugin API:** contract exists; loader/installation/sandbox/lifecycle management is not implied.
+- **Cloud/custom providers, generic AI Gateway, remote server, RAG, workstation/Linux runtime:** roadmap unless separately proven by source and evidence.
 
 ## Runtime lifecycle
 
-1. `LaiApplication` creates `AppContainer`.
-2. `AppContainer` composes repositories, policies, runtime adapters, scheduler, and authority gateways.
-3. `MainViewModel` observes Accessibility/Shizuku state and coordinates product operations.
-4. Models are explicitly downloaded/imported, verified, then explicitly loaded.
-5. Inference streams local events; optional tool proposals are parsed only after generation completes.
-6. A trusted UI review and durable audit approval precede consequential tool execution.
-7. Native sessions close on explicit unload, ViewModel teardown, or critical memory pressure.
-
-## Data flow
-
-Prompts and generations flow from Compose to `InferenceEngine` and remain local. Public catalog/model bytes may flow inbound only through `platform:download`. Screen data flows from Accessibility to bounded immutable structures or in-memory bitmaps. Tool audit records contain fingerprints and outcomes, not arguments or output content. User-owned workspace access uses an explicitly granted SAF tree.
+1. Compose/application creates the runtime container.
+2. Policies, repositories, schedulers and authority gateways are composed.
+3. Models are explicitly imported/downloaded, verified and loaded.
+4. Inference produces typed streamed events where supported.
+5. Tool proposals are treated as untrusted model output.
+6. Permission/confirmation and audit policy precede consequential tool execution.
+7. Runtime sessions close on explicit unload, lifecycle teardown or critical memory pressure.
 
 ## Security boundaries
 
-The trust boundaries are model output, screen content, downloaded artifacts, SAF documents, Accessibility authority, Shizuku authority, plugin input, native code, and CI secrets. Policy is fail-closed: unavailable authority or failed validation produces a typed failure, not a broader fallback. See [`security-architecture.md`](security-architecture.md).
+Trust boundaries include model output, screen content, downloaded artifacts, SAF documents, Accessibility authority, Shizuku authority, plugin input, native code and CI secrets. Fail-closed behavior is required: missing authority or failed validation yields a typed failure, never broader implicit authority.
 
-## Failure behavior
+Credentials/secrets remain inside LAI's runtime security boundary and must not leak into GGEN contracts, project files or ordinary logs.
 
-- Missing model/backend: inference load/generation fails visibly.
-- Missing Accessibility/Shizuku: corresponding tool is denied.
-- Invalid model proposal: rejected before authority.
-- Corrupt audit: proposal mode disabled.
-- Invalid model/catalog/workspace data: rejected or safe defaults used.
-- Missing OCR model: explicit model-required error.
+## GGEN integration boundary
 
-## Testing strategy
+The shared contract is semantic and versioned. GGEN may request capabilities such as:
 
-Pure contracts, policy, scheduler, catalog, plugin manifest, audit, and format detection have unit tests. CI runs source boundaries, coverage ratchets, Android unit tests, lint, native build, and APK assembly. Physical evidence currently covers the Qwen CPU baseline and selected app flows on Redmi Turbo 4 Pro; it does not establish production readiness.
+- `text.generate`
+- `vision.analyze`
+- `ocr.extract`
+- `image.generate`
+- `image.edit`
+- `embedding.create`
+- `document.transform`
+- `tool.execute`
+- `agent.run`
 
-## Extension strategy
+LAI owns execution authority and evidence; GGEN owns user intent, creative UX and result integration. Provider SDKs, secrets and internal runtime types must not cross into the GGEN contract.
 
-Add new behavior behind core contracts and isolated adapters. A second inference provider should precede a generic provider manager. New Android authority requires a dedicated platform owner, explicit permission/policy, tests, documentation, and an ADR. Roadmap systems such as AI Gateway, localhost server, project/workstation, RAG, and plugin management are not present and must not be inferred from these seams.
+`LOCAL_ONLY` must never silently leave the device. LAI owns retry/failover and must respect privacy, capability, cost, side-effect and idempotency constraints.
 
-## Current architectural constraints
+## Testing and evidence
 
-- `MainViewModel` is a large orchestration surface and needs decomposition before workstation-scale UI.
-- Only llama CPU is real; Vulkan and QNN are not implemented.
-- Agent execution is one-shot, not a multi-step autonomous loop.
-- Plugin API exists, but discovery, installation, sandboxing, and lifecycle management do not.
-- No AI Gateway, localhost inference server, remote provider, project system, diff/rollback engine, terminal, Git workbench, or Linux runtime exists.
+Unit/integration tests cover pure contracts, policy, scheduler and applicable runtime components. Hardware-dependent claims require device evidence. Evidence should progress through:
+
+`API_AVAILABLE → BACKEND_AVAILABLE → BACKEND_ACCEPTED → EXECUTION_COMPLETED → DEVICE_VALIDATED → PERFORMANCE_MEASURED`
+
+The presence of an implementation or backend is never sufficient to claim validated hardware execution.
+
+## Documentation rule
+
+Every roadmap or research document must preserve the distinction:
+
+`IMPLEMENTED / VALIDATED / EXPERIMENTAL / PLANNED / BLOCKED / NOT_STARTED`.
+
+If documentation conflicts with source or evidence, reconcile the canonical documentation before extending implementation. Non-trivial implementation must follow current Android/professional/open-source benchmark research and the cross-project ownership boundary.
+
+## Extension rule
+
+Add behavior behind core contracts and isolated adapters. New Android authority requires a dedicated platform owner, explicit permission/policy, tests, documentation and an ADR. Do not introduce duplicate provider registries, routing/failover systems, model runtimes, tool authorities or runtime audit systems in GGEN.
+
+## Completion criterion
+
+LAI architecture documentation is aligned when each capability has one canonical owner, maturity is evidence-backed, GGEN integration uses a stable contract, LAI remains independently useful as an Android AI runtime, and no roadmap claim is presented as implemented without source/test/device evidence.
