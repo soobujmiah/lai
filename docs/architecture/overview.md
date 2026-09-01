@@ -88,6 +88,15 @@ A generic cloud gateway/provider manager is an architectural target, not proof o
 6. Permission/confirmation and audit policy precede consequential tool execution.
 7. Runtime sessions close on explicit unload, lifecycle teardown or critical memory pressure.
 
+## Data flow
+
+- Model acquisition: explicit user import/download → verification → private storage → explicit load.
+- Inference: app/UI request → core policy/scheduler → selected runtime backend (CPU/GPU/NPU) → typed streamed events back to the app.
+- Tool proposal: untrusted model output → permission/confirmation and audit policy → bounded tool/agent execution → typed result.
+- GGEN integration: GGEN requests a capability through the versioned contract (e.g. `text.generate`, `tool.execute`) → LAI executes with its own authority and evidence → typed result returned to GGEN.
+
+`LOCAL_ONLY` data must never leave the device; provider routing/retry/failover applies only to explicitly permitted cloud/custom paths.
+
 ## Security boundaries
 
 Trust boundaries include model output, screen content, downloaded artifacts, SAF documents, Accessibility authority, Shizuku authority, plugin input, native code and CI secrets. Fail-closed behavior is required: missing authority or failed validation yields a typed failure, never broader implicit authority.
