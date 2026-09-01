@@ -2,9 +2,6 @@ package dev.lai.runtime.inference
 
 import kotlinx.coroutines.flow.Flow
 
-/** Evidence state for a registered provider. Only MEASURED providers are exposed as usable. */
-enum class ProviderEvidence { UNQUALIFIED, MEASURED, FAILED }
-
 data class ProviderDescriptor(
     val id: String,
     val backends: Set<BackendDescriptor>,
