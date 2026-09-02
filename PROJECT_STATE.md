@@ -1,9 +1,9 @@
 # LAI Project State
 
-Snapshot date: 2026-08-19 (initialization + CI repair + diagnostics + signing rule complete)
+Snapshot date: 2026-09-03 (KleidiAI + Vulkan warptile-clamp device qualification: crash confirmed, not fixed)
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime` · Public repo
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
-Head: **`e80bd1e`** · CI: **#172 green** (signed release APK + R8 mapping; debug skipped by rule) · **187 unit tests** · 16 Gradle modules
+Head: **`c870b83`** · CI: **#295 green** (signed release APK + R8 mapping; debug skipped by rule) · **~192 `@Test` annotations** (187 at the 2026-08-19 snapshot; counted by grep this session, not re-verified against the CI-reported figure) · 16 Gradle modules
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase
 > 0–14 roadmap and accepted ADRs govern architecture.
@@ -21,7 +21,7 @@ Head: **`e80bd1e`** · CI: **#172 green** (signed release APK + R8 mapping; debu
 |---|---|---|---|
 | Inference contract | Build verified | `InferenceEngine` (load / streaming `Flow<InferenceEvent>` / capabilities / context size) + `GenerationConfig` + `GenerationMetrics` (honest `evaluatedPromptTokens`) | — |
 | llama.cpp CPU adapter | **Device validated** | `llama_session.{h,cpp}` shared session: KV-prefix reuse (~0.6 s steady TTFT), chat template, cancellation, thermal thread limit, `LAI-llama` µs stall tracing. Decode 2.5–15 tok/s; prefill 10–20 tok/s | — |
-| **Vulkan (GPU) adapter** | Implemented; **device qualification pending** | Real `VulkanBackend::open()` with full layer offload (`LLAMA_LOAD_MODE_NONE` for GPU, mmap kept for CPU); IGPU device probe (Adreno 825 is integrated); `GGML_VK_DISABLE_COOPMAT/_2` + **`GGML_VK_DISABLE_MMVQ`** for the Adreno driver's confirmed failing shader `mul_mat_vec_q4_k_f32_f32`; `std::cerr` → `LAI-llama` logcat + in-app capture of the failing pipeline name; auto **CPU fallback** on accelerator failure/stall (fail-closed, no acceleration claim until device-validated) | **Driver crash unresolved** (SIGSEGV `vkCmdBindPipeline` MUL_MAT bind, release-183 addr2line); Vulkan stays opt-in; GPU qualification moved to the OpenCL track below |
+| **Vulkan (GPU) adapter** | Implemented; **device-validated CRASH — not viable on this driver** | Real `VulkanBackend::open()` with full layer offload (`LLAMA_LOAD_MODE_NONE` for GPU, mmap kept for CPU); IGPU device probe (Adreno 825 is integrated); `GGML_VK_DISABLE_COOPMAT/_2` + `GGML_VK_DISABLE_MMVQ` + (2026-09-02) upstream warptile clamp PR #27726 (`ggml-vulkan-clamp-warptile.patch`) for the Adreno driver's confirmed failing shaders; `std::cerr` → `LAI-llama` logcat + in-app capture of the failing pipeline name; auto **CPU fallback** on accelerator failure/stall (fail-closed, no acceleration claim until device-validated) | **2026-09-03 device evidence (`docs/device-results/2026-09-03-redmi-turbo-4-pro-vulkan-warptile-clamp-crash.md`): the warptile clamp did NOT fix the crash.** `lai-release-292` loaded the model cleanly on `Vulkan0` and completed prefill (93/93 tokens, 11.5 tok/s), then SIGSEGV'd in `vkCmdBindPipeline` (`vulkan.adreno.so`) on the first decode — same crash site as every prior report, just later in the pipeline. Mitigation lever spent; do not stack another speculative Vulkan patch without new upstream evidence. Vulkan stays opt-in/non-default; **NPU/QNN (Phase 3) is now the next acceleration priority**, ahead of the OpenCL track below. Also found: on this crash the Compose chat UI hangs silently on an empty "Stop" bubble with no error surfaced — open UX bug, independent of the backend decision |
 | **Adreno OpenCL track (GPU primary path)** | Implemented; **device qualification pending** | llama.cpp's Qualcomm-maintained OpenCL backend compiled into `liblai_runtime.so` (Adreno-optimized kernels embedded); Khronos headers + ICD loader fetched by immutable SHA on CI, ICD loader linked statically (no binaries committed); `OpenCLBackend` probes `GPUOpenCL`; catalog rev 5 declares `llama-opencl` fallback; `model_params.devices` pinned per backend | **Qualification build** (`validated_accelerators=llama-opencl`) + device evidence in `docs/device-results/`; record tok/s and thermal if generation succeeds |
 | Backend scheduler | Device validated (CPU) | `InferenceScheduler`: evidence gates — accelerators need `DEVICE_VALIDATED` (granted per build via `-Plai.validatedAccelerators`, default empty = CPU-only); memory/battery/thermal admission; model catalog declares compatible backends (rev 5: `llama-cpu` preferred; `llama-opencl` + `llama-vulkan` fallbacks) | — |
 | Rolling context window / Bangla pass / thermal governor | Build verified | `ContextWindowPolicy`, tuned bilingual system prompt + repetition penalty, closed-loop thermal governor (min 2 threads) | Device re-validation |
@@ -190,30 +190,37 @@ lai/
 
 ## 4. Next Logical Implementation Phase
 
-### 4.1 Immediate (device-qualification loop for GPU — this is THE open gate)
-1. **Install `lai-release-172`+ on the Redmi Turbo 4 Pro** (updates over previous builds now —
-   same cert `D3:A6:6C:E0:…`). Confirm the update succeeds in place (the signing fix).
-2. **Retest GPU generation** (MMVQ disabled). Expected logcat: `offloaded 28/29 layers to GPU`;
-   generation should run on `Vulkan0` (KV cache already lands there).
-   - If it **works**: record device evidence in `docs/device-results/2026-08-19-redmi-turbo-4-pro-vulkan.md`
-     (decode/prefill tok/s, thermal), mark GPU row Device Validated, and optionally make
-     `llama-vulkan` the catalog `preferredBackendId`.
-   - If a **different shader fails**: the in-app capture names it (`Generation failed:
-     … Compute pipeline creation failed for <shader>`); disable that path or bump the pinned
-     llama.cpp to a commit with the Adreno fix.
-   - If GPU is fundamentally unstable: keep CPU as the default (`validated_accelerators=cpu` /
-     catalog preferred `llama-cpu`) and log the decision.
-3. **Tag `v0.9.8`** (or `v0.10.0`) once GPU/CPU is settled → production-signed release via the
-   secrets (this is the only path to `PRODUCTION_SIGNED=true`).
+### 4.1 GPU qualification loop — CLOSED, 2026-09-03 (result: crash confirmed, not fixed)
+
+The device-qualification loop that used to be "the open gate" is done: `lai-release-292`
+(warptile-clamp build) was installed and exercised end-to-end on the Redmi Turbo 4 Pro —
+model load succeeded on `Vulkan0`, prefill completed, and the first decode step SIGSEGV'd in
+`vkCmdBindPipeline` (`vulkan.adreno.so`). Full evidence in
+`docs/device-results/2026-09-03-redmi-turbo-4-pro-vulkan-warptile-clamp-crash.md`. Consequences:
+
+- Do not attempt another speculative Vulkan patch without new upstream evidence targeting this
+  exact call site — the mitigation lever (warptile clamp, PR #27726) is spent.
+- Keep `llama-vulkan` opt-in/non-default; CPU (`llama-cpu`) remains the shipped default.
+- **QNN/HTP (NPU) Phase 3 is now the next acceleration priority** (see 4.2).
+- Fix the silent-hang UX bug found during this test: on a native crash mid-generation, the
+  Compose chat UI is left showing an empty response bubble with "Stop" still active and no
+  error surfaced. `MainViewModel` should detect the lost native session (or key off
+  `LaiApplication`'s "process start" signal) and mark any in-flight generation failed on
+  restart.
+- Once NPU direction is decided (or explicitly deferred), tag `v0.9.8`/`v0.10.0` for a
+  production-signed release via the `ANDROID_KEYSTORE_*` secrets (the only path to
+  `PRODUCTION_SIGNED=true`).
 
 ### 4.2 Next features (in roadmap order, each needs a PR + device evidence)
 1. **Bangla OCR real model** — unblock the owner's dataset/licence decision; then wire the
    engine into `BanglaOcrService` (contract + pipeline already scaffolded).
-2. **GPU qualification artifacts** — `llama-vulkan` benchmark + thermal record; Vulkan
-   `preferredBackendId` flip after evidence.
+2. **Chat UI crash-recovery fix** — surface a failure state instead of an indefinite silent
+   hang when a native generation crash restarts the process (found 2026-09-03, see 4.1).
 3. **QNN/HTP (NPU) Phase 3** — isolated adapter, converted DLC, licensed QAIRT CI. Boundary
-   only, no code today.
-4. Product backlog from `docs/ROADMAP.md`: autonomous multi-step tool loop (foreground
+   only, no code today; now the priority acceleration track after the Vulkan crash result.
+4. **Adreno OpenCL track** — still pending its own qualification build per
+   `docs/HANDOFF-2026-08-20-acceleration-sprint.md`; unaffected by the Vulkan result.
+5. Product backlog from `docs/ROADMAP.md`: autonomous multi-step tool loop (foreground
    binding + loop limits), RAG/STT/TTS plugins, encrypted vector DB — after runtime stability
    is proven.
 
