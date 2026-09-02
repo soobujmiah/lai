@@ -101,21 +101,24 @@ path (`docs/backend/snapdragon/README.md`) uses a public Docker image,
 OpenCL SDK + CMake. Two open items before any CI wiring can start, both requiring Sobuj's
 input, not further research:
 
-1. **Confirm the Docker image is actually pullable anonymously from a GitHub Actions runner**
-   (no login/EULA click-through baked into the pull itself) — this needs an actual `docker
-   pull` test from a runner, not an assumption. If it requires auth, the fallback is a manual
-   Hexagon SDK download (Qualcomm ID + EULA, "Community Edition 6.6 or later" per upstream's
-   Windows notes) uploaded once as a private release asset or repo secret, which is a licensing
-   click-through only a human can do.
-2. **Runner cost/time budget**: the toolchain image bundles a full NDK + Hexagon SDK + OpenCL
-   SDK — likely a multi-GB pull on every CI run unless cached. Needs a decision on whether to
-   accept that cost per-build, add a cache step, or restrict Hexagon builds to explicit
-   `workflow_dispatch` (matching the existing `validated_accelerators` opt-in pattern used for
-   Vulkan) rather than every push.
+1. ~~Confirm the Docker image is actually pullable anonymously from a GitHub Actions
+   runner~~ — **checked directly, not assumed.** Requested an anonymous GHCR token
+   (`ghcr.io/token?scope=repository:snapdragon-toolchain/arm64-android:pull`) and fetched the
+   `v0.7` manifest with it: `HTTP 200`, valid OCI image index, no login/EULA gate on the pull
+   itself. **This item is resolved — no auth blocker exists for the Docker path.**
+2. **Runner cost/time budget (still open, needs Sobuj)**: measured the actual `linux/amd64`
+   manifest (the platform GitHub-hosted runners use) — **11 layers, ~2.42 GB compressed.** That
+   is a real per-run cost if pulled fresh every time. Needs a decision: accept it per-build,
+   add a Docker layer cache step (GitHub Actions supports this), or restrict Hexagon builds to
+   explicit `workflow_dispatch` only (matching the existing `validated_accelerators` opt-in
+   pattern already used for Vulkan) so it's never pulled on ordinary pushes.
 
 ## 4. Proposed next steps (ordered)
 
-1. **Sobuj decision**: Docker-image path vs. manual SDK secret upload (item 3.1 above).
+1. **Sobuj decision**: the Docker-image path is now confirmed viable (item 3.1, resolved) and
+   is the recommended default over a manual SDK secret upload — the open call is narrower now:
+   accept the ~2.42 GB pull cost per Hexagon-flagged run, add caching, or gate it to explicit
+   `workflow_dispatch` (item 3.2).
 2. Add `HEXAGON_SDK_ROOT`/`HEXAGON_TOOLS_ROOT` wiring to
    `runtime/llama/src/main/cpp/CMakeLists.txt` and a new
    `scripts/ci/fetch_hexagon_sdk.sh` (or Docker-based CI job step) parallel to the existing
