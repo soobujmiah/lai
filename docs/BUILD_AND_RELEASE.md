@@ -2,7 +2,7 @@
 
 ## Why no Gradle wrapper JAR?
 
-The repository is source-only. `gradle-wrapper.jar`, Android SDK/NDK, CMake, QAIRT/QNN SDKs, APKs, and models are not committed. GitHub Actions obtains Gradle 8.13 with `gradle/actions/setup-gradle` and Android tools with `sdkmanager`.
+The repository is source-only. `gradle-wrapper.jar`, Android SDK/NDK, CMake, QAIRT/QNN SDKs, APKs, and models are not committed. GitHub Actions obtains Gradle 9.5.0 with `gradle/actions/setup-gradle` and Android tools with `sdkmanager`.
 
 ## Workflow triggers
 
