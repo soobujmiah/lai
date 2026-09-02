@@ -20,7 +20,7 @@ actual=$(git -C "$destination" rev-parse HEAD)
 # LAI local patch(es) for the pinned llama.cpp, applied on top of the immutable commit.
 # See the patch files for what/why. `patch` is available on the GitHub ubuntu runners.
 patch_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for patch_file in "$patch_dir"/ggml-vulkan-skip-mmvq.patch; do
+for patch_file in "$patch_dir"/ggml-vulkan-skip-mmvq.patch "$patch_dir"/ggml-vulkan-clamp-warptile.patch; do
   [[ -f "$patch_file" ]] || continue
   echo "Applying LAI patch: $(basename "$patch_file")"
   (cd "$destination" && patch -p1 --forward < "$patch_file")
