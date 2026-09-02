@@ -56,9 +56,11 @@ Process 475 died; Android restarted the app (`LaiApplication onCreate (process s
 
 Per `docs/HANDOFF-2026-08-20-acceleration-sprint.md`'s own ordering: the warptile-clamp mitigation lever is now spent. Do not stack another speculative Vulkan patch without new upstream evidence that specifically addresses this call site. **NPU/QNN (Phase 3) becomes the next priority track.**
 
-## Secondary finding: silent hang on native crash
+## Correction: no persisted UI hang (retracts this doc's earlier draft claim)
 
-When the native process crashes mid-generation, the Compose chat UI is left showing an empty assistant bubble with the **Stop** button still active — chat history persists across the crash/restart (giving the illusion of continuity), but no error or crash indicator is ever surfaced to the user. A user hitting this crash today sees an indefinite hang, not a failure message. Worth a follow-up UX fix independent of the Vulkan/NPU decision: `MainViewModel` should detect the process having lost its native session (or use `Application.onCreate`'s "process start" signal) and mark any in-flight generation as failed on restart.
+The screenshot taken immediately after the crash showed an empty assistant bubble with **Stop** still active, which this doc's first draft mischaracterized as a "silent hang" surviving the crash/restart. A live recheck of the same device state minutes later, after the process had fully restarted, showed a clean chat screen with no stray message and no stuck button.
+
+Tracing `MainViewModel.persistChat()` explains why: it is only invoked on a definite outcome (reply completed, reply failed, or a canned notice), and it filters out blank-text messages before writing to disk. A native SIGSEGV kills the process before any such Kotlin-level callback can run, so **neither the user's message nor the empty placeholder bubble was ever persisted** — the doc-comment on `persistChat()` states this is intentional ("a process death never loses more than the message currently streaming"). What the earlier screenshot captured was the doomed process's last in-memory frame, not a surviving app-level bug. No UX fix is warranted here; this section is left in the doc as a record of the correction rather than deleted.
 
 ## Status transition
 

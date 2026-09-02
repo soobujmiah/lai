@@ -202,11 +202,12 @@ model load succeeded on `Vulkan0`, prefill completed, and the first decode step 
   exact call site — the mitigation lever (warptile clamp, PR #27726) is spent.
 - Keep `llama-vulkan` opt-in/non-default; CPU (`llama-cpu`) remains the shipped default.
 - **QNN/HTP (NPU) Phase 3 is now the next acceleration priority** (see 4.2).
-- Fix the silent-hang UX bug found during this test: on a native crash mid-generation, the
-  Compose chat UI is left showing an empty response bubble with "Stop" still active and no
-  error surfaced. `MainViewModel` should detect the lost native session (or key off
-  `LaiApplication`'s "process start" signal) and mark any in-flight generation failed on
-  restart.
+- A "silent hang" UX bug was suspected from the crash screenshot (empty response bubble, "Stop"
+  still active) but was **retracted after a live recheck**: `MainViewModel.persistChat()` only
+  writes to disk on a definite outcome and drops blank-text messages, so a native SIGSEGV never
+  persists the in-flight exchange at all — the screenshot just caught the doomed process's last
+  frame. No fix needed here; see the correction section in
+  `docs/device-results/2026-09-03-redmi-turbo-4-pro-vulkan-warptile-clamp-crash.md`.
 - Once NPU direction is decided (or explicitly deferred), tag `v0.9.8`/`v0.10.0` for a
   production-signed release via the `ANDROID_KEYSTORE_*` secrets (the only path to
   `PRODUCTION_SIGNED=true`).
@@ -214,13 +215,11 @@ model load succeeded on `Vulkan0`, prefill completed, and the first decode step 
 ### 4.2 Next features (in roadmap order, each needs a PR + device evidence)
 1. **Bangla OCR real model** — unblock the owner's dataset/licence decision; then wire the
    engine into `BanglaOcrService` (contract + pipeline already scaffolded).
-2. **Chat UI crash-recovery fix** — surface a failure state instead of an indefinite silent
-   hang when a native generation crash restarts the process (found 2026-09-03, see 4.1).
-3. **QNN/HTP (NPU) Phase 3** — isolated adapter, converted DLC, licensed QAIRT CI. Boundary
+2. **QNN/HTP (NPU) Phase 3** — isolated adapter, converted DLC, licensed QAIRT CI. Boundary
    only, no code today; now the priority acceleration track after the Vulkan crash result.
-4. **Adreno OpenCL track** — still pending its own qualification build per
+3. **Adreno OpenCL track** — still pending its own qualification build per
    `docs/HANDOFF-2026-08-20-acceleration-sprint.md`; unaffected by the Vulkan result.
-5. Product backlog from `docs/ROADMAP.md`: autonomous multi-step tool loop (foreground
+4. Product backlog from `docs/ROADMAP.md`: autonomous multi-step tool loop (foreground
    binding + loop limits), RAG/STT/TTS plugins, encrypted vector DB — after runtime stability
    is proven.
 
