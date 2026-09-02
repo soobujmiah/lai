@@ -25,7 +25,7 @@ Head: **`c870b83`** · CI: **#295 green** (signed release APK + R8 mapping; debu
 | **Adreno OpenCL track (GPU primary path)** | Implemented; **device qualification pending** | llama.cpp's Qualcomm-maintained OpenCL backend compiled into `liblai_runtime.so` (Adreno-optimized kernels embedded); Khronos headers + ICD loader fetched by immutable SHA on CI, ICD loader linked statically (no binaries committed); `OpenCLBackend` probes `GPUOpenCL`; catalog rev 5 declares `llama-opencl` fallback; `model_params.devices` pinned per backend | **Qualification build** (`validated_accelerators=llama-opencl`) + device evidence in `docs/device-results/`; record tok/s and thermal if generation succeeds |
 | Backend scheduler | Device validated (CPU) | `InferenceScheduler`: evidence gates — accelerators need `DEVICE_VALIDATED` (granted per build via `-Plai.validatedAccelerators`, default empty = CPU-only); memory/battery/thermal admission; model catalog declares compatible backends (rev 5: `llama-cpu` preferred; `llama-opencl` + `llama-vulkan` fallbacks) | — |
 | Rolling context window / Bangla pass / thermal governor | Build verified | `ContextWindowPolicy`, tuned bilingual system prompt + repetition penalty, closed-loop thermal governor (min 2 threads) | Device re-validation |
-| Qualcomm QNN/HTP (NPU) | Planned — no code | Boundary documented only | Licensed QAIRT CI + model conversion (Phase 3) |
+| Hexagon NPU (HTP) | Planned — no code; **scoped 2026-09-03** | SM8735's HTP confirmed **v73** via on-device evidence (`libQnnHtpV73*.so` present, no other version present). Cheaper path identified: upstream's own `ggml-hexagon` backend is already vendored in LAI's pinned llama.cpp commit — runs GGUF directly via the Hexagon SDK, no QNN/QAIRT model conversion needed, compliant with the actual (not just prose) `check_architecture_boundaries.py` vendor-term gate. Full scoping in `docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md`. ADR 0005's original dedicated QAIRT/QNN `runtime:qnn` adapter path remains the fallback if this proves insufficient | Sobuj decision needed: Hexagon SDK CI intake (Docker toolchain image vs. manual SDK secret upload — Qualcomm EULA click-through either way) before any code/build work can start |
 
 ### 1.2 Accessibility Service & Android control
 | Area | Status | Result | Remaining |
@@ -201,7 +201,11 @@ model load succeeded on `Vulkan0`, prefill completed, and the first decode step 
 - Do not attempt another speculative Vulkan patch without new upstream evidence targeting this
   exact call site — the mitigation lever (warptile clamp, PR #27726) is spent.
 - Keep `llama-vulkan` opt-in/non-default; CPU (`llama-cpu`) remains the shipped default.
-- **QNN/HTP (NPU) Phase 3 is now the next acceleration priority** (see 4.2).
+- **Hexagon NPU is now the next acceleration priority, and is scoped** (see 4.2 and
+  `docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md`): SM8735's HTP is confirmed v73, and a
+  cheaper path than ADR 0005's original QAIRT/QNN adapter was found — `ggml-hexagon` is already
+  vendored in LAI's pinned llama.cpp and runs GGUF directly, no model conversion needed. Blocked
+  on a human decision (Hexagon SDK CI intake method), not further research.
 - A "silent hang" UX bug was suspected from the crash screenshot (empty response bubble, "Stop"
   still active) but was **retracted after a live recheck**: `MainViewModel.persistChat()` only
   writes to disk on a definite outcome and drops blank-text messages, so a native SIGSEGV never
@@ -215,8 +219,12 @@ model load succeeded on `Vulkan0`, prefill completed, and the first decode step 
 ### 4.2 Next features (in roadmap order, each needs a PR + device evidence)
 1. **Bangla OCR real model** — unblock the owner's dataset/licence decision; then wire the
    engine into `BanglaOcrService` (contract + pipeline already scaffolded).
-2. **QNN/HTP (NPU) Phase 3** — isolated adapter, converted DLC, licensed QAIRT CI. Boundary
-   only, no code today; now the priority acceleration track after the Vulkan crash result.
+2. **Hexagon NPU (`llama-hexagon`)** — no code today, but scoped: fourth `runtime:llama`
+   backend using upstream's already-vendored `ggml-hexagon` (GGUF-direct, no QNN/QAIRT
+   conversion). Needs a Sobuj decision on Hexagon SDK CI intake before any code/build work.
+   See `docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md`. Now the priority acceleration track
+   after the Vulkan crash result; the original ADR 0005 QAIRT/QNN adapter path stays the
+   fallback if this proves insufficient.
 3. **Adreno OpenCL track** — still pending its own qualification build per
    `docs/HANDOFF-2026-08-20-acceleration-sprint.md`; unaffected by the Vulkan result.
 4. Product backlog from `docs/ROADMAP.md`: autonomous multi-step tool loop (foreground
