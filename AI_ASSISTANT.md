@@ -59,9 +59,9 @@ SKB continuity does not impose a fixed technology template. Select the appropria
 
 ## Implementation workflow
 
-`read → inspect HEAD → contract → implement smallest coherent change → run relevant CI/tests → collect evidence → update PROJECT_STATE/phase docs → review diff → Knowledge Return Review → commit → handoff`
+`read → inspect HEAD → contract → implement smallest coherent change → run relevant CI/tests → collect evidence → update PROJECT_STATE/phase docs → review diff → Knowledge Return Review → commit and push immediately → handoff`
 
-This environment is GitHub-centric. Do not claim local Android/device execution unless actual evidence exists. Builds and CI are authoritative for build verification; the Redmi Turbo 4 Pro is authoritative for physical-device validation.
+This environment is GitHub-centric **for the build/compile step only** — that is a device-health policy choice (avoid CPU/thermal/battery/storage load on Sobuj's phone), not a missing local toolchain: his Termux/PRoot environment has a real local ARM64 native Android toolchain (see `soobujmiah/adt`) and local builds are technically possible when specifically needed. Builds/CI are authoritative for build verification; the Redmi Turbo 4 Pro is authoritative for physical-device validation. Everything other than the build itself — downloading artifacts, installing, launching, using, reading logs, debugging, and fixing source — happens locally on the phone/PRoot setup, which is Sobuj's actual repo workstation, not just a remote-job dispatcher. Do not claim local Android/device execution unless actual evidence exists.
 
 ## Session close — mandatory
 
@@ -72,7 +72,7 @@ Before ending a substantial session:
 3. Update `PROJECT_STATE.md` and relevant phase/architecture documentation.
 4. Record failures, limitations, deferred work, and exact reproduction/verification steps.
 5. Perform the SKB Knowledge Return Review.
-6. Commit/push completed work when authorized.
+6. Commit/push completed work when authorized — **push validated work first**: as soon as a change is actually validated (tests/CI green, or device-validated where that's the relevant bar), commit and push it before starting further work, rather than letting it sit unpushed on the single phone/PRoot working copy where it can be lost.
 7. Record the resulting commit SHA for substantial milestones.
 8. Leave no unexplained dirty changes. If intentionally uncommitted, document why.
 
