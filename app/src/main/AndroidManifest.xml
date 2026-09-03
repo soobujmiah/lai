@@ -25,7 +25,7 @@
          that only exposes it to the vendor sphal namespace, not automatically to the app's default
          linker namespace. uses-native-library is the documented Android mechanism (API 31+) for an
          app to request that bridge explicitly. required="false" keeps this a no-op wherever the
-         library or the mechanism is unavailable -- no install/launch risk, CPU/Vulkan remain
+         library or the mechanism is unavailable: no install/launch risk, CPU/Vulkan remain
          unaffected either way. -->
     <uses-native-library
       android:name="libOpenCL.so"
