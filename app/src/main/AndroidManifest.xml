@@ -18,19 +18,6 @@
     android:theme="@style/Theme.Lai"
     android:usesCleartextTraffic="false">
 
-    <!-- Adreno OpenCL track (docs/HANDOFF-2026-08-20-acceleration-sprint.md,
-         docs/device-results/2026-08-20-redmi-turbo-4-pro-opencl-device-facts.md): the vendor
-         partition declares libOpenCL.so in /vendor/etc/public.libraries.txt (same_process_hal_file,
-         same category as the Adreno EGL/Vulkan libraries this app already loads successfully), but
-         that only exposes it to the vendor sphal namespace, not automatically to the app's default
-         linker namespace. uses-native-library is the documented Android mechanism (API 31+) for an
-         app to request that bridge explicitly. required="false" keeps this a no-op wherever the
-         library or the mechanism is unavailable: no install/launch risk, CPU/Vulkan remain
-         unaffected either way. -->
-    <uses-native-library
-      android:name="libOpenCL.so"
-      android:required="false" />
-
     <activity
       android:name=".MainActivity"
       android:exported="true"
