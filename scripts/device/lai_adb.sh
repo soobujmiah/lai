@@ -83,7 +83,7 @@ cmd_wait_log() {
   local waited=0
   local match
   while (( waited < timeout )); do
-    match=$(adb logcat -d -e "$pattern" 2>/dev/null | tail -1)
+    match=$( (adb logcat -d -e "$pattern" 2>/dev/null || true) | tail -1)
     if [[ -n "$match" ]]; then
       echo "$match"
       return 0
@@ -109,21 +109,31 @@ cmd_state() {
   adb shell dumpsys activity activities 2>/dev/null | grep -E "topResumedActivity|mResumedActivity" | head -2
 }
 
+
+# `adb shell` re-joins its argv into one string and the *remote* shell re-tokenizes it, so a
+# value containing spaces (e.g. a prompt) silently loses its quoting and gets split into
+# separate `am start` arguments (observed: "Say hello" became two stray positional args, one
+# of which `am` misread as a package name). Route through a single pre-quoted remote command
+# string instead of an argv array so values survive intact.
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
 cmd_qualify() {
   local model_id="$1" backend_id="$2" prompt="${3:-}" timeout="${4:-180}"
   cmd_reset
   adb logcat -c
-  local args=(-n "$ACTIVITY" --es qualify_backend "$backend_id" --es qualify_model "$model_id")
+  local remote_cmd="am start -W -n $ACTIVITY --es qualify_backend $(shell_quote "$backend_id") --es qualify_model $(shell_quote "$model_id")"
   if [[ -n "$prompt" ]]; then
-    args+=(--es qualify_prompt "$prompt")
+    remote_cmd+=" --es qualify_prompt $(shell_quote "$prompt")"
   fi
   echo "launching qualification: model=$model_id backend=$backend_id"
-  adb shell am start -W "${args[@]}"
+  adb shell "$remote_cmd"
 
   local waited=0
   local line=""
   while (( waited < timeout )); do
-    line=$(adb logcat -d -e 'LAI-qualify' 2>/dev/null | grep -E 'DONE|DENIED|LOAD_FAILED' | tail -1)
+    line=$( (adb logcat -d -e 'LAI-qualify' 2>/dev/null || true) | (grep -E 'DONE|DENIED|LOAD_FAILED' || true) | tail -1)
     if [[ -n "$line" ]]; then
       break
     fi
