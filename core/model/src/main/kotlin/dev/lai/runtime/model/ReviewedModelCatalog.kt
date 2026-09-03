@@ -90,11 +90,46 @@ object ReviewedModelCatalog {
         banglaQualityValidated = false,
     )
 
-    val all: List<ReviewedModel> = listOf(recommendedCpuBaseline)
+    // Same Qwen 2.5 1.5B Instruct weights as recommendedCpuBaseline, quantized Q4_0 instead of
+    // Q4_K_M specifically to qualify llama-hexagon (NPU): ggml-hexagon's MUL_MAT kernel only
+    // accepts Q4_0/Q4_1/Q8_0/IQ4_NL, not Q4_K (docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md).
+    // An alternate entry, not the recommended baseline -- CPU stays preferred until device
+    // evidence says otherwise for this file too.
+    val hexagonQualificationVariant = ReviewedModel(
+        id = "qwen2.5-1.5b-instruct-q4-0",
+        displayName = "Qwen 2.5 1.5B Instruct (Q4_0)",
+        description = "Same Qwen 2.5 1.5B Instruct weights as the CPU baseline, quantized Q4_0 instead of " +
+            "Q4_K_M specifically to qualify llama-hexagon (NPU): ggml-hexagon's MUL_MAT kernel only accepts " +
+            "Q4_0/Q4_1/Q8_0/IQ4_NL, not Q4_K. Also kernel-compatible with llama-vulkan/llama-opencl. CPU " +
+            "remains the reviewed, preferred backend until device evidence says otherwise; no backend has " +
+            "DEVICE_VALIDATED evidence for this file yet.",
+        sourceRepository = "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+        fileName = "qwen2.5-1.5b-instruct-q4_0.gguf",
+        url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/" +
+            "qwen2.5-1.5b-instruct-q4_0.gguf",
+        sha256 = "dcd819ff094852c38faba6873d8ff0c9d51eadb2844539e52042ae5d647bbfdb",
+        bytes = 1_066_227_232,
+        license = "Apache-2.0",
+        architecture = "qwen2",
+        quantization = "Q4_0",
+        modelFormat = "gguf",
+        contextSize = 4_096,
+        compatibleBackendIds = listOf("llama-cpu", "llama-vulkan", "llama-opencl", "llama-hexagon"),
+        preferredBackendId = "llama-cpu",
+        fallbackBackendIds = listOf("llama-hexagon", "llama-opencl", "llama-vulkan"),
+        estimatedPeakBytes = 1_882_428_328,
+        requiredAbis = listOf("arm64-v8a"),
+        reviewState = setOf(
+            ArtifactReviewState.METADATA_VERIFIED,
+        ),
+        banglaQualityValidated = false,
+    )
+
+    val all: List<ReviewedModel> = listOf(recommendedCpuBaseline, hexagonQualificationVariant)
     val embeddedDocument = ReviewedModelCatalogDocument(
         schemaVersion = 1,
-        revision = 5,
-        generatedAt = "2026-08-20T14:00:00+06:00",
+        revision = 6,
+        generatedAt = "2026-09-03T14:00:00+06:00",
         models = all,
     )
 

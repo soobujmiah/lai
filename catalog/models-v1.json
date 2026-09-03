@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": 5,
-  "generatedAt": "2026-08-20T14:00:00+06:00",
+  "revision": 6,
+  "generatedAt": "2026-09-03T14:00:00+06:00",
   "models": [
     {
       "id": "qwen2.5-1.5b-instruct-q4-k-m",
@@ -35,6 +35,41 @@
         "METADATA_VERIFIED",
         "BUILD_COMPATIBLE",
         "DEVICE_VALIDATED"
+      ],
+      "banglaQualityValidated": false
+    },
+    {
+      "id": "qwen2.5-1.5b-instruct-q4-0",
+      "displayName": "Qwen 2.5 1.5B Instruct (Q4_0)",
+      "description": "Same Qwen 2.5 1.5B Instruct weights as the CPU baseline, quantized Q4_0 instead of Q4_K_M specifically to qualify llama-hexagon (NPU): ggml-hexagon's MUL_MAT kernel only accepts Q4_0/Q4_1/Q8_0/IQ4_NL, not Q4_K. Also kernel-compatible with llama-vulkan/llama-opencl. CPU remains the reviewed, preferred backend until device evidence says otherwise; no backend has DEVICE_VALIDATED evidence for this file yet.",
+      "sourceRepository": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+      "fileName": "qwen2.5-1.5b-instruct-q4_0.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_0.gguf",
+      "sha256": "dcd819ff094852c38faba6873d8ff0c9d51eadb2844539e52042ae5d647bbfdb",
+      "bytes": 1066227232,
+      "license": "Apache-2.0",
+      "architecture": "qwen2",
+      "quantization": "Q4_0",
+      "modelFormat": "gguf",
+      "contextSize": 4096,
+      "compatibleBackendIds": [
+        "llama-cpu",
+        "llama-vulkan",
+        "llama-opencl",
+        "llama-hexagon"
+      ],
+      "preferredBackendId": "llama-cpu",
+      "fallbackBackendIds": [
+        "llama-hexagon",
+        "llama-opencl",
+        "llama-vulkan"
+      ],
+      "estimatedPeakBytes": 1882428328,
+      "requiredAbis": [
+        "arm64-v8a"
+      ],
+      "reviewState": [
+        "METADATA_VERIFIED"
       ],
       "banglaQualityValidated": false
     }
