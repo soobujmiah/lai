@@ -1,5 +1,6 @@
 package dev.lai.runtime
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.Display
@@ -26,6 +27,36 @@ class MainActivity : ComponentActivity() {
                 LaiApp(viewModel = viewModel)
             }
         }
+        handleQualificationIntent(intent)
+    }
+
+    /**
+     * ADB-first accelerator qualification trigger (docs/TESTING.md "Backend qualification").
+     * MainActivity is already the app's only exported, always-present component, so it doubles
+     * as the app-native control surface instead of adding a new one: a device-testing agent
+     * qualifies a backend with one command and no UI navigation —
+     *
+     *   adb shell am start -n dev.lai.runtime/.MainActivity \
+     *     --es qualify_backend llama-hexagon --es qualify_model qwen2.5-1.5b-instruct-q4-0
+     *
+     * [MainViewModel.runBackendQualification] independently re-verifies the backend is in this
+     * build's BuildConfig.VALIDATED_ACCELERATORS before doing anything, so this is inert on
+     * every ordinary signed release (which ships with that set empty) — it never changes
+     * production backend-selection behavior.
+     */
+    private fun handleQualificationIntent(intent: Intent) {
+        val backend = intent.getStringExtra(EXTRA_QUALIFY_BACKEND) ?: return
+        val modelId = intent.getStringExtra(EXTRA_QUALIFY_MODEL) ?: return
+        val prompt = intent.getStringExtra(EXTRA_QUALIFY_PROMPT) ?: DEFAULT_QUALIFY_PROMPT
+        LaiLog.i("LAI-qualify", "Qualification intent received: model=$modelId backend=$backend")
+        viewModel.runBackendQualification(modelId, backend, prompt)
+    }
+
+    private companion object {
+        const val EXTRA_QUALIFY_BACKEND = "qualify_backend"
+        const val EXTRA_QUALIFY_MODEL = "qualify_model"
+        const val EXTRA_QUALIFY_PROMPT = "qualify_prompt"
+        const val DEFAULT_QUALIFY_PROMPT = "Say hello in one short sentence."
     }
 
     override fun onDestroy() {

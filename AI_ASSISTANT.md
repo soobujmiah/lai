@@ -48,6 +48,16 @@ Never upgrade a status without direct evidence. Vulkan/GPU/NPU/performance claim
 
 SKB continuity does not impose a fixed technology template. Select the appropriate language, framework, architecture, module structure, documentation, dependencies, testing strategy, and validation method from LAI's actual requirements and constraints. Preserve LAI-specific architecture where required; justify material deviations through the repository's ADR process.
 
+## Android device testing
+
+ADB-first is the default methodology for any real-device interaction — see `docs/TESTING.md`
+§"ADB-first device testing" for the full priority order (app-native intents/interfaces → ADB →
+instrumentation → UIAutomator → coordinate taps, last resort) and `scripts/device/lai_adb.sh`
+for the reusable helper. Discover → control → observe → verify, not click → wait → screenshot →
+click. Never poll with an arbitrary sleep; wait on an observable condition (process state,
+activity draw completion, a specific logcat pattern) instead, and read logs through a tag/regex
+filter, not a raw dump.
+
 ## Engineering rules
 
 - Preserve LAI's offline-first/privacy-first boundaries and explicit user authority model.

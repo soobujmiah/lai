@@ -1304,10 +1304,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadModel(modelId: String) {
+    fun loadModel(modelId: String, forcedBackend: BackendId? = null) {
         if (state.value.busy) return
         val model = state.value.installedModels.firstOrNull { it.id == modelId } ?: return
-        LaiLog.i("LAI-model", "Loading model id=$modelId")
+        LaiLog.i("LAI-model", "Loading model id=$modelId" + (forcedBackend?.let { " forcedBackend=${it.value}" } ?: ""))
         _state.update {
             it.copy(operation = RuntimeOperation.LOADING, notice = "Checking device resources for ${model.displayName}…")
         }
@@ -1348,32 +1348,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val profile = container.runtimeEnvironment.profile(capabilities)
                 val reviewedModel = state.value.supportedModels.firstOrNull { it.id == model.id }
                 val requiredBytes = maxOf(estimate.estimatedPeakBytes, reviewedModel?.estimatedPeakBytes ?: 0L)
-                val decision = container.inferenceScheduler.select(
-                    workload = InferenceWorkload(
-                        estimatedRequiredBytes = requiredBytes,
-                        modelFormat = reviewedModel?.modelFormat ?: "gguf",
-                        quantization = reviewedModel?.quantization,
-                        compatibleBackends = reviewedModel?.compatibleBackendIds
-                            ?.map(::BackendId)
-                            ?.toSet()
-                            .orEmpty(),
-                        backendPreference = reviewedModel?.let {
-                            listOf(it.preferredBackendId) + it.fallbackBackendIds
-                        }?.map(::BackendId).orEmpty(),
-                        requiredAbis = reviewedModel?.requiredAbis?.toSet().orEmpty(),
-                    ),
-                    profile = profile,
-                )
                 val file = container.modelRepository.resolve(model)
                 val loadStarted = SystemClock.elapsedRealtime()
-                container.inferenceEngine.load(file.absolutePath, decision.selected).getOrThrow()
-                ScheduledLoad(
-                    backend = decision.selected,
-                    reason = decision.reason,
-                    estimatedPeakBytes = requiredBytes,
-                    environment = profile.environment,
-                    loadMs = SystemClock.elapsedRealtime() - loadStarted,
-                )
+                if (forcedBackend != null) {
+                    // Qualification-only path (see docs/TESTING.md "Backend qualification"):
+                    // deliberately bypasses InferenceScheduler.select() and its CPU-first
+                    // preference ranking so an accelerator can be device-tested before it is
+                    // ever the catalog's preferred/fallback choice. Only reachable when the
+                    // caller (MainActivity's qualification intent) already confirmed this
+                    // backend is in BuildConfig.VALIDATED_ACCELERATORS for this build — normal
+                    // signed releases ship with that set empty, so this path is inert there.
+                    // load() itself fails loudly (Result.failure) if the backend is not
+                    // actually compiled/available; it never silently substitutes CPU.
+                    container.inferenceEngine.load(file.absolutePath, forcedBackend).getOrThrow()
+                    ScheduledLoad(
+                        backend = forcedBackend,
+                        reason = "Forced backend override for accelerator qualification (scheduler bypassed)",
+                        estimatedPeakBytes = requiredBytes,
+                        environment = profile.environment,
+                        loadMs = SystemClock.elapsedRealtime() - loadStarted,
+                    )
+                } else {
+                    val decision = container.inferenceScheduler.select(
+                        workload = InferenceWorkload(
+                            estimatedRequiredBytes = requiredBytes,
+                            modelFormat = reviewedModel?.modelFormat ?: "gguf",
+                            quantization = reviewedModel?.quantization,
+                            compatibleBackends = reviewedModel?.compatibleBackendIds
+                                ?.map(::BackendId)
+                                ?.toSet()
+                                .orEmpty(),
+                            backendPreference = reviewedModel?.let {
+                                listOf(it.preferredBackendId) + it.fallbackBackendIds
+                            }?.map(::BackendId).orEmpty(),
+                            requiredAbis = reviewedModel?.requiredAbis?.toSet().orEmpty(),
+                        ),
+                        profile = profile,
+                    )
+                    container.inferenceEngine.load(file.absolutePath, decision.selected).getOrThrow()
+                    ScheduledLoad(
+                        backend = decision.selected,
+                        reason = decision.reason,
+                        estimatedPeakBytes = requiredBytes,
+                        environment = profile.environment,
+                        loadMs = SystemClock.elapsedRealtime() - loadStarted,
+                    )
+                }
             }
             result.onSuccess { load ->
                 LaiLog.i(
@@ -1402,6 +1422,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * ADB-first accelerator qualification entry point (docs/TESTING.md "Backend qualification").
+     * Driven by an intent extra on the exported, always-present MainActivity launcher activity —
+     * no UI navigation or coordinate taps required. Forces [modelId] onto [backendIdValue],
+     * bypassing the scheduler's CPU-first preference, then runs one real generation with
+     * [prompt] so a single `adb shell am start` produces observable, grep-able evidence
+     * (`adb logcat -s LAI-qualify:* LAI-model:* LAI-llm:*`) of whether the backend actually
+     * engaged, without ever touching production backend-selection behavior: this only executes
+     * when [backendIdValue] is present in this build's BuildConfig.VALIDATED_ACCELERATORS,
+     * which is empty on every ordinary signed release.
+     */
+    fun runBackendQualification(modelId: String, backendIdValue: String, prompt: String) {
+        val validated = BuildConfig.VALIDATED_ACCELERATORS
+            .split(',')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .toSet()
+        if (backendIdValue !in validated) {
+            LaiLog.w(
+                "LAI-qualify",
+                "DENIED model=$modelId backend=$backendIdValue — not in this build's " +
+                    "VALIDATED_ACCELERATORS=$validated; rebuild with " +
+                    "-Plai.validatedAccelerators=$backendIdValue to qualify it",
+            )
+            return
+        }
+        LaiLog.i("LAI-qualify", "STARTING model=$modelId backend=$backendIdValue")
+        loadModel(modelId, forcedBackend = BackendId(backendIdValue))
+        viewModelScope.launch {
+            state.first { it.operation == RuntimeOperation.READY || it.operation == RuntimeOperation.ERROR }
+            if (state.value.operation != RuntimeOperation.READY || state.value.activeModelId != modelId) {
+                LaiLog.e(
+                    "LAI-qualify",
+                    "LOAD_FAILED model=$modelId backend=$backendIdValue detail=${state.value.schedulerDetail}",
+                )
+                return@launch
+            }
+            LaiLog.i("LAI-qualify", "LOAD_OK model=$modelId backend=$backendIdValue — sending qualification prompt")
+            _state.update { it.copy(input = prompt) }
+            sendMessage()
+            state.first { it.operation == RuntimeOperation.READY || it.operation == RuntimeOperation.ERROR }
+            LaiLog.i(
+                "LAI-qualify",
+                "DONE model=$modelId backend=$backendIdValue finalOperation=${state.value.operation} " +
+                    "metrics=${state.value.lastGenerationMetrics}",
+            )
         }
     }
 
