@@ -87,6 +87,18 @@ jobs:
           echo "::group::hexagon_sdk.json (HEXAGON_TOOLS_ROOT resolution, per ggml-hexagon CMakeLists.txt)"
           docker run --rm "$IMAGE" sh -c 'find /opt/hexagon -maxdepth 2 -iname "hexagon_sdk.json" -exec cat {} \; 2>/dev/null || echo "not found at depth 2"'
           echo "::endgroup::"
+          echo "::group::readme.txt (what this SDK package actually is)"
+          docker run --rm "$IMAGE" sh -c 'cat /opt/hexagon/*/readme.txt 2>/dev/null || echo "not found"'
+          echo "::endgroup::"
+          echo "::group::libs/ subtree (one level deeper)"
+          docker run --rm "$IMAGE" sh -c 'find /opt/hexagon/*/libs -maxdepth 2 2>/dev/null | head -100'
+          echo "::endgroup::"
+          echo "::group::any QNN-named file anywhere in the image (2026-09-03 QNN prototype sourcing check)"
+          docker run --rm "$IMAGE" sh -c 'find / -iname "*qnn*" 2>/dev/null | head -100'
+          echo "::endgroup::"
+          echo "::group::any QAIRT-named file anywhere in the image"
+          docker run --rm "$IMAGE" sh -c 'find / -iname "*qairt*" 2>/dev/null | head -50'
+          echo "::endgroup::"
           echo "::group::bundled NDK (compare against LAI pin: ${ANDROID_NDK:-unset})"
           docker run --rm "$IMAGE" sh -c 'find / -maxdepth 4 -iname "*ndk*" -type d 2>/dev/null'
           echo "::endgroup::"
