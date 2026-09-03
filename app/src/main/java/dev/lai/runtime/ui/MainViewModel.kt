@@ -1305,8 +1305,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadModel(modelId: String, forcedBackend: BackendId? = null) {
-        if (state.value.busy) return
-        val model = state.value.installedModels.firstOrNull { it.id == modelId } ?: return
+        // Both early returns below used to be silent no-ops with no log line at all -- a real
+        // gap found during the 2026-09-03 Hexagon qualification investigation (docs/device-
+        // results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md): a caller racing app startup
+        // (installedModels is populated asynchronously by refreshModels() in init{}, but a
+        // qualification intent can fire before that completes) got no observable signal at all
+        // that loadModel() had done nothing, and a waiting coroutine could block forever on a
+        // state transition that would never come. Normal UI use is unaffected -- the "Load"
+        // button in LaiApp.kt is only ever visible/tappable once installedModels is already
+        // populated and the app isn't already busy, so these branches are effectively
+        // unreachable from a real tap and this is purely an observability improvement there.
+        if (state.value.busy) {
+            LaiLog.w("LAI-model", "loadModel(id=$modelId) ignored: already busy (operation=${state.value.operation})")
+            return
+        }
+        val model = state.value.installedModels.firstOrNull { it.id == modelId }
+        if (model == null) {
+            LaiLog.w(
+                "LAI-model",
+                "loadModel(id=$modelId) ignored: not in installedModels " +
+                    "(known=${state.value.installedModels.map { it.id }})",
+            )
+            return
+        }
         LaiLog.i("LAI-model", "Loading model id=$modelId" + (forcedBackend?.let { " forcedBackend=${it.value}" } ?: ""))
         _state.update {
             it.copy(operation = RuntimeOperation.LOADING, notice = "Checking device resources for ${model.displayName}…")
@@ -1474,8 +1495,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * engaged, without ever touching production backend-selection behavior: this only executes
      * when [backendIdValue] is present in this build's BuildConfig.VALIDATED_ACCELERATORS,
      * which is empty on every ordinary signed release.
+     *
+     * **Timeout guard (diagnostic only, does not touch production [loadModel]):** the native
+     * `createSession()`/`open()` call [loadModel] eventually makes is a synchronous, uninterruptible
+     * JNI call — Kotlin coroutine cancellation is cooperative and cannot stop a thread genuinely
+     * blocked inside vendor C++/driver code, and forcibly killing that thread would risk leaving
+     * native global state (the ggml backend registry, a partially-opened FastRPC/DSP session)
+     * corrupted for the rest of the process. So this does not attempt to cancel the native call at
+     * all: [withTimeoutOrNull] only bounds how long *this qualification coroutine* waits for
+     * [loadModel]'s result. If [timeoutMs] elapses, that native call is left running orphaned on
+     * its own `Dispatchers.IO` thread (the pool has many threads; one permanently stuck thread is
+     * an acceptable, bounded cost unique to an explicitly-requested qualification run gated
+     * behind BuildConfig.VALIDATED_ACCELERATORS, never a production path) while this function logs
+     * a definitive `LOAD_TIMEOUT` state and returns immediately, instead of the caller (a human or
+     * `scripts/device/lai_adb.sh`) having no way to know the app itself detected and gave up on the
+     * stall, distinct from `LOAD_FAILED` (a clean native failure), `DENIED` (rejected before ever
+     * attempting a load), and `MODEL_NOT_FOUND` (the model never appeared in `installedModels` —
+     * see docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md, which traces how this
+     * exact race was mistaken for a native hang until the diagnostic instrumentation proved
+     * otherwise: neither Hexagon attempt in that investigation ever reached native code at all).
      */
-    fun runBackendQualification(modelId: String, backendIdValue: String, prompt: String) {
+    fun runBackendQualification(
+        modelId: String,
+        backendIdValue: String,
+        prompt: String,
+        timeoutMs: Long = DEFAULT_QUALIFY_LOAD_TIMEOUT_MS,
+    ) {
         val validated = BuildConfig.VALIDATED_ACCELERATORS
             .split(',')
             .map(String::trim)
@@ -1490,10 +1535,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        LaiLog.i("LAI-qualify", "STARTING model=$modelId backend=$backendIdValue")
-        loadModel(modelId, forcedBackend = BackendId(backendIdValue))
+        LaiLog.i("LAI-qualify", "STARTING model=$modelId backend=$backendIdValue loadTimeoutMs=$timeoutMs")
         viewModelScope.launch {
-            state.first { it.operation == RuntimeOperation.READY || it.operation == RuntimeOperation.ERROR }
+            // Closes a real startup race found during this investigation (docs/device-results/
+            // 2026-09-03-redmi-turbo-4-pro-hexagon-v73.md): installedModels is populated
+            // asynchronously by refreshModels() in init{}, and this qualification intent fires
+            // essentially immediately on cold app start -- calling loadModel() before that
+            // population completes used to silently no-op (loadModel()'s own guards now log
+            // this, but the qualification flow still needs to not race it), and the whole
+            // qualification would then wait forever on a state transition nothing ever
+            // triggered. Wait for the model to actually be visible first, bounded by the same
+            // timeout budget as the load itself.
+            val modelReady = withTimeoutOrNull(timeoutMs) {
+                state.first { ui -> ui.installedModels.any { it.id == modelId } }
+            }
+            if (modelReady == null) {
+                LaiLog.e(
+                    "LAI-qualify",
+                    "MODEL_NOT_FOUND model=$modelId backend=$backendIdValue after ${timeoutMs}ms — " +
+                        "never appeared in installedModels (known=${state.value.installedModels.map { it.id }})",
+                )
+                return@launch
+            }
+            loadModel(modelId, forcedBackend = BackendId(backendIdValue))
+            val loadOutcome = withTimeoutOrNull(timeoutMs) {
+                state.first { it.operation == RuntimeOperation.READY || it.operation == RuntimeOperation.ERROR }
+            }
+            if (loadOutcome == null) {
+                LaiLog.e(
+                    "LAI-qualify",
+                    "LOAD_TIMEOUT model=$modelId backend=$backendIdValue after ${timeoutMs}ms — " +
+                        "the native load call has not returned; it is left running orphaned rather " +
+                        "than force-killed (see LAI-diag tag for the last stage reached)",
+                )
+                return@launch
+            }
             if (state.value.operation != RuntimeOperation.READY || state.value.activeModelId != modelId) {
                 LaiLog.e(
                     "LAI-qualify",
@@ -1979,6 +2055,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
          * stall and abandoned a perfectly healthy generation (device reports 0.6.83 / 0.6.84).
          */
         private const val CANCEL_GRACE_MS = 45_000L
+
+        /**
+         * Default bound on how long [runBackendQualification] waits for a forced backend load
+         * before giving up and reporting LOAD_TIMEOUT (docs/device-results/
+         * 2026-09-03-redmi-turbo-4-pro-hexagon-v73.md). Matches [CANCEL_GRACE_MS]'s existing
+         * "generous but not indefinite" budget: comfortably above CPU's known ~1 s load and any
+         * plausible accelerator init overhead, short enough to be a genuinely fast diagnostic
+         * rather than a multi-minute wait. Qualification-only; production `loadModel` calls never
+         * pass a timeout and are completely unaffected.
+         */
+        const val DEFAULT_QUALIFY_LOAD_TIMEOUT_MS = 45_000L
         private const val MAX_PERFORMANCE_SAMPLES = 20
         private const val MAX_FAILURE_REASON_CHARS = 512
         private const val MAX_TOOL_AUDIT_RECORDS = 50

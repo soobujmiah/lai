@@ -30,9 +30,17 @@ Usage: lai_adb.sh <command> [args]
                                     reset, launch with a qualification intent that forces
                                     <model-id> onto <backend-id> and runs one real generation,
                                     then block on the terminal LAI-qualify log line and print
-                                    the evidence. Exit code: 0 DONE/ready, 1 DENIED
-                                    (backend not in this build's VALIDATED_ACCELERATORS),
-                                    2 LOAD_FAILED, 3 timed out with no terminal state.
+                                    the evidence. The app itself gives up waiting on a stuck
+                                    native load after ~45s (LOAD_TIMEOUT) by default, so this
+                                    script's own [timeout-seconds] is now just an outer safety
+                                    margin, not the only bound. Exit code: 0 DONE/ready,
+                                    1 DENIED (backend not in this build's
+                                    VALIDATED_ACCELERATORS), 2 LOAD_FAILED, 4 LOAD_TIMEOUT (the
+                                    app detected and gave up on a stuck native call itself),
+                                    5 MODEL_NOT_FOUND (the model never appeared in
+                                    installedModels -- a startup race, not a load problem),
+                                    3 this script's own timeout with no terminal state at all
+                                    (worse than 4/5: the app never even reported one itself).
   probe <backend-id> [timeout-seconds]
                                     reset, launch with a model-free capabilities probe (no
                                     load, no generation) and block on the terminal LAI-diag
@@ -69,6 +77,20 @@ cmd_launch() {
   adb shell am start -W -n "$ACTIVITY"
 }
 
+# Repeated `adb logcat -d -e '<tag>'` polling has a real, observed failure mode: each
+# invocation is itself echoed into the device's own logcat by adbd ("in ShellService: ...
+# exec logcat ... '<tag>'"), which -- because that echoed line literally contains the tag
+# text -- matches the very filter it's polluting. At a 1-2s polling interval this
+# self-referential noise, plus ordinary system log volume, can rotate a real target line out
+# of the buffer before a later poll ever reads it (confirmed: a `probe: DONE` line present at
+# T+0 was gone from `-e` output well within 30s of 1s-interval polling on this device). Filter
+# by exact PID instead: it can't match its own invocation (a PID number isn't the search text
+# a text-matching filter would echo) and it excludes unrelated system/app noise entirely,
+# leaving far more buffer headroom for the signal actually being waited on.
+pid_of_app() {
+  adb shell pidof -s "$PKG" 2>/dev/null | tr -d '\r'
+}
+
 cmd_wait_process() {
   local timeout="${1:-30}"
   local waited=0
@@ -89,14 +111,19 @@ cmd_wait_log() {
   local timeout="${2:-60}"
   local waited=0
   local match
+  local pid
+  pid=$(pid_of_app)
   while (( waited < timeout )); do
-    match=$( (adb logcat -d -e "$pattern" 2>/dev/null || true) | tail -1)
+    if [[ -n "$pid" ]]; then
+      match=$( (adb logcat -d --pid="$pid" 2>/dev/null || true) | (grep -E "$pattern" || true) | tail -1)
+    fi
     if [[ -n "$match" ]]; then
       echo "$match"
       return 0
     fi
     sleep 1
     waited=$(( waited + 1 ))
+    [[ -z "$pid" ]] && pid=$(pid_of_app)
   done
   echo "no match for /$pattern/ within ${timeout}s" >&2
   return 1
@@ -136,29 +163,38 @@ cmd_qualify() {
   fi
   echo "launching qualification: model=$model_id backend=$backend_id"
   adb shell "$remote_cmd"
+  local pid
+  pid=$(pid_of_app)
 
   local waited=0
   local line=""
   while (( waited < timeout )); do
-    line=$( (adb logcat -d -e 'LAI-qualify' 2>/dev/null || true) | (grep -E 'DONE|DENIED|LOAD_FAILED' || true) | tail -1)
+    if [[ -n "$pid" ]]; then
+      line=$( (adb logcat -d --pid="$pid" 2>/dev/null || true) | (grep -E 'DONE|DENIED|LOAD_FAILED|LOAD_TIMEOUT|MODEL_NOT_FOUND' || true) | tail -1)
+    fi
     if [[ -n "$line" ]]; then
       break
     fi
     sleep 2
     waited=$(( waited + 2 ))
+    [[ -z "$pid" ]] && pid=$(pid_of_app)
   done
 
   echo "=== qualification evidence (model=$model_id backend=$backend_id) ==="
-  adb logcat -d | grep -E "$LOG_TAGS" || true
+  if [[ -n "$pid" ]]; then
+    adb logcat -d --pid="$pid" 2>/dev/null | grep -E "$LOG_TAGS" || true
+  fi
   echo "==="
 
   if [[ -z "$line" ]]; then
-    echo "TIMED OUT waiting for a terminal LAI-qualify state within ${timeout}s" >&2
+    echo "TIMED OUT (script-level) waiting for a terminal LAI-qualify state within ${timeout}s -- the app itself never reported LOAD_TIMEOUT either, which is a worse sign than exit 4" >&2
     return 3
   fi
   case "$line" in
     *DENIED*) return 1 ;;
     *LOAD_FAILED*) return 2 ;;
+    *LOAD_TIMEOUT*) return 4 ;;
+    *MODEL_NOT_FOUND*) return 5 ;;
     *DONE*) return 0 ;;
   esac
 }
@@ -170,20 +206,27 @@ cmd_probe() {
   local remote_cmd="am start -W -n $ACTIVITY --es qualify_backend $(shell_quote "$backend_id") --ez qualify_probe true"
   echo "launching probe: backend=$backend_id"
   adb shell "$remote_cmd"
+  local pid
+  pid=$(pid_of_app)
 
   local waited=0
   local line=""
   while (( waited < timeout )); do
-    line=$( (adb logcat -d -e 'LAI-diag' 2>/dev/null || true) | (grep -E 'probe: DONE' || true) | tail -1)
+    if [[ -n "$pid" ]]; then
+      line=$( (adb logcat -d --pid="$pid" 2>/dev/null || true) | (grep -E 'probe: DONE' || true) | tail -1)
+    fi
     if [[ -n "$line" ]]; then
       break
     fi
     sleep 1
     waited=$(( waited + 1 ))
+    [[ -z "$pid" ]] && pid=$(pid_of_app)
   done
 
   echo "=== probe evidence (backend=$backend_id) ==="
-  adb logcat -d | grep -E "$LOG_TAGS" || true
+  if [[ -n "$pid" ]]; then
+    adb logcat -d --pid="$pid" 2>/dev/null | grep -E "$LOG_TAGS" || true
+  fi
   echo "==="
 
   if [[ -z "$line" ]]; then

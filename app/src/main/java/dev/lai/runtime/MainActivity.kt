@@ -57,8 +57,9 @@ class MainActivity : ComponentActivity() {
         }
         val modelId = intent.getStringExtra(EXTRA_QUALIFY_MODEL) ?: return
         val prompt = intent.getStringExtra(EXTRA_QUALIFY_PROMPT) ?: DEFAULT_QUALIFY_PROMPT
+        val timeoutMs = intent.getLongExtra(EXTRA_QUALIFY_TIMEOUT_MS, MainViewModel.DEFAULT_QUALIFY_LOAD_TIMEOUT_MS)
         LaiLog.i("LAI-qualify", "Qualification intent received: model=$modelId backend=$backend")
-        viewModel.runBackendQualification(modelId, backend, prompt)
+        viewModel.runBackendQualification(modelId, backend, prompt, timeoutMs)
     }
 
     private companion object {
@@ -66,6 +67,7 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_QUALIFY_MODEL = "qualify_model"
         const val EXTRA_QUALIFY_PROMPT = "qualify_prompt"
         const val EXTRA_QUALIFY_PROBE_ONLY = "qualify_probe"
+        const val EXTRA_QUALIFY_TIMEOUT_MS = "qualify_timeout_ms"
         const val DEFAULT_QUALIFY_PROMPT = "Say hello in one short sentence."
     }
 
