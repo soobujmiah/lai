@@ -355,13 +355,15 @@ jobs:
           if [[ "$VERSION_NAME" == "$GITHUB_REF_NAME" ]]; then VERSION_NAME="0.1.${GITHUB_RUN_NUMBER}"; fi
           # --no-build-cache ruled out (2026-09-03): confirmed a fully uncached build ALSO
           # produces zero libggml-htp-v*.so anywhere in the workspace, so this was not a stale
-          # Gradle build-cache artifact. Reverted; --info added instead to see AGP's
-          # externalNativeBuild CMake configure/build output at all, which it suppresses by
-          # default even on success (confirmed: a separate, standalone CMake invocation earlier
-          # in the same log shows its own "-- Configuring done", LAI's own app/runtime:llama
-          # CMake configure never does) -- the prior absence of any GGML_HEXAGON/htp-related
-          # message() output was inconclusive for this reason, not evidence of failure either way.
-          gradle --no-daemon --stacktrace --info :app:assembleRelease \
+          # Gradle build-cache artifact. --info (also 2026-09-03) found the real cause and is no
+          # longer needed: it showed AGP's externalNativeBuild CMake integration explicitly
+          # skipping the four HTP skel targets ("not building target htp-v73 because no targets
+          # are specified and library build output file is null") because they are standalone
+          # DSP-side .so files never linked into lai_runtime, so AGP's default "only build what
+          # the module's own .so needs" heuristic silently drops them. Fixed at the source
+          # (runtime/llama/build.gradle.kts: externalNativeBuild.cmake.targets now lists them
+          # explicitly) rather than worked around here.
+          gradle --no-daemon --stacktrace :app:assembleRelease \
             -Plai.versionCode="${GITHUB_RUN_NUMBER}" \
             -Plai.versionName="$VERSION_NAME" \
             -Plai.enableLlamaCpp=ON \

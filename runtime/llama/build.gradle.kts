@@ -14,6 +14,17 @@ android {
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake {
+                // AGP's CMake integration only builds targets that are link-dependencies of the
+                // module's own .so output (lai_runtime) unless told otherwise -- confirmed via
+                // --info build log: "not building target htp-v73 because no targets are
+                // specified and library build output file is null" for all four HTP skel
+                // libraries. They are standalone DSP-side shared objects (loaded by the Hexagon
+                // FastRPC skel loader via ADSP_LIBRARY_PATH, never linked into lai_runtime), so
+                // CMake's own dependency graph never pulls them in as a side effect of building
+                // lai_runtime the way the static ggml/llama libs are. Must list every .so target
+                // actually needed in the APK explicitly. See
+                // docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md.
+                targets += listOf("lai_runtime", "htp-v73", "htp-v75", "htp-v79", "htp-v81")
                 cppFlags += listOf("-std=c++20", "-Wall", "-Wextra", "-Wpedantic")
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
