@@ -232,7 +232,12 @@ model load succeeded on `Vulkan0`, prefill completed, and the first decode step 
    result is a clean "no HTP device" rejection — strong device evidence (no accessible non-secure
    ADSP FastRPC node for third-party apps on this HyperOS build) points to a platform/vendor
    restriction, not something LAI can fix. Do not retry without new evidence a non-secure ADSP
-   path is actually reachable on this or a similar device.
+   path is actually reachable on this or a similar device. **Ecosystem research
+   (`docs/HANDOFF-2026-09-03-npu-android-ecosystem-research.md`) confirms this is not a LAI-specific
+   gap**: no proven Android local-LLM app (MLC Chat included) ships working sandboxed-third-party
+   Hexagon NPU acceleration; the restriction is industry-wide (Google enforces the same on Pixel).
+   The only AOSP-guaranteed-accessible NPU path is NNAPI, not direct QNN/FastRPC — worth a
+   time-boxed spike only if NPU becomes a genuine product priority, not urgent.
 3. **Adreno OpenCL track retry** — unrelated to the Hexagon finding above (that was a genuine
    Kotlin bug, not a shared native-init issue as previously suspected). OpenCL's own hang
    (`docs/device-results/2026-09-03-redmi-turbo-4-pro-opencl-namespace-hang.md`) is still real
