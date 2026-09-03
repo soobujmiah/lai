@@ -25,7 +25,7 @@ Head: **`1dd4948`** · CI run 33766023217 green (signed release APK `versionCode
 | **Adreno OpenCL track (GPU primary path)** | Implemented; **device-validated HANG, reverted (2026-09-03)** | llama.cpp's Qualcomm-maintained OpenCL backend compiled into `liblai_runtime.so` (Adreno-optimized kernels embedded); Khronos headers + ICD loader fetched by immutable SHA on CI, ICD loader linked statically (no binaries committed); `OpenCLBackend` probes `GPUOpenCL`; catalog rev 5 declares `llama-opencl` fallback; `model_params.devices` pinned per backend. Root cause found: `/vendor/lib64/libOpenCL.so` exists (`same_process_hal_file`, same class as the Adreno EGL/Vulkan libs this app already loads) but is only bridged to the vendor sphal namespace, not the app's default namespace — a `<uses-native-library>` manifest fix was tried and reached real vendor driver code, but hung indefinitely on every launch (confirmed: 45+s, thread state `S`, no crash) instead of failing fast, which broke the CPU guaranteed-fallback principle. Reverted (`82949bb`) | **Not currently viable without a background-thread + timeout-guarded probe** — the hang is inside `initialize_llama_once()`, shared with CPU/Vulkan detection, so this needs careful native-threading design, not a quick patch. Full evidence: `docs/device-results/2026-09-03-redmi-turbo-4-pro-opencl-namespace-hang.md` |
 | Backend scheduler | Device validated (CPU) | `InferenceScheduler`: evidence gates — accelerators need `DEVICE_VALIDATED` (granted per build via `-Plai.validatedAccelerators`, default empty = CPU-only); memory/battery/thermal admission; model catalog declares compatible backends (rev 5: `llama-cpu` preferred; `llama-opencl` + `llama-vulkan` fallbacks) | — |
 | Rolling context window / Bangla pass / thermal governor | Build verified | `ContextWindowPolicy`, tuned bilingual system prompt + repetition penalty, closed-loop thermal governor (min 2 threads) | Device re-validation |
-| Hexagon NPU (HTP) | Build-verified; **device-validated CLEAN UNAVAILABLE (2026-09-03, corrected) — not a hang** | SM8735's HTP confirmed **v73** via on-device evidence. CI extracts the real Hexagon SDK 6.6.0.0 from the public `ghcr.io/snapdragon-toolchain/arm64-android:v0.7` image (opt-in via `validated_accelerators=llama-hexagon`); `hexagon_backend.cpp` mirrors Vulkan/OpenCL (fail-closed, probes for an "HTP*" ggml device). **The original 2026-09-03 qualification attempt appeared to hang for 4+ minutes; root-caused the same day and it was never a native/vendor hang** — it was a Kotlin-level startup race in `MainViewModel.loadModel()`'s model-lookup guard (`installedModels` populated async, the qualification intent could fire first), now fixed. With the race fixed, `find_htp_device()` enumerates in 2-4 μs and finds only `Vulkan0`+`CPU`, never an HTP device; the forced load now fails cleanly in **47 ms**. Strong device evidence (not a captured denial) for why: this device exposes no non-secure `/dev/fastrpc-adsp` node, only `fastrpc-adsp-secure`/`fastrpc-cdsp` typed `vendor_xdsp_device`/`vendor_qdsp_device`, inaccessible to the standard `untrusted_app` SELinux domain LAI runs in — the same class of platform restriction already documented for OpenCL on this device. Full record: `docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md`; scoping doc: `docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md` | Verified external blocker for acceleration (no accessible ADSP FastRPC domain for third-party apps on this HyperOS build); do not retry speculatively without evidence a non-secure path is actually reachable (a HyperOS update, a different device, or a documented vendor allowlist). The startup-race bug itself is fixed and needs no further action — `MainViewModel.loadModel()`'s early-return guards now log instead of silently no-op'ing, and `runBackendQualification()` waits for `installedModels` before loading |
+| Hexagon NPU (HTP) | Build-verified; native path clean (not hanging); **NPU unavailable via `ggml-hexagon` specifically — a real, proven QNN-based alternative exists (2026-09-03)** | SM8735's HTP confirmed **v73** via on-device evidence. Two corrections landed the same day: (1) the original apparent 4+ minute hang was a Kotlin-level startup race in `MainViewModel.loadModel()`, not a native/vendor hang — fixed; with it fixed, `find_htp_device()` enumerates in 2-4 μs and finds only `Vulkan0`+`CPU`, forced load fails cleanly in 47 ms. (2) The follow-up conclusion that this reflected an industry-wide, unfixable platform restriction was **itself wrong** — a real third-party app, Local Dream (`io.github.xororz.localdream`, plain `untrusted_app` domain, sideloaded, no special privilege), was tested on this exact device and genuinely uses the Hexagon NPU via Qualcomm's real QNN SDK: real `QnnDevice_create`/HTP power-config success in logcat, a 512×512 image generated in 5.7s labeled "NPU" by the app itself. It hits the identical `/vendor/dsp` SELinux denial `ggml-hexagon` hits and works anyway — its FastRPC session establishment doesn't depend on that specific denied path. Full records: `docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md` (race fix), `docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-real-npu-path-found.md` (the correction — **read this one for the current conclusion**); scoping doc: `docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md` | `ggml-hexagon`'s direct-FastRPC approach is what's broken here, not NPU access in general. A real, evidenced path forward: integrate against the actual QNN SDK (matching Local Dream's proven approach — bundle/download `libQnnHtp*.so` into LAI's own app storage, use QNN's own runtime for session establishment) instead of relying on `ggml-hexagon`. This is a real engineering candidate now, not a speculative one, if NPU acceleration becomes a priority. MLC Chat re-tested the same day showed no NPU evidence (4.2 tok/s decode, consistent with GPU/CPU) — that specific finding is unaffected by this correction. The startup-race bug fix needs no further action |
 
 ### 1.2 Accessibility Service & Android control
 | Area | Status | Result | Remaining |
@@ -203,15 +203,16 @@ model load succeeded on `Vulkan0`, prefill completed, and the first decode step 
 - Keep `llama-vulkan` opt-in/non-default; CPU (`llama-cpu`) remains the shipped default.
 - **Hexagon NPU was qualified on-device same day; the apparent hang was root-caused and fixed —
   it was never a native/vendor issue.** Full story in 4.2 and
-  `docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md` (superseded/corrected same
-  file): a Kotlin-level startup race in `MainViewModel.loadModel()` (the qualification intent
-  could fire before `installedModels` finished populating, silently no-op'ing the load) made a
-  clean, fast, honest "no HTP device" rejection look like an indefinite hang from outside the
-  process. Fixed; the forced load now fails cleanly in 47 ms — `llama-hexagon` is unavailable on
-  this device (verified external blocker: no accessible non-secure ADSP FastRPC domain for
-  third-party apps), but LAI itself is no longer at fault. All three non-CPU backends (Vulkan,
-  OpenCL, Hexagon) are now device-tested and none is viable as shipped; `llama-cpu` remains the
-  only device-validated backend.
+  `docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md`: a Kotlin-level startup race
+  in `MainViewModel.loadModel()` made a clean, fast, honest "no HTP device" rejection look like
+  an indefinite hang from outside the process. Fixed; the forced load now fails cleanly in 47 ms
+  via `ggml-hexagon`. **Same-day follow-up correction:** that clean failure does not mean NPU is
+  unreachable in general — `docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-real-npu-path-found.md`
+  shows a real third-party app (Local Dream) genuinely using this device's Hexagon NPU via
+  Qualcomm's actual QNN SDK. `ggml-hexagon`'s specific low-level approach is what fails, not the
+  platform. All three non-CPU backends (Vulkan, OpenCL, Hexagon-via-ggml-hexagon) remain
+  unviable as currently implemented; `llama-cpu` remains the only device-validated backend, but a
+  QNN-based Hexagon path is now a real, evidenced candidate rather than a dead end.
 - A "silent hang" UX bug was suspected from the crash screenshot (empty response bubble, "Stop"
   still active) but was **retracted after a live recheck**: `MainViewModel.persistChat()` only
   writes to disk on a definite outcome and drops blank-text messages, so a native SIGSEGV never
@@ -225,19 +226,21 @@ model load succeeded on `Vulkan0`, prefill completed, and the first decode step 
 ### 4.2 Next features (in roadmap order, each needs a PR + device evidence)
 1. **Bangla OCR real model** — unblock the owner's dataset/licence decision; then wire the
    engine into `BanglaOcrService` (contract + pipeline already scaffolded).
-2. **Hexagon NPU (`llama-hexagon`) — closed as a verified external blocker (2026-09-03), not
-   pending further LAI-side work.** The apparent hang (docs/device-results/
-   2026-09-03-redmi-turbo-4-pro-hexagon-v73.md) was a LAI-side Kotlin startup race, now fixed
-   (`MainViewModel.loadModel`/`runBackendQualification`). With it fixed, the real, fast (47 ms)
-   result is a clean "no HTP device" rejection — strong device evidence (no accessible non-secure
-   ADSP FastRPC node for third-party apps on this HyperOS build) points to a platform/vendor
-   restriction, not something LAI can fix. Do not retry without new evidence a non-secure ADSP
-   path is actually reachable on this or a similar device. **Ecosystem research
-   (`docs/HANDOFF-2026-09-03-npu-android-ecosystem-research.md`) confirms this is not a LAI-specific
-   gap**: no proven Android local-LLM app (MLC Chat included) ships working sandboxed-third-party
-   Hexagon NPU acceleration; the restriction is industry-wide (Google enforces the same on Pixel).
-   The only AOSP-guaranteed-accessible NPU path is NNAPI, not direct QNN/FastRPC — worth a
-   time-boxed spike only if NPU becomes a genuine product priority, not urgent.
+2. **Hexagon NPU (`llama-hexagon`) — the startup-race bug is closed; NPU itself is a real,
+   evidenced future candidate via QNN, not a dead end (corrected 2026-09-03).** The apparent hang
+   (`docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md`) was a LAI-side Kotlin
+   startup race, now fixed. With it fixed, the real, fast (47 ms) result is a clean "no HTP
+   device" rejection from `ggml-hexagon` specifically. **A same-day follow-up device test
+   corrected the "industry-wide platform blocker" conclusion**
+   (`docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-real-npu-path-found.md`): a real,
+   unprivileged third-party app (Local Dream) genuinely uses this device's Hexagon NPU via
+   Qualcomm's actual QNN SDK — same SELinux domain, same `/vendor/dsp` denial LAI hits, works
+   anyway because its FastRPC session establishment doesn't depend on that path. If NPU
+   acceleration becomes a priority: the evidenced path is a real QNN SDK integration (bundle/
+   download `libQnnHtp*.so` into LAI's own storage, matching Local Dream's proven approach), not
+   `ggml-hexagon`'s current direct-FastRPC code and not (necessarily) NNAPI — MLC Chat re-tested
+   the same day showed no NPU use (OpenCL/CPU only), so that earlier research finding is
+   unaffected, but the broader "no third-party app reaches Hexagon NPU here" claim was wrong.
 3. **Adreno OpenCL track retry** — unrelated to the Hexagon finding above (that was a genuine
    Kotlin bug, not a shared native-init issue as previously suspected). OpenCL's own hang
    (`docs/device-results/2026-09-03-redmi-turbo-4-pro-opencl-namespace-hang.md`) is still real

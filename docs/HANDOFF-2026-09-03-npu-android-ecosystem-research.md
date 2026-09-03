@@ -1,6 +1,20 @@
 # NPU/Hexagon ecosystem research (2026-09-03)
 
-**Read this first.** Follows the same-day Hexagon investigation
+**CORRECTED, same day, later — read this first.** The "MLC Chat" findings below (§Findings,
+first paragraph) still hold. The broader claim in the Conclusion — "no proven Android app ships
+working sandboxed third-party Hexagon NPU acceleration... a real Android security boundary that
+every app in this space hits" — is **wrong** and is corrected by
+`docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-real-npu-path-found.md`: a real,
+already-installed third-party app (Local Dream, `io.github.xororz.localdream`, plain
+`untrusted_app` domain, sideloaded) was tested on this exact device and genuinely uses the
+Hexagon NPU via Qualcomm's real QNN SDK — a complete image generated in 5.7s, labeled "NPU" by
+the app, real `QnnDevice_create`/HTP power-config success in logcat. It hits the identical SELinux
+restriction on `/vendor/dsp` this research documents and works anyway, by not depending on that
+specific path. The restriction is real; the industry-wide-blocker generalization from it was not.
+Read the corrected document before acting on the "no runtime replacement, no NPU work" conclusion
+below — that recommendation no longer holds.
+
+**Read this first (original).** Follows the same-day Hexagon investigation
 (`docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md`), which fixed a Kotlin startup
 race that was masquerading as a native hang, and found — with strong device evidence — that this
 device exposes no non-secure `/dev/fastrpc-adsp` node accessible to a third-party app's
@@ -56,16 +70,23 @@ LAI's `vkCmdBindPipeline` crash is a known, recurring class of Adreno/Qualcomm V
 reported independently by multiple llama.cpp users (issues #6395, #8455, discussion #8336), not
 an LAI-specific defect.
 
-## Conclusion
+## Conclusion — SUPERSEDED, see the correction notice at the top of this document
 
-No proven Android local-LLM app — MLC Chat included — actually ships working, sandboxed
+~~No proven Android local-LLM app — MLC Chat included — actually ships working, sandboxed
 third-party Hexagon NPU acceleration today. LAI's `ggml-hexagon` failure reflects a real Android
-security boundary that every app in this space hits, not an LAI implementation gap. Recommendation:
-no runtime replacement, no new NPU integration effort under the current approach. Keep CPU
-(working) and Vulkan-first GPU (architecturally correct, blocked only by a known driver bug
-class). If NPU acceleration becomes a genuine product priority later, the only path worth a
-time-boxed spike is NNAPI/LiteRT — not more direct-FastRPC work — and it would slot in as a
-fifth `Backend` behind the existing evidence-gated scheduler with no architectural rework needed.
+security boundary that every app in this space hits, not an LAI implementation gap.~~ **Wrong —
+Local Dream is real counter-evidence, see the correction doc.** The MLC-specific finding (no NPU
+evidence for that particular app) still holds; the generalization to "every app in this space"
+does not.
+
+**Corrected recommendation:** `ggml-hexagon`'s specific direct-FastRPC approach is what fails on
+this device, not NPU access in general. A real, evidenced path exists: integrate against
+Qualcomm's actual QNN SDK the way Local Dream does (bundle/download `libQnnHtp*.so` into the
+app's own storage, use QNN's own runtime for FastRPC session establishment rather than a raw
+device-node open). This is worth real engineering investment if NPU acceleration becomes a
+product priority — it is a proven-on-this-device path, not a speculative one. NNAPI remains a
+secondary, lower-effort option per the original findings above, but QNN is now the better-evidenced
+first candidate. CPU and Vulkan-first GPU conclusions are unaffected either way.
 
 ## What this does not do
 

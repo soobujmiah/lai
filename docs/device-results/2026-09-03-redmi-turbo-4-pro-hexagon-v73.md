@@ -10,6 +10,14 @@ after a full instrument → isolate → diagnose → fix → requalify pass. The
 (process alive, no terminal log line, no crash) was real; the FastRPC/DSP-hang interpretation of
 it was not.
 
+**Further correction (same day, later):** the "Consequences" section below concluding
+`llama-hexagon` unavailability is a *verified external blocker* is itself corrected by
+`docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-real-npu-path-found.md` — a real
+third-party app (Local Dream) was tested on this same device and genuinely uses the Hexagon NPU via
+Qualcomm's actual QNN SDK, despite hitting the identical SELinux restriction this document
+documents. The restriction is real; "therefore no third-party app can use the NPU here" was not.
+Read that document for the corrected conclusion before acting on anything below.
+
 ## Summary
 
 The original "hang" was a **Kotlin-level startup race in LAI's own qualification-intent
