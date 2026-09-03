@@ -234,6 +234,17 @@ class NativeInferenceEngine : InferenceEngine {
             supportedModelFormats = setOf("gguf"),
             defaultPriority = 200,
         )
+        // Hexagon NPU track (docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md). ggml itself
+        // classifies the HTP device as GGML_BACKEND_DEVICE_TYPE_GPU (upstream's own framing:
+        // "Hexagon NPU behaves as a 'GPU' device when it comes to -ngl and other offload-related
+        // options"), but LAI's own ComputeClass is a separate, more accurate vocabulary for the
+        // scheduler/UI/evidence records -- this is genuinely an NPU, not a GPU.
+        "hexagon" -> BackendDescriptor(
+            id = BackendId("llama-hexagon"),
+            computeClass = ComputeClass.NPU,
+            supportedModelFormats = setOf("gguf"),
+            defaultPriority = 300,
+        )
         else -> null
     }
 
@@ -241,6 +252,7 @@ class NativeInferenceEngine : InferenceEngine {
         "llama-cpu" -> "cpu"
         "llama-vulkan" -> "vulkan"
         "llama-opencl" -> "opencl"
+        "llama-hexagon" -> "hexagon"
         else -> error("Unknown llama backend ${id.value}")
     }
 

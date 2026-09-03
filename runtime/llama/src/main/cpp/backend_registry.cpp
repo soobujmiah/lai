@@ -39,6 +39,7 @@ std::vector<std::unique_ptr<Backend>> create_backends() {
 #endif
     backends.emplace_back(create_vulkan_backend());
     backends.emplace_back(create_opencl_backend());
+    backends.emplace_back(create_hexagon_backend());
     return backends;
 }
 

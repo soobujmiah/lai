@@ -23,6 +23,7 @@ add_library(
     backend_registry.cpp
     vulkan_backend.cpp
     opencl_backend.cpp
+    hexagon_backend.cpp
     native_crash_handler.cpp
 )
 
@@ -96,6 +97,9 @@ if(LAI_ENABLE_LLAMA_CPP)
     target_compile_definitions(lai_runtime PRIVATE LAI_HAS_LLAMA_CPP=1 LAI_HAS_VULKAN=1)
     if(GGML_OPENCL)
         target_compile_definitions(lai_runtime PRIVATE LAI_HAS_OPENCL=1)
+    endif()
+    if(GGML_HEXAGON)
+        target_compile_definitions(lai_runtime PRIVATE LAI_HAS_HEXAGON=1)
     endif()
     target_link_libraries(lai_runtime PRIVATE llama)
 endif()
