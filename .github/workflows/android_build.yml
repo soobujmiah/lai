@@ -339,9 +339,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CMAKE_BIN="${{ steps.pinned_cmake.outputs.cmake-path }}"
+          # lukka/get-cmake's action.yml documents "cmake-path" as "the path to the installed
+          # CMake executable", but the actual runtime output observed in CI (run 33809080662) is
+          # the bin/ DIRECTORY containing it, not the executable itself -- trusting the doc string
+          # over the real output made the first attempt at this step try to execute a directory
+          # (exit 126). Derive both the binary and cmake.dir from that directory instead.
+          CMAKE_BIN_DIR="${{ steps.pinned_cmake.outputs.cmake-path }}"
+          CMAKE_BIN_DIR="${CMAKE_BIN_DIR%/}"
+          CMAKE_BIN="$CMAKE_BIN_DIR/cmake"
           test -x "$CMAKE_BIN" || { echo "pinned cmake binary not found at '$CMAKE_BIN'" >&2; exit 1; }
-          CMAKE_ROOT="${CMAKE_BIN%/bin/cmake}"
+          CMAKE_ROOT="${CMAKE_BIN_DIR%/bin}"
           # Append only -- local.properties is gitignored/CI-only; never overwrite any content
           # a prior step (e.g. android-actions/setup-android) may already have written to it.
           echo "cmake.dir=$CMAKE_ROOT" >> local.properties
