@@ -91,7 +91,11 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+            // Must match the pinned CMake installed by the "Install pinned CMake" workflow step
+            // (cmake.dir in local.properties) -- ggml-hexagon's htp/CMakeLists.txt requires
+            // >=3.22.2, which the SDK-managed cmake;3.22.1 (still installed above, unused for
+            // this exact-version request) does not satisfy.
+            version = "3.31.6"
         }
     }
     compileOptions {

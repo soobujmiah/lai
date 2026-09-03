@@ -313,6 +313,44 @@ jobs:
           command -v glslc || { echo "glslc is required for GGML_VULKAN shader compilation but was not installed" >&2; exit 1; }
           pkg-config --modversion vulkan 2>&1 || echo "vulkan pkg-config not found, but headers should be in /usr/include/vulkan"
 
+      # ggml-hexagon/htp/CMakeLists.txt (pinned llama.cpp commit) requires
+      # cmake_minimum_required(VERSION 3.22.2); the SDK-managed cmake;${CMAKE_VERSION} above is
+      # 3.22.1, one patch below that floor (see docs/device-results/2026-09-03-redmi-turbo-4-pro-
+      # hexagon-htp-skels-not-built-root-cause.md and the CI evidence from run 33805871946).
+      # Install a pinned, checksum-verified Kitware release via lukka/get-cmake (SHA-pinned,
+      # not just tag-pinned, since it's a single-maintainer third-party action selecting the
+      # exact toolchain version for this fix) and point AGP's externalNativeBuild at it via
+      # cmake.dir in local.properties, matching runtime/llama/build.gradle.kts's
+      # externalNativeBuild.cmake.version. Confirmed from AGP's own CmakeLocator.kt
+      # (findCmakePathLogic): cmake.dir from local.properties is checked BEFORE the SDK-managed
+      # package search and, once it satisfies the declared version, short-circuits it entirely --
+      # so the existing sdkmanager "cmake;${CMAKE_VERSION}" install stays untouched and is simply
+      # never selected for this exact-version request. CMake 3.x (not 4.x) to stay clear of
+      # CMake 4's default minimum-required-policy floor change, which is documented to break
+      # older projects; 3.31.6 matches the version actions/runner-images itself pinned as its
+      # stable fallback for months for the same reason.
+      - name: Install pinned CMake 3.31.6 for ggml-hexagon HTP (requires >=3.22.2)
+        id: pinned_cmake
+        uses: lukka/get-cmake@fffaaafeea488556c2c12dad60690008bc1caacb # v4.4.2
+        with:
+          cmakeVersion: '3.31.6'
+
+      - name: Point AGP at the pinned CMake (cmake.dir, CI-only local.properties)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CMAKE_BIN="${{ steps.pinned_cmake.outputs.cmake-path }}"
+          test -x "$CMAKE_BIN" || { echo "pinned cmake binary not found at '$CMAKE_BIN'" >&2; exit 1; }
+          CMAKE_ROOT="${CMAKE_BIN%/bin/cmake}"
+          # Append only -- local.properties is gitignored/CI-only; never overwrite any content
+          # a prior step (e.g. android-actions/setup-android) may already have written to it.
+          echo "cmake.dir=$CMAKE_ROOT" >> local.properties
+          echo "::group::Pinned CMake evidence (for HTP >=3.22.2 requirement)"
+          echo "cmake-path output: $CMAKE_BIN"
+          echo "derived cmake.dir: $CMAKE_ROOT"
+          "$CMAKE_BIN" --version
+          echo "::endgroup::"
+
       - name: Unit tests and lint
         run: >-
           gradle --no-daemon --stacktrace coverageCheck :platform:audit:testDebugUnitTest :platform:download:testDebugUnitTest :platform:workspace:testDebugUnitTest :platform:history:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug
