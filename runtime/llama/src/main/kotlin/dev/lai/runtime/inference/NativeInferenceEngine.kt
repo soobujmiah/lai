@@ -40,6 +40,7 @@ internal class NativeBindings private constructor() {
         @JvmStatic external fun lastError(): String
         @JvmStatic external fun installNativeCrashHandler(logFilePath: String?)
         @JvmStatic external fun configureOpenCLVendors(baseDir: String?)
+        @JvmStatic external fun configureHexagonAdspPath(nativeLibraryDir: String?)
     }
 }
 
@@ -69,6 +70,23 @@ class NativeInferenceEngine : InferenceEngine {
      */
     fun configureOpenCLVendors(baseDir: String?) {
         if (NativeBindings.loaded) NativeBindings.configureOpenCLVendors(baseDir)
+    }
+
+    /**
+     * Hexagon DSP-side library discovery (docs/device-results/
+     * 2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md). ggml-hexagon's session
+     * open failed with FastRPC error 0x80000406 ("dynamic loading failed" on the DSP side) even
+     * after libcdsprpc.so itself loaded successfully: the HTP skel .so files (libggml-htp-v73.so
+     * etc.) are compiled in and bundled, but with this build's native-library packaging they are
+     * never extracted to a real filesystem path the DSP-side loader can open — they load straight
+     * out of the (now-extracted, see android:extractNativeLibs="true") APK's native library
+     * directory instead. This points the vendor FastRPC client at that same directory via the
+     * ADSP_LIBRARY_PATH environment variable, mirroring the OpenCL vendor-discovery pattern
+     * above. Must run BEFORE any backend capability probe. Safe no-op when the native library is
+     * not loaded.
+     */
+    fun configureHexagonAdspPath(nativeLibraryDir: String?) {
+        if (NativeBindings.loaded) NativeBindings.configureHexagonAdspPath(nativeLibraryDir)
     }
 
     /**

@@ -1,8 +1,10 @@
 #include "include/lai/backend.h"
 
 #include <android/log.h>
+#include <jni.h>
 
 #include <chrono>
+#include <cstdlib>
 #include <string>
 
 #ifdef LAI_HAS_HEXAGON
@@ -134,4 +136,41 @@ std::unique_ptr<Backend> create_hexagon_backend() {
     return std::make_unique<HexagonBackend>();
 }
 
+// See docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md.
+// ggml-hexagon's session-open call failed with FastRPC error 0x80000406 ("dynamic loading
+// failed" on the DSP side) even after libcdsprpc.so itself loaded successfully: the HTP skel
+// .so files are compiled in and bundled, but the DSP-side loader needs an actual file on disk,
+// and this build's native-library packaging otherwise loads straight out of the (now-extracted,
+// see AndroidManifest.xml android:extractNativeLibs) APK's own native library directory --
+// pointing the vendor FastRPC client at that directory via ADSP_LIBRARY_PATH is what upstream's
+// own Android integration (and every other real app found to reach this device's HTP) does.
+void configure_hexagon_adsp_path(const std::string& native_library_dir) {
+    if (native_library_dir.empty()) return;
+    setenv("ADSP_LIBRARY_PATH", native_library_dir.c_str(), 1);
+    __android_log_print(
+        ANDROID_LOG_INFO, "LAI-llama", "hexagon: ADSP_LIBRARY_PATH set to %s",
+        native_library_dir.c_str()
+    );
+}
+
 }  // namespace lai
+
+namespace {
+
+std::string jni_jstring_to_utf8(JNIEnv* env, jstring value) {
+    if (value == nullptr) return {};
+    const char* chars = env->GetStringUTFChars(value, nullptr);
+    if (chars == nullptr) return {};
+    std::string result(chars);
+    env->ReleaseStringUTFChars(value, chars);
+    return result;
+}
+
+}  // namespace
+
+extern "C" JNIEXPORT void JNICALL
+Java_dev_lai_runtime_inference_NativeBindings_configureHexagonAdspPath(
+    JNIEnv* env, jclass, jstring native_library_dir
+) {
+    lai::configure_hexagon_adsp_path(jni_jstring_to_utf8(env, native_library_dir));
+}

@@ -11,6 +11,7 @@
   <application
     android:name=".LaiApplication"
     android:allowBackup="false"
+    android:extractNativeLibs="true"
     android:icon="@drawable/ic_lai"
     android:label="@string/app_name"
     android:roundIcon="@drawable/ic_lai"
@@ -18,17 +19,20 @@
     android:theme="@style/Theme.Lai"
     android:usesCleartextTraffic="false">
 
-    <!-- Hexagon FastRPC track (docs/device-results/2026-09-03-redmi-turbo-4-pro-chatterui-fastrpc-comparison.md):
+    <!-- Hexagon FastRPC track (docs/device-results/2026-09-03-redmi-turbo-4-pro-chatterui-fastrpc-comparison.md,
+         docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md):
          a real third-party app (ChatterUI, plain untrusted_app, sideloaded) running the exact
          same upstream ggml-hexagon this app uses successfully opens a FastRPC handle to the cdsp
-         domain and loads the v73 HTP skel on this device: LAI's own attempt finds zero HTP
-         devices instead. The one concrete difference found: ChatterUI's manifest declares
-         uses-native-library for libcdsprpc.so (Android's nativeloader reports
-         uses_libraries=libOpenCL.so:libcdsprpc.so for it); LAI never has. Same
-         required="false" no-op-if-unavailable guarantee already used for this device's other
-         vendor-library bridge attempts (see the note below): CPU/Vulkan remain unaffected
-         either way. Needs a real-device requalification to know if it actually closes the gap;
-         recorded as a qualification step, not claimed as a fix yet. -->
+         domain and loads the v73 HTP skel on this device. This entry (confirmed working: the
+         driver now loads and the Hexagon backend registry now constructs, where before nothing
+         happened at all) plus android:extractNativeLibs="true" above closes the two concrete
+         gaps found: (1) libcdsprpc.so needs the app-namespace bridge below to dlopen at all;
+         (2) the DSP-side loader needs an actual file on disk for the HTP skel .so, which this
+         build's default APK packaging never provided (native libs load straight from the
+         uncompressed APK, never extracted): ggml-hexagon's session-open call then reads
+         ADSP_LIBRARY_PATH (set in LaiApplication.onCreate from applicationInfo.nativeLibraryDir)
+         to find it. required="false" keeps this entry a no-op wherever the library or the
+         mechanism is unavailable; CPU/Vulkan remain unaffected either way. -->
     <uses-native-library
       android:name="libcdsprpc.so"
       android:required="false" />

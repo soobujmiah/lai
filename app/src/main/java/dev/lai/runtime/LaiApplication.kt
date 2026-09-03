@@ -33,6 +33,11 @@ class LaiApplication : Application() {
         // docs/BUILD_AND_RELEASE.md "GPU enablement — Adreno OpenCL track".
         container.inferenceEngine.configureOpenCLVendors(filesDir.absolutePath)
         LaiLog.i("LAI-lifecycle", "OpenCL vendor discovery configured under ${filesDir.name}")
+        // Hexagon DSP-side skel discovery (docs/device-results/
+        // 2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md): must also run before
+        // any backend probe, same requirement as the OpenCL vendor setup above.
+        container.inferenceEngine.configureHexagonAdspPath(applicationInfo.nativeLibraryDir)
+        LaiLog.i("LAI-lifecycle", "Hexagon ADSP_LIBRARY_PATH configured under ${applicationInfo.nativeLibraryDir}")
     }
 
     override fun onTrimMemory(level: Int) {
