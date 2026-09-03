@@ -265,7 +265,12 @@ jobs:
           mkdir -p "$SDK_DEST"
           docker pull "$IMAGE"
           CID=$(docker create "$IMAGE")
-          docker cp "$CID:/opt/hexagon/6.6.0.0/." "$SDK_DEST/"
+          # The SDK's directories inside the image are mode 555 (read-only, even for root) --
+          # a plain `docker cp` preserves those bits onto the host and extraction fails
+          # partway through with "permission denied" creating a subdirectory (hit this for
+          # real: build/cdep). Stream through tar instead so ownership/mode come from our
+          # own umask, not the image's.
+          docker cp "$CID:/opt/hexagon/6.6.0.0/." - | tar -x --no-same-permissions --no-same-owner -C "$SDK_DEST"
           docker rm "$CID" >/dev/null
           test -f "$SDK_DEST/build/cmake/hexagon_fun.cmake" || { echo "Hexagon SDK extraction incomplete (missing build/cmake/hexagon_fun.cmake)" >&2; exit 1; }
           test -d "$SDK_DEST/tools/HEXAGON_Tools/19.0.07" || { echo "Hexagon Tools missing (expected tools/HEXAGON_Tools/19.0.07 per hexagon_sdk.json)" >&2; exit 1; }
