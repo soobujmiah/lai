@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <jni.h>
 
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -19,6 +20,13 @@ namespace lai {
 namespace {
 
 constexpr const char* kLogTag = "LAI-llama";
+// See llama_session.cpp's kDiagTag doc comment (2026-09-03 shared-init hang investigation).
+constexpr const char* kDiagTag = "LAI-diag";
+using DiagClock = std::chrono::steady_clock;
+
+[[maybe_unused]] long long diag_elapsed_us(DiagClock::time_point start, DiagClock::time_point end) {
+    return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+}
 
 std::string jstring_to_utf8(JNIEnv* env, jstring value) {
     if (value == nullptr) return {};
@@ -89,6 +97,7 @@ public:
 
     bool available() const override {
 #ifdef LAI_HAS_OPENCL
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "opencl: available() ENTER");
         // Direct namespace probe: can this app process even dlopen the vendor OpenCL
         // library? Qualcomm exposes it through the public-library namespace on most
         // devices; a failure here names the exact linker error in logcat.
@@ -104,7 +113,12 @@ public:
         // loader. On a device without a vendor OpenCL driver this yields zero devices and
         // we report unavailable — no crash, no acceleration claim.
         initialize_llama_once();
+        const auto probe_start = DiagClock::now();
         const ggml_backend_dev_t device = find_opencl_device();
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag, "opencl: available() find_opencl_device() returned %p after %lld us",
+            static_cast<void*>(device), diag_elapsed_us(probe_start, DiagClock::now())
+        );
         if (device == nullptr) {
             __android_log_print(ANDROID_LOG_WARN, kLogTag, "opencl: compiled but no OpenCL GPU device registered (no vendor ICD?)");
             return false;
@@ -123,6 +137,7 @@ public:
         std::string& error
     ) override {
 #ifdef LAI_HAS_OPENCL
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "opencl: open() ENTER");
         initialize_llama_once();
         const ggml_backend_dev_t device = find_opencl_device();
         if (device == nullptr) {

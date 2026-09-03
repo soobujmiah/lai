@@ -46,9 +46,9 @@ existence (`pidof`), activity draw completion (`am start -W`), or a specific log
 appearing. Read logs with a tag/regex filter, not a full unfiltered dump.
 
 `scripts/device/lai_adb.sh` wraps the common operations (`install`, `reset`, `launch`,
-`wait-process`, `wait-log <regex>`, `logs`, `state`, `qualify`) with this discipline already
-built in — reuse it rather than hand-rolling raw `adb`/screenshot loops. Set `LAI_PKG` to
-`dev.lai.runtime.debug` when targeting a debug build.
+`wait-process`, `wait-log <regex>`, `logs`, `state`, `qualify`, `probe`) with this discipline
+already built in — reuse it rather than hand-rolling raw `adb`/screenshot loops. Set `LAI_PKG`
+to `dev.lai.runtime.debug` when targeting a debug build.
 
 ### Backend qualification (accelerator device-testing)
 
@@ -79,3 +79,16 @@ block (`LAI-qualify`/`LAI-model`/`LAI-llm` tags: request received, actual backen
 loaded on, and generation metrics if one ran). Record the result in
 `docs/device-results/<date>-<device>-<backend>.md` regardless of outcome, per the existing
 evidence discipline in this file.
+
+**Diagnostic probe (model-free, seconds not minutes):** before running a full qualification,
+`scripts/device/lai_adb.sh probe llama-hexagon` triggers a `qualify_probe=true` intent that only
+reads `InferenceEngine.capabilities` — which calls `available()` on every compiled backend,
+including the one under test — and logs the result, without ever calling `loadModel()` or the
+native `createSession`/`open()` path. It isolates whether a hang is in backend *enumeration*
+(this probe) from one in the heavier session/model *load* path (full `qualify`). The shared
+native init path (`initialize_llama_once()` in `llama_session.cpp`) and each backend's
+`available()`/`open()` (`hexagon_backend.cpp`, `opencl_backend.cpp`, `vulkan_backend.cpp`) log
+fine-grained, timestamped stage markers under the permanent, dedicated `LAI-diag` tag — kept
+apart from the noisier `LAI-llama` tag so a stuck qualification can be localized to an exact
+stage (e.g. `MODEL_LOAD_BEGIN` with no following `MODEL_LOAD_END`) straight from
+`adb logcat -s LAI-diag:*`, without guessing.

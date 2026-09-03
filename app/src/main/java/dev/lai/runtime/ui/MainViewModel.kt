@@ -1426,6 +1426,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Cheap, model-free diagnostic probe for the 2026-09-03 Hexagon/OpenCL shared-init hang
+     * investigation (docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md). Reads
+     * [InferenceEngine.capabilities] — which internally calls `available()` on every compiled
+     * backend, including the one under test — and logs the result, without ever calling
+     * [loadModel] or touching the native `createSession`/`open()` path. This isolates whether a
+     * hang is in backend *enumeration* (this probe) or specifically in the heavier session/model
+     * *load* path (see [runBackendQualification]), in well under a second if enumeration is
+     * healthy, instead of waiting out a multi-minute qualification timeout to learn the same
+     * thing. Triggered by `qualify_probe=true` alongside `qualify_backend` on the same
+     * MainActivity intent extras qualification uses; independent of BuildConfig gating since it
+     * never forces a load — reading capabilities is already always safe.
+     */
+    fun runBackendProbe(backendIdValue: String) {
+        LaiLog.i("LAI-diag", "probe: ENTER backend=$backendIdValue")
+        viewModelScope.launch {
+            val start = SystemClock.elapsedRealtime()
+            val capabilities = container.inferenceEngine.capabilities
+            val elapsedMs = SystemClock.elapsedRealtime() - start
+            LaiLog.i(
+                "LAI-diag",
+                "probe: capabilities resolved in ${elapsedMs}ms nativeLibraryLoaded=" +
+                    "${capabilities.nativeLibraryLoaded} detail=\"${capabilities.detail}\"",
+            )
+            if (capabilities.compiledBackends.isEmpty()) {
+                LaiLog.i("LAI-diag", "probe: compiledBackends is EMPTY (no backend reported available)")
+            }
+            capabilities.compiledBackends.forEach { descriptor ->
+                LaiLog.i(
+                    "LAI-diag",
+                    "probe: compiledBackends[] id=${descriptor.id.value} computeClass=${descriptor.computeClass} " +
+                        "formats=${descriptor.supportedModelFormats} quantizations=${descriptor.supportedQuantizations}",
+                )
+            }
+            val targetSeen = capabilities.compiledBackends.any { it.id.value == backendIdValue }
+            LaiLog.i("LAI-diag", "probe: DONE backend=$backendIdValue reportedAvailable=$targetSeen totalMs=$elapsedMs")
+        }
+    }
+
+    /**
      * ADB-first accelerator qualification entry point (docs/TESTING.md "Backend qualification").
      * Driven by an intent extra on the exported, always-present MainActivity launcher activity —
      * no UI navigation or coordinate taps required. Forces [modelId] onto [backendIdValue],

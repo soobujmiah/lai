@@ -2,6 +2,7 @@
 
 #include <android/log.h>
 
+#include <chrono>
 #include <string>
 
 #ifdef LAI_HAS_HEXAGON
@@ -13,6 +14,15 @@ namespace lai {
 namespace {
 
 constexpr const char* kLogTag = "LAI-llama";
+// See llama_session.cpp's own kDiagTag doc comment: same distinct, permanent diagnostic tag,
+// duplicated locally (rather than shared via the header) to avoid coupling this translation
+// unit's diagnostics to llama_session.cpp's internals for a handful of log-only helpers.
+constexpr const char* kDiagTag = "LAI-diag";
+using DiagClock = std::chrono::steady_clock;
+
+[[maybe_unused]] long long diag_elapsed_us(DiagClock::time_point start, DiagClock::time_point end) {
+    return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+}
 
 #ifdef LAI_HAS_HEXAGON
 
@@ -63,8 +73,14 @@ public:
 
     bool available() const override {
 #ifdef LAI_HAS_HEXAGON
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "hexagon: available() ENTER");
         initialize_llama_once();
+        const auto probe_start = DiagClock::now();
         const ggml_backend_dev_t device = find_htp_device();
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag, "hexagon: available() find_htp_device() returned %p after %lld us",
+            static_cast<void*>(device), diag_elapsed_us(probe_start, DiagClock::now())
+        );
         if (device == nullptr) {
             __android_log_print(ANDROID_LOG_WARN, kLogTag, "hexagon: compiled but no HTP device registered (skel/session init failed?)");
             return false;
@@ -83,8 +99,15 @@ public:
         std::string& error
     ) override {
 #ifdef LAI_HAS_HEXAGON
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "hexagon: open() ENTER");
         initialize_llama_once();
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "hexagon: open() calling find_htp_device()");
+        const auto probe_start = DiagClock::now();
         const ggml_backend_dev_t device = find_htp_device();
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag, "hexagon: open() find_htp_device() returned %p after %lld us",
+            static_cast<void*>(device), diag_elapsed_us(probe_start, DiagClock::now())
+        );
         if (device == nullptr) {
             error = "Hexagon compiled but no HTP device is available on this device";
             return nullptr;
@@ -94,6 +117,7 @@ public:
         // per upstream's own sizing guidance (docs/backend/snapdragon/README.md), so pin to the
         // first session only -- do not raise NDEV without new evidence this model needs it.
         __android_log_print(ANDROID_LOG_INFO, kLogTag, "hexagon: opening session with full layer offload");
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "hexagon: open() calling build_llama_session()");
         return build_llama_session(model_path, context_size, 999, "HTP0", error);
 #else
         (void) model_path;

@@ -12,7 +12,7 @@ set -euo pipefail
 
 PKG="${LAI_PKG:-dev.lai.runtime}"
 ACTIVITY="$PKG/dev.lai.runtime.MainActivity"
-LOG_TAGS='LAI-qualify|LAI-model|LAI-llm|LAI-lifecycle'
+LOG_TAGS='LAI-qualify|LAI-model|LAI-llm|LAI-lifecycle|LAI-diag'
 
 usage() {
   cat <<'EOF'
@@ -33,6 +33,13 @@ Usage: lai_adb.sh <command> [args]
                                     the evidence. Exit code: 0 DONE/ready, 1 DENIED
                                     (backend not in this build's VALIDATED_ACCELERATORS),
                                     2 LOAD_FAILED, 3 timed out with no terminal state.
+  probe <backend-id> [timeout-seconds]
+                                    reset, launch with a model-free capabilities probe (no
+                                    load, no generation) and block on the terminal LAI-diag
+                                    "probe: DONE" line. Seconds, not minutes, when backend
+                                    enumeration is healthy — run this before `qualify` to
+                                    isolate an enumeration hang from a load/session hang.
+                                    Exit code: 0 DONE seen, 3 timed out.
 
 Environment:
   LAI_PKG   application id (default dev.lai.runtime; use dev.lai.runtime.debug for debug builds)
@@ -156,6 +163,36 @@ cmd_qualify() {
   esac
 }
 
+cmd_probe() {
+  local backend_id="$1" timeout="${2:-30}"
+  cmd_reset
+  adb logcat -c
+  local remote_cmd="am start -W -n $ACTIVITY --es qualify_backend $(shell_quote "$backend_id") --ez qualify_probe true"
+  echo "launching probe: backend=$backend_id"
+  adb shell "$remote_cmd"
+
+  local waited=0
+  local line=""
+  while (( waited < timeout )); do
+    line=$( (adb logcat -d -e 'LAI-diag' 2>/dev/null || true) | (grep -E 'probe: DONE' || true) | tail -1)
+    if [[ -n "$line" ]]; then
+      break
+    fi
+    sleep 1
+    waited=$(( waited + 1 ))
+  done
+
+  echo "=== probe evidence (backend=$backend_id) ==="
+  adb logcat -d | grep -E "$LOG_TAGS" || true
+  echo "==="
+
+  if [[ -z "$line" ]]; then
+    echo "TIMED OUT waiting for 'probe: DONE' within ${timeout}s -- enumeration itself may be hanging" >&2
+    return 3
+  fi
+  return 0
+}
+
 main() {
   local command="${1:-}"
   [[ -n "$command" ]] || { usage; exit 1; }
@@ -170,6 +207,7 @@ main() {
     logs) cmd_logs "$@" ;;
     state) cmd_state "$@" ;;
     qualify) cmd_qualify "$@" ;;
+    probe) cmd_probe "$@" ;;
     -h|--help|help) usage ;;
     *) echo "Unknown command: $command" >&2; usage; exit 1 ;;
   esac

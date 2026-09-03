@@ -46,6 +46,15 @@ class MainActivity : ComponentActivity() {
      */
     private fun handleQualificationIntent(intent: Intent) {
         val backend = intent.getStringExtra(EXTRA_QUALIFY_BACKEND) ?: return
+        if (intent.getBooleanExtra(EXTRA_QUALIFY_PROBE_ONLY, false)) {
+            // Cheap, model-free capabilities probe (docs/TESTING.md "Backend qualification" —
+            // diagnostic probe mode) — isolates whether backend *enumeration* hangs before
+            // committing to a full, multi-minute qualification attempt. No BuildConfig gating
+            // needed here: reading capabilities never forces a load.
+            LaiLog.i("LAI-diag", "Probe intent received: backend=$backend")
+            viewModel.runBackendProbe(backend)
+            return
+        }
         val modelId = intent.getStringExtra(EXTRA_QUALIFY_MODEL) ?: return
         val prompt = intent.getStringExtra(EXTRA_QUALIFY_PROMPT) ?: DEFAULT_QUALIFY_PROMPT
         LaiLog.i("LAI-qualify", "Qualification intent received: model=$modelId backend=$backend")
@@ -56,6 +65,7 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_QUALIFY_BACKEND = "qualify_backend"
         const val EXTRA_QUALIFY_MODEL = "qualify_model"
         const val EXTRA_QUALIFY_PROMPT = "qualify_prompt"
+        const val EXTRA_QUALIFY_PROBE_ONLY = "qualify_probe"
         const val DEFAULT_QUALIFY_PROMPT = "Say hello in one short sentence."
     }
 

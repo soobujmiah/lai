@@ -195,9 +195,21 @@ std::string captured_cerr_tail() {
     return g_cerr_buf != nullptr ? g_cerr_buf->tail() : std::string();
 }
 
+// Diagnostic instrumentation for the 2026-09-03 Hexagon/OpenCL shared-init hang investigation
+// (docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md). Kept permanently: it is
+// cheap (a handful of log lines per process lifetime, not per token/request) and answers "what
+// was the last stage reached before a block" for any future accelerator qualification, not just
+// this one. Deliberately a distinct tag from kLogTag ("LAI-llama", which also carries verbose
+// llama.cpp/ggml internal logging) so `scripts/device/lai_adb.sh` and a human can grep it alone.
+constexpr const char* kDiagTag = "LAI-diag";
+
 void initialize_llama_once() {
     static std::once_flag once;
+    const auto call_start = Clock::now();
+    __android_log_print(ANDROID_LOG_INFO, kDiagTag, "init_once: call (may be a no-op if already run)");
     std::call_once(once, [] {
+        const auto stage_start = Clock::now();
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "init_once: ENTER (first call in this process)");
         static LogcatStreambuf cerr_buf(kLogTag);
         g_cerr_buf = &cerr_buf;
         std::cerr.rdbuf(&cerr_buf);
@@ -205,9 +217,29 @@ void initialize_llama_once() {
             const int priority = level >= GGML_LOG_LEVEL_ERROR ? ANDROID_LOG_ERROR : ANDROID_LOG_DEBUG;
             __android_log_write(priority, kLogTag, text);
         }, nullptr);
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "init_once: calling llama_backend_init()");
+        const auto backend_init_start = Clock::now();
         llama_backend_init();
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag, "init_once: llama_backend_init() returned after %lld us",
+            elapsed_us(backend_init_start, Clock::now())
+        );
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "init_once: calling ggml_backend_load_all()");
+        const auto load_all_start = Clock::now();
         ggml_backend_load_all();
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag, "init_once: ggml_backend_load_all() returned after %lld us",
+            elapsed_us(load_all_start, Clock::now())
+        );
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag, "init_once: EXIT, total %lld us",
+            elapsed_us(stage_start, Clock::now())
+        );
     });
+    __android_log_print(
+        ANDROID_LOG_INFO, kDiagTag, "init_once: returning to caller after %lld us",
+        elapsed_us(call_start, Clock::now())
+    );
 }
 
 class LlamaSession final : public BackendSession {
@@ -488,6 +520,11 @@ std::unique_ptr<BackendSession> build_llama_session(
     std::string& error
 ) {
         initialize_llama_once();
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag,
+            "build_llama_session: ENTER gpu_layers=%d gpu_device_name='%s'",
+            gpu_layers, gpu_device_name != nullptr ? gpu_device_name : "(none)"
+        );
         llama_model_params model_params = llama_model_default_params();
         model_params.n_gpu_layers = gpu_layers;
         // When several GPU backends are compiled into one artifact (Vulkan + OpenCL on the
@@ -496,6 +533,8 @@ std::unique_ptr<BackendSession> build_llama_session(
         // remainder) so offload can never land on the other GPU backend's device.
         static ggml_backend_dev_t g_pinned_devices[3] = {nullptr, nullptr, nullptr};
         if (gpu_layers > 0 && gpu_device_name != nullptr) {
+            const auto pin_start = Clock::now();
+            __android_log_print(ANDROID_LOG_INFO, kDiagTag, "build_llama_session: device-pin ENTER (enumerating ggml devices)");
             ggml_backend_dev_t gpu_device = nullptr;
             const size_t device_count = ggml_backend_dev_count();
             for (size_t index = 0; index < device_count; ++index) {
@@ -528,6 +567,10 @@ std::unique_ptr<BackendSession> build_llama_session(
                 "device: pinned offload to '%s' (+ CPU for the remainder)",
                 ggml_backend_dev_name(gpu_device)
             );
+            __android_log_print(
+                ANDROID_LOG_INFO, kDiagTag, "build_llama_session: device-pin EXIT after %lld us",
+                elapsed_us(pin_start, Clock::now())
+            );
         }
         // GPU offload requires copying weights into the device's buffers. With MMAP the loader
         // keeps tensors in the CPU-mapped file, and llama.cpp deliberately swaps any GPU host
@@ -538,7 +581,19 @@ std::unique_ptr<BackendSession> build_llama_session(
         // Use LOAD_MODE_NONE for GPU offload so weights land in Vulkan buffers; keep MMAP for
         // the pure-CPU path (fast mmap load, no copies).
         model_params.load_mode = gpu_layers > 0 ? LLAMA_LOAD_MODE_NONE : LLAMA_LOAD_MODE_MMAP;
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag,
+            "build_llama_session: MODEL_LOAD_BEGIN calling llama_model_load_from_file() "
+            "-- this is where backend buffer/device init (e.g. a FastRPC/DSP session open) "
+            "would happen for an offload device; if no MODEL_LOAD_END ever follows, the block "
+            "is inside this vendor call, not in LAI code"
+        );
+        const auto model_load_start = Clock::now();
         llama_model* model = llama_model_load_from_file(model_path.c_str(), model_params);
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag, "build_llama_session: MODEL_LOAD_END after %lld us, model=%p",
+            elapsed_us(model_load_start, Clock::now()), static_cast<void*>(model)
+        );
         if (model == nullptr) {
             error = "llama.cpp could not load the GGUF model";
             return nullptr;
@@ -569,12 +624,23 @@ std::unique_ptr<BackendSession> build_llama_session(
         // vkCmdBindPipeline crash; the standard attention path is far more widely exercised.
         context_params.flash_attn_type = gpu_layers > 0 ? LLAMA_FLASH_ATTN_TYPE_DISABLED : LLAMA_FLASH_ATTN_TYPE_AUTO;
 
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag,
+            "build_llama_session: CONTEXT_CREATE_BEGIN calling llama_init_from_model() "
+            "-- KV cache + compute graph allocation on the target device happens here"
+        );
+        const auto context_create_start = Clock::now();
         llama_context* context = llama_init_from_model(model, context_params);
+        __android_log_print(
+            ANDROID_LOG_INFO, kDiagTag, "build_llama_session: CONTEXT_CREATE_END after %lld us, context=%p",
+            elapsed_us(context_create_start, Clock::now()), static_cast<void*>(context)
+        );
         if (context == nullptr) {
             llama_model_free(model);
             error = "llama.cpp could not allocate the inference context";
             return nullptr;
         }
+        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "build_llama_session: EXIT success");
         // Idle: keep process on little cores until user sends a message.
         pin_to_little_cores();
         return std::make_unique<LlamaSession>(model, context, static_cast<int>(worker_threads));
