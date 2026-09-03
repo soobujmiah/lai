@@ -102,4 +102,36 @@ if(LAI_ENABLE_LLAMA_CPP)
         target_compile_definitions(lai_runtime PRIVATE LAI_HAS_HEXAGON=1)
     endif()
     target_link_libraries(lai_runtime PRIVATE llama)
+
+    if(GGML_HEXAGON)
+        # ggml-hexagon's HTP skels (v73/v75/v79/v81) are standalone DSP-side .so files built by
+        # its own nested ExternalProject_Add sub-build with its own toolchain -- independent of
+        # this target's NDK build (see the GGML_HEXAGON block above) -- so nothing links them
+        # into lai_runtime and nothing places them where AGP packages native libs from. Copy them
+        # there explicitly, using only CMake-resolved locations, never a guessed/hardcoded
+        # .cxx/<hash> path: add_subdirectory() above pins llama.cpp's binary dir to
+        # ${CMAKE_CURRENT_BINARY_DIR}/llama.cpp, and ExternalProject_Add's own default layout
+        # (<name>-prefix/src/<name>-build/) is a fixed CMake convention, not an AGP-generated
+        # hash -- confirmed against real CI output (run 33809644535) before writing this.
+        # $<TARGET_FILE_DIR:lai_runtime> is the exact directory liblai_runtime.so itself lands
+        # in, i.e. the same directory AGP's existing native-lib packaging already scans.
+        set(LAI_HEXAGON_HTP_SKEL_DIR "${CMAKE_CURRENT_BINARY_DIR}/llama.cpp/ggml/src/ggml-hexagon")
+        set(LAI_HEXAGON_HTP_SKELS
+            "${LAI_HEXAGON_HTP_SKEL_DIR}/htp-v73-prefix/src/htp-v73-build/libggml-htp-v73.so"
+            "${LAI_HEXAGON_HTP_SKEL_DIR}/htp-v75-prefix/src/htp-v75-build/libggml-htp-v75.so"
+            "${LAI_HEXAGON_HTP_SKEL_DIR}/htp-v79-prefix/src/htp-v79-build/libggml-htp-v79.so"
+            "${LAI_HEXAGON_HTP_SKEL_DIR}/htp-v81-prefix/src/htp-v81-build/libggml-htp-v81.so"
+        )
+        # Ordering: lai_runtime's own build (and therefore this POST_BUILD step) cannot start
+        # until all four HTP skel targets have finished, so the copy can never run early.
+        add_dependencies(lai_runtime htp-v73 htp-v75 htp-v79 htp-v81)
+        add_custom_command(
+            TARGET lai_runtime POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${LAI_HEXAGON_HTP_SKELS}
+                "$<TARGET_FILE_DIR:lai_runtime>"
+            COMMENT "LAI: copying ggml-hexagon HTP skels into lai_runtime's native-lib output dir"
+            VERBATIM
+        )
+    endif()
 endif()
