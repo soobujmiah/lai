@@ -79,6 +79,12 @@ if(LAI_ENABLE_LLAMA_CPP)
         set(GGML_HEXAGON ON CACHE BOOL "" FORCE)
         set(HEXAGON_SDK_ROOT "${LAI_HEXAGON_SDK_ROOT}" CACHE PATH "" FORCE)
         set(HEXAGON_TOOLS_ROOT "${LAI_HEXAGON_TOOLS_ROOT}" CACHE PATH "" FORCE)
+        # Matches upstream's own docs/backend/snapdragon/CMakeUserPresets.json for the
+        # arm64-android-snapdragon target exactly. Without this, hexagon_fun.cmake's own
+        # string(FIND ...) calls receive an undefined (not just empty) variable, which CMake
+        # drops as an argument entirely -- the exact "string sub-command FIND requires 3 or 4
+        # parameters" error hit on the first real compile attempt.
+        set(PREBUILT_LIB_DIR "android_aarch64" CACHE STRING "" FORCE)
         message(STATUS "LAI: ggml-hexagon enabled (compile-only gate, SDK at ${LAI_HEXAGON_SDK_ROOT})")
     else()
         set(GGML_HEXAGON OFF CACHE BOOL "" FORCE)
