@@ -27,6 +27,16 @@ on:
         required: false
         default: ''
         type: string
+      hexagon_recon:
+        description: >-
+          Run ONLY the isolated Hexagon SDK reconnaissance job (pulls the public
+          ghcr.io/snapdragon-toolchain/arm64-android:v0.7 image, ~2.4 GB, confirmed
+          anonymously pullable — see docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md) and
+          inspects its bundled Hexagon SDK layout. Does not touch the main Android build
+          job at all — zero risk to the working pipeline. Leave false for a normal build.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: android-${{ github.ref }}
@@ -52,8 +62,41 @@ env:
   OPENCL_ICD_LOADER_COMMIT: '45cdbda4ddd31c324e32a744f112087c42da18f7'
 
 jobs:
+  hexagon-sdk-recon:
+    name: Hexagon SDK reconnaissance (manual, no build impact)
+    if: github.event_name == 'workflow_dispatch' && inputs.hexagon_recon
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Pull snapdragon-toolchain image and inspect Hexagon SDK layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/snapdragon-toolchain/arm64-android:v0.7"
+          echo "::group::docker pull"
+          docker pull "$IMAGE"
+          echo "::endgroup::"
+          echo "::group::/opt contents"
+          docker run --rm "$IMAGE" ls -la /opt
+          echo "::endgroup::"
+          echo "::group::Hexagon SDK root candidates"
+          docker run --rm "$IMAGE" sh -c 'ls -la /opt/hexagon/ 2>/dev/null; for d in /opt/hexagon/*/; do echo "-- $d --"; ls -la "$d" 2>/dev/null | head -20; done'
+          echo "::endgroup::"
+          echo "::group::hexagon_sdk.json (HEXAGON_TOOLS_ROOT resolution, per ggml-hexagon CMakeLists.txt)"
+          docker run --rm "$IMAGE" sh -c 'find /opt/hexagon -maxdepth 2 -iname "hexagon_sdk.json" -exec cat {} \; 2>/dev/null || echo "not found at depth 2"'
+          echo "::endgroup::"
+          echo "::group::bundled NDK (compare against LAI pin: ${ANDROID_NDK:-unset})"
+          docker run --rm "$IMAGE" sh -c 'find / -maxdepth 4 -iname "*ndk*" -type d 2>/dev/null'
+          echo "::endgroup::"
+          echo "::group::image size on disk"
+          docker image inspect "$IMAGE" --format='{{.Size}}' | awk '{printf "%.2f GB\n", $1/1e9}'
+          echo "::endgroup::"
+
   source-policy:
     name: Source and documentation policy
+    if: "!(github.event_name == 'workflow_dispatch' && inputs.hexagon_recon)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -63,6 +106,7 @@ jobs:
   build:
     name: Compile Kotlin, C++ and APK
     needs: source-policy
+    if: "!(github.event_name == 'workflow_dispatch' && inputs.hexagon_recon)"
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
