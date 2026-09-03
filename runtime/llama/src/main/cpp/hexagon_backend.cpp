@@ -141,7 +141,7 @@ std::unique_ptr<Backend> create_hexagon_backend() {
 // failed" on the DSP side) even after libcdsprpc.so itself loaded successfully: the HTP skel
 // .so files are compiled in and bundled, but the DSP-side loader needs an actual file on disk,
 // and this build's native-library packaging otherwise loads straight out of the (now-extracted,
-// see AndroidManifest.xml android:extractNativeLibs) APK's own native library directory --
+// see app/build.gradle.kts jniLibs.useLegacyPackaging) APK's own native library directory --
 // pointing the vendor FastRPC client at that directory via ADSP_LIBRARY_PATH is what upstream's
 // own Android integration (and every other real app found to reach this device's HTP) does.
 void configure_hexagon_adsp_path(const std::string& native_library_dir) {

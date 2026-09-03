@@ -67,18 +67,21 @@ after a manual extraction step: `RNLlama: Set ADSP_LIBRARY_PATH=/data/user/0/com
 
 ## Fix applied
 
-1. `android:extractNativeLibs="true"` (`AndroidManifest.xml`, `<application>` tag) — makes
-   Android's own package installer extract every bundled `.so` (including the four HTP skels) to
+1. `packaging { jniLibs.useLegacyPackaging = true }` (`app/build.gradle.kts`) — makes Android's
+   own package installer extract every bundled `.so` (including the four HTP skels) to
    `legacyNativeLibraryDir` at install time, avoiding a manual runtime-extraction step like
-   ChatterUI's.
+   ChatterUI's. First attempt used the `AndroidManifest.xml android:extractNativeLibs="true"`
+   attribute directly; AGP rejects that outright ("Avoid setting android:extractNativeLibs=true
+   explicitly... instead set android.packagingOptions.jniLibs.useLegacyPackaging"), caught from
+   the actual CI failure and fixed to the Gradle-DSL form.
 2. `LaiApplication.onCreate()` now calls a new native function,
    `NativeInferenceEngine.configureHexagonAdspPath(applicationInfo.nativeLibraryDir)`
    (`hexagon_backend.cpp`), which does `setenv("ADSP_LIBRARY_PATH", nativeLibraryDir, 1)` —
    mirroring the existing `configureOpenCLVendors` pattern exactly, run before any backend probe.
 
 Both changes are additive and inert for every other path: CPU/Vulkan load the same way regardless,
-and `extractNativeLibs="true"` only affects on-disk packaging (larger install footprint, no
-behavior change for libraries that don't need DSP-style filesystem access).
+and legacy packaging only affects on-disk footprint (larger install size), no behavior change for
+libraries that don't need DSP-style filesystem access.
 
 ## Result
 

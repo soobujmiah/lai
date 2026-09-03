@@ -94,6 +94,13 @@ android {
             "META-INF/LICENSE.md",
             "META-INF/NOTICE.md",
         )
+        // Hexagon DSP-side skel discovery (docs/device-results/
+        // 2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md): the DSP-side loader
+        // needs a real file on disk for libggml-htp-v*.so, which this app's default packaging
+        // (native libs loaded straight out of the APK, never extracted) never provides. AGP
+        // requires this Gradle-DSL setting rather than the AndroidManifest.xml
+        // android:extractNativeLibs attribute, which it now rejects outright.
+        jniLibs.useLegacyPackaging = true
     }
     testOptions { unitTests.isIncludeAndroidResources = true }
 }

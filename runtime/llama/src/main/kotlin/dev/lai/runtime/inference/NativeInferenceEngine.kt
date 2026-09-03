@@ -79,7 +79,7 @@ class NativeInferenceEngine : InferenceEngine {
      * after libcdsprpc.so itself loaded successfully: the HTP skel .so files (libggml-htp-v73.so
      * etc.) are compiled in and bundled, but with this build's native-library packaging they are
      * never extracted to a real filesystem path the DSP-side loader can open — they load straight
-     * out of the (now-extracted, see android:extractNativeLibs="true") APK's native library
+     * out of the (now-extracted, see app/build.gradle.kts jniLibs.useLegacyPackaging) APK's native library
      * directory instead. This points the vendor FastRPC client at that same directory via the
      * ADSP_LIBRARY_PATH environment variable, mirroring the OpenCL vendor-discovery pattern
      * above. Must run BEFORE any backend capability probe. Safe no-op when the native library is

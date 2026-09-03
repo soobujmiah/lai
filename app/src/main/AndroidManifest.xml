@@ -11,7 +11,6 @@
   <application
     android:name=".LaiApplication"
     android:allowBackup="false"
-    android:extractNativeLibs="true"
     android:icon="@drawable/ic_lai"
     android:label="@string/app_name"
     android:roundIcon="@drawable/ic_lai"
@@ -25,8 +24,9 @@
          same upstream ggml-hexagon this app uses successfully opens a FastRPC handle to the cdsp
          domain and loads the v73 HTP skel on this device. This entry (confirmed working: the
          driver now loads and the Hexagon backend registry now constructs, where before nothing
-         happened at all) plus android:extractNativeLibs="true" above closes the two concrete
-         gaps found: (1) libcdsprpc.so needs the app-namespace bridge below to dlopen at all;
+         happened at all) plus app/build.gradle.kts's jniLibs.useLegacyPackaging setting closes
+         the two concrete gaps found: (1) libcdsprpc.so needs the app-namespace bridge below to
+         dlopen at all;
          (2) the DSP-side loader needs an actual file on disk for the HTP skel .so, which this
          build's default APK packaging never provided (native libs load straight from the
          uncompressed APK, never extracted): ggml-hexagon's session-open call then reads
