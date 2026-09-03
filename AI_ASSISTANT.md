@@ -21,6 +21,8 @@ At session close, perform a Knowledge Return Review. Identify durable LAI facts,
 
 See `SKB_KNOWLEDGE_CONTINUITY.md` for the project-local contract.
 
+Before any GPU/NPU/accelerator work specifically, also read SKB's `devices/redmi-turbo-4-pro/accelerator-access-audit.md` — the canonical, cross-project record of what this device's Vulkan/OpenCL/QNN-Hexagon doors actually allow, including the 2026-09-03 finding that direct FastRPC/QNN NPU access is verified-blocked for third-party apps industry-wide (not LAI- or HyperOS-specific), corroborated in this repo's `docs/HANDOFF-2026-09-03-npu-android-ecosystem-research.md` and `docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md`.
+
 ## Session start
 
 Before changing LAI:
