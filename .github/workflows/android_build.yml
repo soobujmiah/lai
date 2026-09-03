@@ -249,6 +249,31 @@ jobs:
             echo "LAI_OPENCL_LIBRARY=$ICD_DIR/build/libOpenCL.a"
           } >> "$GITHUB_ENV"
 
+      # Hexagon NPU track (docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md): opt-in only, via
+      # validated_accelerators=llama-hexagon -- never runs on an ordinary push or a dispatch
+      # that doesn't ask for it, so normal builds never pay this image's cost. Pulls the public
+      # snapdragon-toolchain image (confirmed anonymously pullable; ~7.4 GB on disk total) but
+      # extracts ONLY the Hexagon SDK subtree via docker cp, not the whole image, into the build.
+      # Compile-only gate for now -- see runtime/llama/src/main/cpp/CMakeLists.txt.
+      - name: Fetch Hexagon SDK (opt-in, llama-hexagon only)
+        if: contains(inputs.validated_accelerators, 'llama-hexagon')
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/snapdragon-toolchain/arm64-android:v0.7"
+          SDK_DEST="$RUNNER_TEMP/hexagon-sdk"
+          mkdir -p "$SDK_DEST"
+          docker pull "$IMAGE"
+          CID=$(docker create "$IMAGE")
+          docker cp "$CID:/opt/hexagon/6.6.0.0/." "$SDK_DEST/"
+          docker rm "$CID" >/dev/null
+          test -f "$SDK_DEST/build/cmake/hexagon_fun.cmake" || { echo "Hexagon SDK extraction incomplete (missing build/cmake/hexagon_fun.cmake)" >&2; exit 1; }
+          test -d "$SDK_DEST/tools/HEXAGON_Tools/19.0.07" || { echo "Hexagon Tools missing (expected tools/HEXAGON_Tools/19.0.07 per hexagon_sdk.json)" >&2; exit 1; }
+          {
+            echo "LAI_HEXAGON_SDK_ROOT=$SDK_DEST"
+            echo "LAI_HEXAGON_TOOLS_ROOT=$SDK_DEST/tools/HEXAGON_Tools/19.0.07"
+          } >> "$GITHUB_ENV"
+
       - name: Install Vulkan build dependencies (SPIRV-Headers, glslang)
         timeout-minutes: 12
         shell: bash
@@ -280,6 +305,8 @@ jobs:
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
           -Plai.openclIncludeDir="$LAI_OPENCL_INCLUDE_DIR"
           -Plai.openclLibrary="$LAI_OPENCL_LIBRARY"
+          -Plai.hexagonSdkRoot="$LAI_HEXAGON_SDK_ROOT"
+          -Plai.hexagonToolsRoot="$LAI_HEXAGON_TOOLS_ROOT"
           -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
 
       - name: Build debug APK and native arm64 library
@@ -296,6 +323,8 @@ jobs:
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
           -Plai.openclIncludeDir="$LAI_OPENCL_INCLUDE_DIR"
           -Plai.openclLibrary="$LAI_OPENCL_LIBRARY"
+          -Plai.hexagonSdkRoot="$LAI_HEXAGON_SDK_ROOT"
+          -Plai.hexagonToolsRoot="$LAI_HEXAGON_TOOLS_ROOT"
           -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
 
       # WORKING RULE (docs/BUILD_AND_RELEASE.md): build ONLY the signed release APK by default.
@@ -316,6 +345,8 @@ jobs:
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR" \
           -Plai.openclIncludeDir="$LAI_OPENCL_INCLUDE_DIR" \
           -Plai.openclLibrary="$LAI_OPENCL_LIBRARY" \
+          -Plai.hexagonSdkRoot="$LAI_HEXAGON_SDK_ROOT" \
+          -Plai.hexagonToolsRoot="$LAI_HEXAGON_TOOLS_ROOT" \
           -Plai.validatedAccelerators="${{ inputs.validated_accelerators }}"
 
       - name: Inventory native and APK artifacts

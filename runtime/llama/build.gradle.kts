@@ -42,6 +42,17 @@ android {
                         "-DLAI_OPENCL_LIBRARY=$openclLibrary",
                     )
                 }
+                // Hexagon NPU track (docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md): CI extracts
+                // just the Hexagon SDK subtree from the public snapdragon-toolchain image. Compile-only
+                // gate for now -- see runtime/llama/src/main/cpp/CMakeLists.txt.
+                val hexagonSdkRoot = providers.gradleProperty("lai.hexagonSdkRoot").orNull
+                val hexagonToolsRoot = providers.gradleProperty("lai.hexagonToolsRoot").orNull
+                if (!hexagonSdkRoot.isNullOrBlank() && !hexagonToolsRoot.isNullOrBlank()) {
+                    arguments += listOf(
+                        "-DLAI_HEXAGON_SDK_ROOT=$hexagonSdkRoot",
+                        "-DLAI_HEXAGON_TOOLS_ROOT=$hexagonToolsRoot",
+                    )
+                }
                 // ggml-vulkan.cpp includes <vulkan/vulkan.hpp> and <spirv/unified1/spirv.hpp>,
                 // which the NDK sysroot and apt packages do not expose to the cross-compiler
                 // (apt installs them under /usr/include, hidden by NDK sysroot isolation). CI

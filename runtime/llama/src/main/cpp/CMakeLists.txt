@@ -7,6 +7,12 @@ set(LAI_LLAMA_CPP_DIR "" CACHE PATH "Path to a CI-fetched llama.cpp checkout")
 # ggml-opencl is compiled into liblai_runtime.so (docs/BUILD_AND_RELEASE.md).
 set(LAI_OPENCL_INCLUDE_DIR "" CACHE PATH "Path to CI-fetched Khronos OpenCL-Headers")
 set(LAI_OPENCL_LIBRARY "" CACHE FILEPATH "Path to CI-built static OpenCL ICD loader (libOpenCL.a)")
+# Hexagon NPU track (docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md): when CI extracts the
+# Hexagon SDK from the public ghcr.io/snapdragon-toolchain image, ggml-hexagon is compiled
+# into liblai_runtime.so. Compile-only gate for now (no llama-hexagon backend selectable
+# yet) -- see the handoff doc for the staged plan.
+set(LAI_HEXAGON_SDK_ROOT "" CACHE PATH "Path to the extracted Hexagon SDK (e.g. .../hexagon/6.6.0.0)")
+set(LAI_HEXAGON_TOOLS_ROOT "" CACHE PATH "Path to the Hexagon Tools compiler root inside the SDK")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -63,6 +69,20 @@ if(LAI_ENABLE_LLAMA_CPP)
     else()
         set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
         message(STATUS "LAI: ggml-opencl disabled (no OpenCL headers/ICD loader provided)")
+    endif()
+    # Hexagon NPU track. ggml-hexagon's CMakeLists does include(${HEXAGON_SDK_ROOT}/build/cmake/hexagon_fun.cmake)
+    # and cross-compiles four HTP skels (v73/v75/v79/v81) via its own ExternalProject_Add sub-build with
+    # its own toolchain file -- independent of this target's own NDK 27 build, so no version conflict
+    # with the SDK's internally-expected NDK r25c. Compile-only gate: proves the CI SDK intake actually
+    # lets ggml-hexagon build before any llama-hexagon backend is exposed to the Kotlin scheduler.
+    if(EXISTS "${LAI_HEXAGON_SDK_ROOT}/build/cmake/hexagon_fun.cmake" AND EXISTS "${LAI_HEXAGON_TOOLS_ROOT}")
+        set(GGML_HEXAGON ON CACHE BOOL "" FORCE)
+        set(HEXAGON_SDK_ROOT "${LAI_HEXAGON_SDK_ROOT}" CACHE PATH "" FORCE)
+        set(HEXAGON_TOOLS_ROOT "${LAI_HEXAGON_TOOLS_ROOT}" CACHE PATH "" FORCE)
+        message(STATUS "LAI: ggml-hexagon enabled (compile-only gate, SDK at ${LAI_HEXAGON_SDK_ROOT})")
+    else()
+        set(GGML_HEXAGON OFF CACHE BOOL "" FORCE)
+        message(STATUS "LAI: ggml-hexagon disabled (no Hexagon SDK provided)")
     endif()
     # Proper way: SPIRV-Headers + glslang are now installed on CI via workflow apt-get.
     add_subdirectory("${LAI_LLAMA_CPP_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/llama.cpp" EXCLUDE_FROM_ALL)
