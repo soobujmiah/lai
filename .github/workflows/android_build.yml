@@ -371,6 +371,15 @@ jobs:
         shell: bash
         run: |
           find app runtime -type f \( -name '*.apk' -o -name 'liblai_runtime.so' \) -print 2>/dev/null || true
+          echo "::group::All .so files under runtime/llama/build (2026-09-03 Hexagon skel packaging check)"
+          find runtime/llama/build -name '*.so' 2>/dev/null | sort || true
+          echo "::endgroup::"
+          echo "::group::Any HTP skel anywhere in the workspace"
+          find . -iname 'libggml-htp*' 2>/dev/null | sort || true
+          echo "::endgroup::"
+          echo "::group::Final APK lib/ contents"
+          find app/build/outputs/apk -name '*.apk' -exec unzip -l {} \; 2>/dev/null | grep -i '\.so$' || true
+          echo "::endgroup::"
 
       - name: Generate dependency SBOM (lightweight)
         if: always()
