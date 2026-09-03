@@ -353,17 +353,15 @@ jobs:
         run: |
           VERSION_NAME="${GITHUB_REF_NAME#v}"
           if [[ "$VERSION_NAME" == "$GITHUB_REF_NAME" ]]; then VERSION_NAME="0.1.${GITHUB_RUN_NUMBER}"; fi
-          # --no-build-cache (2026-09-03 Hexagon skel investigation): a build with
-          # validated_accelerators=llama-hexagon produced zero libggml-htp-v*.so anywhere in the
-          # workspace despite GGML_HEXAGON's other symptoms (registration code present and
-          # running, per docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md)
-          # -- consistent with Gradle's cross-run build cache (this workflow uses
-          # gradle/actions/setup-gradle, which persists it) reusing a stale native-build task
-          # output from an earlier run where the Hexagon SDK path content differed enough for the
-          # cache key to consider it unchanged. Forcing a fresh, uncached native build for
-          # correctness on every accelerator-qualification-relevant run; revisit if this turns
-          # out not to be the cause.
-          gradle --no-daemon --stacktrace --no-build-cache :app:assembleRelease \
+          # --no-build-cache ruled out (2026-09-03): confirmed a fully uncached build ALSO
+          # produces zero libggml-htp-v*.so anywhere in the workspace, so this was not a stale
+          # Gradle build-cache artifact. Reverted; --info added instead to see AGP's
+          # externalNativeBuild CMake configure/build output at all, which it suppresses by
+          # default even on success (confirmed: a separate, standalone CMake invocation earlier
+          # in the same log shows its own "-- Configuring done", LAI's own app/runtime:llama
+          # CMake configure never does) -- the prior absence of any GGML_HEXAGON/htp-related
+          # message() output was inconclusive for this reason, not evidence of failure either way.
+          gradle --no-daemon --stacktrace --info :app:assembleRelease \
             -Plai.versionCode="${GITHUB_RUN_NUMBER}" \
             -Plai.versionName="$VERSION_NAME" \
             -Plai.enableLlamaCpp=ON \
