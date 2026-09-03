@@ -353,7 +353,17 @@ jobs:
         run: |
           VERSION_NAME="${GITHUB_REF_NAME#v}"
           if [[ "$VERSION_NAME" == "$GITHUB_REF_NAME" ]]; then VERSION_NAME="0.1.${GITHUB_RUN_NUMBER}"; fi
-          gradle --no-daemon --stacktrace :app:assembleRelease \
+          # --no-build-cache (2026-09-03 Hexagon skel investigation): a build with
+          # validated_accelerators=llama-hexagon produced zero libggml-htp-v*.so anywhere in the
+          # workspace despite GGML_HEXAGON's other symptoms (registration code present and
+          # running, per docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md)
+          # -- consistent with Gradle's cross-run build cache (this workflow uses
+          # gradle/actions/setup-gradle, which persists it) reusing a stale native-build task
+          # output from an earlier run where the Hexagon SDK path content differed enough for the
+          # cache key to consider it unchanged. Forcing a fresh, uncached native build for
+          # correctness on every accelerator-qualification-relevant run; revisit if this turns
+          # out not to be the cause.
+          gradle --no-daemon --stacktrace --no-build-cache :app:assembleRelease \
             -Plai.versionCode="${GITHUB_RUN_NUMBER}" \
             -Plai.versionName="$VERSION_NAME" \
             -Plai.enableLlamaCpp=ON \
