@@ -24,7 +24,12 @@ android {
                 // lai_runtime the way the static ggml/llama libs are. Must list every .so target
                 // actually needed in the APK explicitly. See
                 // docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md.
-                targets += listOf("lai_runtime", "htp-v73", "htp-v75", "htp-v79", "htp-v81")
+                // The four HTP skel targets only exist in the CMake project when GGML_HEXAGON is
+                // ON (see CMakeLists.txt); listing them unconditionally here breaks every build
+                // variant that doesn't enable Hexagon ("Unexpected native build target htp-v75",
+                // observed in CI run 33790660621). They're appended below, gated on the same
+                // lai.hexagonSdkRoot/lai.hexagonToolsRoot check that flips GGML_HEXAGON itself.
+                targets += "lai_runtime"
                 cppFlags += listOf("-std=c++20", "-Wall", "-Wextra", "-Wpedantic")
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
@@ -63,6 +68,9 @@ android {
                         "-DLAI_HEXAGON_SDK_ROOT=$hexagonSdkRoot",
                         "-DLAI_HEXAGON_TOOLS_ROOT=$hexagonToolsRoot",
                     )
+                    // GGML_HEXAGON only turns ON in CMakeLists.txt under this same condition;
+                    // the HTP skels only exist as CMake targets when it does.
+                    targets += listOf("htp-v73", "htp-v75", "htp-v79", "htp-v81")
                 }
                 // ggml-vulkan.cpp includes <vulkan/vulkan.hpp> and <spirv/unified1/spirv.hpp>,
                 // which the NDK sysroot and apt packages do not expose to the cross-compiler
