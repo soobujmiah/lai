@@ -18,6 +18,28 @@
     android:theme="@style/Theme.Lai"
     android:usesCleartextTraffic="false">
 
+    <!-- Hexagon FastRPC track (docs/device-results/2026-09-03-redmi-turbo-4-pro-chatterui-fastrpc-comparison.md):
+         a real third-party app (ChatterUI, plain untrusted_app, sideloaded) running the exact
+         same upstream ggml-hexagon this app uses successfully opens a FastRPC handle to the cdsp
+         domain and loads the v73 HTP skel on this device -- LAI's own attempt finds zero HTP
+         devices instead. The one concrete difference found: ChatterUI's manifest declares
+         uses-native-library for libcdsprpc.so (Android's nativeloader reports
+         uses_libraries=libOpenCL.so:libcdsprpc.so for it); LAI never has. Same
+         required="false" no-op-if-unavailable guarantee already used for this device's other
+         vendor-library bridge attempts (see the note below) -- CPU/Vulkan remain unaffected
+         either way. Needs a real-device requalification to know if it actually closes the gap;
+         recorded as a qualification step, not claimed as a fix yet. -->
+    <uses-native-library
+      android:name="libcdsprpc.so"
+      android:required="false" />
+
+    <!-- NOTE: libOpenCL.so's own uses-native-library entry was deliberately reverted in commit
+         82949bb after real-device evidence showed it causes an indefinite app-launch hang on
+         this device (docs/device-results/2026-09-03-redmi-turbo-4-pro-opencl-namespace-hang.md).
+         Do not re-add it without a timeout-guarded probe in place first -- see PROJECT_STATE.md
+         §4.2. libcdsprpc.so is a different vendor library with no such evidence against it; it is
+         being tried independently, not as a package with OpenCL's entry. -->
+
     <activity
       android:name=".MainActivity"
       android:exported="true"
