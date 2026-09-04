@@ -33,16 +33,21 @@ day's only or latest event.
 
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime` · Public repo
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
-Head as of session close: **`b53c9cd`**, then a follow-up cleanup commit removing and unwiring the
-two debug-only diagnostic patches (`b626303`/`2397d3f`) from `fetch_llama_cpp.sh` — see the
-session-close handoff below (now marked DONE). Hexagon PASS build: CI run `33812084740` green, release APK device-qualified for
+Head as of session close: **`c72e717`** — `b53c9cd` (documentation audit close) followed by two
+cleanup commits removing all three temporary hang-localization diagnostics: `51b2e00` (deletes and
+unwires the two ggml-level patches `b626303`/`2397d3f` from `fetch_llama_cpp.sh`'s patch loop) and
+`c72e717` (clean `git revert` of the JNI-boundary `LAI-diag` logging, `c93ebda`). Both cleanup
+commits are **CI-green**: `51b2e00` → run `33871465548` success (`Source and documentation policy`
++ `Compile Kotlin, C++ and APK` both passed); `c72e717` → run `33872164259`, same two jobs, same
+result. Hexagon PASS build: CI run `33812084740` green, release APK device-qualified for
 `llama-hexagon` · Hexagon-track commits: `5c74806` (target-list gating), `a8954cb`+`21791ac`
 (CMake 3.31.6 pin), `9ef2edd` (HTP skel packaging) · Later same-day commits: `71319ef` (OpenCL
 main-thread fix), `8b72c12` (OpenCL manifest re-add), `ad0b80c` (model-id reclassification,
 CLOSED milestone), `c93ebda`+`b626303` (Vulkan hang localization), `2397d3f` (OpenCL hang
-localization), `b1f64ef`+`b53c9cd` (documentation audit and updates) · **~192 `@Test`
-annotations** (187 at the 2026-08-19 snapshot, +14 from `ModelReclassificationPolicyTest`; counted
-by grep, not re-verified against the CI-reported figure) · 16 Gradle modules
+localization), `b1f64ef`+`b53c9cd` (documentation audit and updates), `51b2e00`+`c72e717`
+(diagnostic cleanup, CI-verified) · **~192 `@Test` annotations** (187 at the 2026-08-19 snapshot,
++14 from `ModelReclassificationPolicyTest`; counted by grep, not re-verified against the
+CI-reported figure) · 16 Gradle modules
 
 > **Session-close handoff (2026-09-04, end of session — supersedes the earlier same-day handoff
 > below the Hexagon section, which only reflected the day's first milestone):** four milestones
@@ -86,12 +91,17 @@ by grep, not re-verified against the CI-reported figure) · 16 Gradle modules
 > no later commits touched that file, clean apply, no `LAI-diag`/`kDiagTag` references remain). All
 > were additive logging only — their findings are fully preserved in the device-results docs cited
 > above, and all three are still recoverable from git history (`c93ebda`, `b626303`, `2397d3f`) if
-> the localization thread is resumed. If not resuming this thread, the next roadmap item is Bangla
-> OCR (blocked on the owner's dataset/licence decision) — see §4.2.
+> the localization thread is resumed. Both cleanup commits (`51b2e00`, `c72e717`) were pushed and
+> are CI-green (runs `33871465548` and `33872164259`, `Source and documentation policy` +
+> `Compile Kotlin, C++ and APK` both passed on each). If not resuming this thread, the next roadmap
+> item is Bangla OCR (blocked on the owner's dataset/licence decision) — see §4.2.
 >
 > **Portfolio note:** `soobujmiah.github.io` commit `5f8f2f6` (NPU/Hexagon claim wording updated to
-> reflect the reproducible HTP finding above) exists locally in that repo but has **not been
-> pushed** — no push authorization was sought for that repo this session.
+> reflect the reproducible HTP finding above) was pushed this session as `95de6cc` (rebased onto an
+> unrelated same-day test-count fix, `648fdd9`, that had landed on the remote first — non-conflicting,
+> no content loss; see that repo's own `git log` for detail). SKB (`soobujmiah/skb`) was also
+> updated the same session with a dated audit section covering this whole day's LAI work
+> (`repositories/lai.md`, commit `9a40eee`) — both are current, no further sync needed.
 >
 > No local build was performed this session — confirmed via `git status` + absence of
 > `build/`/`.gradle`/`.cxx` dirs; all APKs came from GitHub Actions. Delete pulled artifacts after
