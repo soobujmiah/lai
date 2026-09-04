@@ -12,6 +12,7 @@ Recorded results:
 - [2026-09-04 — OpenCL main-thread hang: root cause (source trace, no device run)](device-results/2026-09-04-opencl-hang-main-thread-root-cause.md)
 - [2026-09-04 — OpenCL revalidation: app hang fixed, backend itself still not viable](device-results/2026-09-04-redmi-turbo-4-pro-opencl-revalidation.md)
 - [2026-09-04 — Vulkan instance-init diagnostic: Vulkan ruled out as the `llama_backend_init()` blocker](device-results/2026-09-04-redmi-turbo-4-pro-vulkan-instance-init-diagnostic.md)
+- [2026-09-04 — OpenCL registration diagnostic: `clGetPlatformIDs()` is the first call without a matching EXIT](device-results/2026-09-04-redmi-turbo-4-pro-opencl-registration-diagnostic.md)
 
 ## Device record
 
