@@ -24,49 +24,75 @@ traces, not a per-op trace) in
 OpenCL app-launch main-thread hang was root-caused and fixed (`71319ef`), then device-revalidated
 with the manifest entry reapplied (`8b72c12`); (3) a model-registry id-matching bug found during
 that revalidation was fixed and closed (`ad0b80c`, milestone recorded at §1.5 "Model management");
-(4) a source trace + debug-only diagnostic patch (`b626303`) ruled out Vulkan as the cause of a
-*separate*, still-open `llama_backend_init()` hang, narrowing it to OpenCL's own backend
-registration as the next (unconfirmed) suspect — see §1.1 "Adreno OpenCL track" for the current,
+(4) a source trace + two debug-only diagnostic patches (`b626303` for Vulkan, `2397d3f` for
+OpenCL) ruled out Vulkan and narrowed a *separate*, still-open `llama_backend_init()` hang down to
+one specific unexplained call, `clGetPlatformIDs()`, inside OpenCL's own backend registration —
+see the session-close handoff below and §1.1 "Adreno OpenCL track" for the current,
 correctly-hedged state of that investigation. Do not read the Hexagon narrative below as the
 day's only or latest event.
 
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime` · Public repo
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
-Head: **`b626303`** (debug-only diagnostic commit; see §1.1 for what it's for and why it's
-temporary) · Hexagon PASS build: CI run `33812084740` green, release APK device-qualified for
+Head as of session close: **`b53c9cd`** (docs-only; two debug-only diagnostic patches from
+`b626303`/`2397d3f` remain wired into the build — see the session-close handoff below for the
+cleanup item) · Hexagon PASS build: CI run `33812084740` green, release APK device-qualified for
 `llama-hexagon` · Hexagon-track commits: `5c74806` (target-list gating), `a8954cb`+`21791ac`
 (CMake 3.31.6 pin), `9ef2edd` (HTP skel packaging) · Later same-day commits: `71319ef` (OpenCL
 main-thread fix), `8b72c12` (OpenCL manifest re-add), `ad0b80c` (model-id reclassification,
-CLOSED milestone), `c93ebda`+`b626303` (native hang localization, in progress) · **~192 `@Test`
+CLOSED milestone), `c93ebda`+`b626303` (Vulkan hang localization), `2397d3f` (OpenCL hang
+localization), `b1f64ef`+`b53c9cd` (documentation audit and updates) · **~192 `@Test`
 annotations** (187 at the 2026-08-19 snapshot, +14 from `ModelReclassificationPolicyTest`; counted
 by grep, not re-verified against the CI-reported figure) · 16 Gradle modules
 
-> **Session-close handoff (2026-09-04, updated same day):** reproducibility is now confirmed — a
-> second `qualify qwen2.5-1.5b-instruct-q4-0 llama-hexagon` run against the same installed build
-> reached `LOAD_OK` → generation → `DONE`/`READY` again, with the same class of unfakeable vendor
-> FastRPC/DSP evidence as the first PASS. The "try the second catalog model" step is **closed as
-> N/A, not a retry target**: `qwen2.5-1.5b-instruct-q4-k-m` was never a valid `llama-hexagon`
-> candidate — `ggml-hexagon`'s kernel only accepts Q4_0/Q4_1/Q8_0/IQ4_NL, not Q4_K (documented in
-> the catalog's own q4-0 entry), and `q4-k-m`'s `compatibleBackendIds` doesn't list
-> `llama-hexagon` at all. Running it anyway surfaced a separate device-testing hazard, not a
-> Hexagon bug: MIUI's `MiuiFreeFormGestureController` finished the activity ~29s in (before the
-> app's own 45s internal timeout), which `lai_adb.sh` correctly reported as exit 3 ("no terminal
-> state at all"). Full evidence and analysis in
-> `docs/device-results/2026-09-04-redmi-turbo-4-pro-hexagon-reproducibility-and-quant-limit.md`.
-> **Next session's first action:** there is no queued Hexagon retry; move to whichever of (a)
-> per-op NPU-vs-CPU attribution logging, (b) the `llama-hexagon` catalog-default product decision,
-> or (c) the next roadmap item (Bangla OCR / OpenCL retry) the owner prioritizes. If precise
-> NPU-vs-CPU compute attribution becomes important, add ggml per-op backend-assignment logging
-> rather than inferring from vendor driver traces alone. Whether to move `llama-hexagon` from
-> empty-by-default to catalog-preferred/fallback in `core/model` is an open product decision, not
-> made yet. Delete the pulled artifact after use per the artifact-hygiene rule
-> (`/home/sbj/.claude/projects/-home-sbj/memory/sobuj-engineering-workflow.md`). No local build
-> was performed this session — confirmed via `git status` + absence of `build/`/`.gradle`/`.cxx`
-> dirs; all APKs came from GitHub Actions. A separate, unrelated finding from this session (not
-> yet acted on): the ADB-first device-testing harness's short/no-op operations (`probe`, a
-> denied `qualify`) are dominated by fixed ADB process/transport overhead (~1.3-1.5s across 5-6
-> serial `adb` invocations per run), while real model-load/qualify runs remain LAI/model-bound —
-> flagged as a future engineering task to reduce serial ADB round-trips, not yet started.
+> **Session-close handoff (2026-09-04, end of session — supersedes the earlier same-day handoff
+> below the Hexagon section, which only reflected the day's first milestone):** four milestones
+> closed or advanced this session, in order:
+>
+> 1. **Hexagon HTP (`llama-hexagon`) — CLOSED, reproducibility-confirmed.** Two independent real
+>    DSP passes; the "second catalog model" retry idea is N/A (`q4-k-m` was never a valid target
+>    for `ggml-hexagon`'s kernel). No further action queued. Details: §1.1 and
+>    `docs/device-results/2026-09-04-redmi-turbo-4-pro-hexagon-reproducibility-and-quant-limit.md`.
+> 2. **OpenCL app-launch main-thread hang — CLOSED and device-revalidated.** Root-caused to an
+>    eager backend-capability probe on the main thread (`71319ef`), fixed, then confirmed on-device
+>    with the manifest entry actually reapplied (`8b72c12`): the app itself no longer hangs at
+>    launch or on any model load, regardless of backend. This is real and durable — do not reopen
+>    without new evidence contradicting it.
+> 3. **Model-registry id reclassification — CLOSED, real-device verified, idempotent.**
+>    `ad0b80c`. Full milestone record: §1.5 "Model management" and `CHANGELOG.md`.
+> 4. **OpenCL native-call localization — OPEN, narrowed to one call, not explained.** Debug-only
+>    diagnostic patches (`b626303` for Vulkan, `2397d3f` for OpenCL) traced the *separate* residual
+>    `LOAD_TIMEOUT` (present on every backend, since it happens during eager ggml backend-registry
+>    construction, not backend selection) down to: Vulkan's entire registration completes cleanly
+>    (~166ms, confirmed twice on two different builds) — **ruled out**; OpenCL's own registration
+>    reaches `clGetPlatformIDs()` and that call never returns — **the current, unexplained
+>    blocker**. Nothing further is instrumentable from LAI's own source at that exact call (a
+>    single opaque call into the vendor ICD loader). *Do not* attribute this to a driver bug,
+>    thermal state, contention, or anything else without new evidence — that question is open, not
+>    answered. Full chain: `docs/device-results/2026-09-04-opencl-hang-main-thread-root-cause.md`,
+>    `docs/device-results/2026-09-04-redmi-turbo-4-pro-opencl-revalidation.md`,
+>    `docs/device-results/2026-09-04-redmi-turbo-4-pro-vulkan-instance-init-diagnostic.md`,
+>    `docs/device-results/2026-09-04-redmi-turbo-4-pro-opencl-registration-diagnostic.md`.
+>
+> **Next session's first action, if resuming this specific thread:** decide whether to (a) stop the
+> OpenCL localization here — `llama-opencl` is not shipping regardless, gated behind
+> `BuildConfig.VALIDATED_ACCELERATORS` (empty by default), so this is a low-priority curiosity, not
+> a blocker — or (b) investigate the ICD loader / `<uses-native-library>` manifest-bridge
+> interaction directly, since nothing further can be learned from ggml's own source at
+> `clGetPlatformIDs()`. **Cleanup item, not yet done:** two debug-only diagnostic patches
+> (`ggml-vulkan-instance-init-diag.patch`, `ggml-opencl-reg-diag.patch`) remain wired into
+> `fetch_llama_cpp.sh` and applied to every build — they're additive logging only (no behavior
+> change) but were explicitly meant to be temporary; remove them once no longer needed for this
+> investigation. If not resuming this thread, the next roadmap item is Bangla OCR (blocked on the
+> owner's dataset/licence decision) — see §4.2.
+>
+> **Portfolio note:** `soobujmiah.github.io` commit `5f8f2f6` (NPU/Hexagon claim wording updated to
+> reflect the reproducible HTP finding above) exists locally in that repo but has **not been
+> pushed** — no push authorization was sought for that repo this session.
+>
+> No local build was performed this session — confirmed via `git status` + absence of
+> `build/`/`.gradle`/`.cxx` dirs; all APKs came from GitHub Actions. Delete pulled artifacts after
+> use per the artifact-hygiene rule
+> (`/home/sbj/.claude/projects/-home-sbj/memory/sobuj-engineering-workflow.md`).
 
 > Handoff snapshot. Source and CI are authoritative; `docs/ROADMAP.md` is the canonical Phase
 > 0–14 roadmap and accepted ADRs govern architecture.
