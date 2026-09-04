@@ -225,13 +225,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
     private val _state = MutableStateFlow(
         MainUiState(
-            runtimeDetail = container.inferenceEngine.capabilities.detail,
+            runtimeDetail = "Probing native runtime…",
             environmentDetail = environmentSummary(container.runtimeEnvironment.snapshot()),
         ),
     )
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
     init {
+        // [InferenceEngine.capabilities] is a `by lazy` property: its FIRST access anywhere in the
+        // process runs `available()` on every compiled backend (Vulkan/OpenCL/Hexagon), which is a
+        // real, synchronous, uninterruptible native/vendor call -- see
+        // docs/device-results/2026-09-04-opencl-hang-main-thread-root-cause.md. Reading it directly
+        // in the `_state` initializer above used to make that first access happen synchronously
+        // during MainViewModel's construction, i.e. on the main thread during MainActivity's
+        // startup -- exactly reproducing the 2026-09-03 OpenCL app-launch hang once a vendor call
+        // that used to fail instantly ("library not found") started actually reaching driver code.
+        // Warming it up here, off the main thread, means every other synchronous read of
+        // `capabilities` elsewhere in this file (loadModel, runBackendProbe, diagnostics export)
+        // gets the already-memoized value instead of triggering the native probe itself -- `by
+        // lazy`'s default synchronization means only the very first caller actually blocks on the
+        // native call; every later caller (on any thread) just waits on that same result. A stuck
+        // vendor call still leaves this one background thread permanently blocked (Kotlin coroutine
+        // cancellation cannot interrupt a blocked JNI call, same accepted cost documented for
+        // [runBackendQualification]'s LOAD_TIMEOUT below) -- but it can no longer take the whole app
+        // down before the first frame draws.
+        viewModelScope.launch(Dispatchers.IO) {
+            val start = SystemClock.elapsedRealtime()
+            val capabilities = runCatching { container.inferenceEngine.capabilities }
+            val elapsedMs = SystemClock.elapsedRealtime() - start
+            capabilities.onSuccess { caps ->
+                LaiLog.i("LAI-diag", "capabilities warm-up resolved in ${elapsedMs}ms detail=\"${caps.detail}\"")
+                _state.update { it.copy(runtimeDetail = caps.detail) }
+            }.onFailure { error ->
+                LaiLog.e("LAI-diag", "capabilities warm-up failed after ${elapsedMs}ms", error)
+                _state.update { it.copy(runtimeDetail = error.message ?: "Runtime probe failed") }
+            }
+        }
         adoptBackgroundDownloads()
         refreshChatSessions()
         // Closed-loop thermal governor. Previously heat only REFUSED new work at SEVERE while an
@@ -1332,7 +1361,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.update {
             it.copy(operation = RuntimeOperation.LOADING, notice = "Checking device resources for ${model.displayName}…")
         }
-        viewModelScope.launch {
+        // Dispatchers.IO: `capabilities` below is only guaranteed already-memoized-and-safe on the
+        // main thread once the init-time warm-up has completed. Loading is user-triggered and can
+        // in principle race that warm-up (or run after a warm-up that itself failed/is still stuck
+        // on a permanently blocked vendor call, per the `init` block's comment) — this coroutine
+        // must not touch `capabilities` on Main.immediate either.
+        viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching {
                 val estimate = container.memoryEstimator.estimate(model.bytes, MODEL_CONTEXT_TOKENS)
                 val runtime = container.inferenceEngine.capabilities
@@ -1457,11 +1491,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * healthy, instead of waiting out a multi-minute qualification timeout to learn the same
      * thing. Triggered by `qualify_probe=true` alongside `qualify_backend` on the same
      * MainActivity intent extras qualification uses; independent of BuildConfig gating since it
-     * never forces a load — reading capabilities is already always safe.
+     * never forces a load. Dispatched on [Dispatchers.IO] (not `viewModelScope`'s default
+     * `Main.immediate`): reading `capabilities` is only safe from the main thread once it has
+     * already been warmed up (see the `init` block) — this probe exists specifically to be usable
+     * *before* that's certain, so it must not risk the same main-thread hang it's meant to
+     * diagnose (docs/device-results/2026-09-04-opencl-hang-main-thread-root-cause.md).
      */
     fun runBackendProbe(backendIdValue: String) {
         LaiLog.i("LAI-diag", "probe: ENTER backend=$backendIdValue")
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val start = SystemClock.elapsedRealtime()
             val capabilities = container.inferenceEngine.capabilities
             val elapsedMs = SystemClock.elapsedRealtime() - start
@@ -1849,9 +1887,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun exportDiagnostics(uri: Uri) {
         viewModelScope.launch {
             val result = runCatching {
-                val report = buildDiagnosticsReport()
-                val json = DIAGNOSTICS_JSON.encodeToString(DiagnosticsReportV1.serializer(), report)
+                // Dispatchers.IO: buildDiagnosticsReport() reads `capabilities`, which is only
+                // guaranteed safe on the main thread once the init-time warm-up has resolved (see
+                // that block's comment). This whole section already needed IO for the file write;
+                // widening it to also cover the report build costs nothing and closes the same
+                // main-thread-hang class this file's other `capabilities` call sites were fixed for.
                 withContext(Dispatchers.IO) {
+                    val report = buildDiagnosticsReport()
+                    val json = DIAGNOSTICS_JSON.encodeToString(DiagnosticsReportV1.serializer(), report)
                     getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { output ->
                         output.write(json.toByteArray(Charsets.UTF_8))
                         output.flush()
