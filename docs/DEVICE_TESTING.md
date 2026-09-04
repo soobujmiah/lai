@@ -5,6 +5,13 @@ Build in GitHub Actions, install on the physical phone, collect only redacted ev
 Recorded results:
 
 - [2026-08-16 — Redmi Turbo 4 Pro, Android 16, Snapdragon 8s Gen 4](device-results/2026-08-16-redmi-turbo-4-pro.md)
+- *(this list is not kept current commit-by-commit — dozens of results from 2026-08-17 through 2026-09-03 exist under `device-results/` but aren't individually indexed here; treat the directory listing and `PROJECT_STATE.md`'s inline references as authoritative for what's been recorded, not this list alone)*
+- [2026-09-04 — Hexagon HTP `llama-hexagon` qualify: first real PASS](device-results/2026-09-04-redmi-turbo-4-pro-hexagon-htp-qualify-pass.md)
+- [2026-09-04 — Hexagon HTP reproducibility confirmed; Q4_K quant limit found](device-results/2026-09-04-redmi-turbo-4-pro-hexagon-reproducibility-and-quant-limit.md)
+- [2026-09-04 — ChatterUI OpenCL reference investigation](device-results/2026-09-04-redmi-turbo-4-pro-chatterui-opencl-reference-investigation.md)
+- [2026-09-04 — OpenCL main-thread hang: root cause (source trace, no device run)](device-results/2026-09-04-opencl-hang-main-thread-root-cause.md)
+- [2026-09-04 — OpenCL revalidation: app hang fixed, backend itself still not viable](device-results/2026-09-04-redmi-turbo-4-pro-opencl-revalidation.md)
+- [2026-09-04 — Vulkan instance-init diagnostic: Vulkan ruled out as the `llama_backend_init()` blocker](device-results/2026-09-04-redmi-turbo-4-pro-vulkan-instance-init-diagnostic.md)
 
 ## Device record
 

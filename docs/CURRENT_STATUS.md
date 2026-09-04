@@ -1,5 +1,10 @@
 # Current Status
 
+> The authoritative handoff snapshot is [`PROJECT_STATE.md`](../PROJECT_STATE.md); the canonical
+> full roadmap is [`ROADMAP.md`](ROADMAP.md). This file is a frozen snapshot from the date below,
+> retained for historical context — several items below (notably the Hexagon/QNN scoping task)
+> have since been completed; see `PROJECT_STATE.md` for current state, not this file.
+
 **Snapshot:** 2026-08-21 — GPU/NPU qualification resumed after new stock-app KGSL access evidence.
 **Build:** Gradle 9.5.0 + AGP 9.3.1 + Kotlin 2.4.10; `validate_repo.sh` remains the documentation/build gate.
 
