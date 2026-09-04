@@ -37,12 +37,19 @@
       android:name="libcdsprpc.so"
       android:required="false" />
 
-    <!-- NOTE: libOpenCL.so's own uses-native-library entry was deliberately reverted in commit
-         82949bb after real-device evidence showed it causes an indefinite app-launch hang on
-         this device (docs/device-results/2026-09-03-redmi-turbo-4-pro-opencl-namespace-hang.md).
-         Do not re-add it without a timeout-guarded probe in place first: see PROJECT_STATE.md
-         §4.2. libcdsprpc.so is a different vendor library with no such evidence against it; it is
-         being tried independently, not as a package with OpenCL's entry. -->
+    <!-- Adreno OpenCL track, re-attempt (2026-09-04): reverted in commit 82949bb after real-device
+         evidence showed this entry causes an indefinite app-launch hang
+         (docs/device-results/2026-09-03-redmi-turbo-4-pro-opencl-namespace-hang.md). Root-caused
+         since then, not on this manifest entry itself but on the backend-capability probe it
+         exposed as a real (rather than instant-failing) vendor call running unguarded on the main
+         thread during app startup — MainViewModel's eager `capabilities` read now warms up on
+         Dispatchers.IO instead (docs/device-results/2026-09-04-opencl-hang-main-thread-root-cause.md).
+         Re-adding this entry now that the main-thread hang class is fixed at the source level, to
+         device-revalidate; do not revert again without new evidence distinct from the already-fixed
+         threading bug. -->
+    <uses-native-library
+      android:name="libOpenCL.so"
+      android:required="false" />
 
     <activity
       android:name=".MainActivity"
