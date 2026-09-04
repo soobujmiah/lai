@@ -33,9 +33,9 @@ day's only or latest event.
 
 Repository: `soobujmiah/lai` · Application ID: `dev.lai.runtime` · Public repo
 Target device: Xiaomi Redmi Turbo 4 Pro (`25053RT47C`), Android SDK 36, QTI **SM8735** (Snapdragon 8s Gen 4), arm64-v8a, 8 cores
-Head as of session close: **`b53c9cd`** (docs-only; two debug-only diagnostic patches from
-`b626303`/`2397d3f` remain wired into the build — see the session-close handoff below for the
-cleanup item) · Hexagon PASS build: CI run `33812084740` green, release APK device-qualified for
+Head as of session close: **`b53c9cd`**, then a follow-up cleanup commit removing and unwiring the
+two debug-only diagnostic patches (`b626303`/`2397d3f`) from `fetch_llama_cpp.sh` — see the
+session-close handoff below (now marked DONE). Hexagon PASS build: CI run `33812084740` green, release APK device-qualified for
 `llama-hexagon` · Hexagon-track commits: `5c74806` (target-list gating), `a8954cb`+`21791ac`
 (CMake 3.31.6 pin), `9ef2edd` (HTP skel packaging) · Later same-day commits: `71319ef` (OpenCL
 main-thread fix), `8b72c12` (OpenCL manifest re-add), `ad0b80c` (model-id reclassification,
@@ -78,12 +78,16 @@ by grep, not re-verified against the CI-reported figure) · 16 Gradle modules
 > `BuildConfig.VALIDATED_ACCELERATORS` (empty by default), so this is a low-priority curiosity, not
 > a blocker — or (b) investigate the ICD loader / `<uses-native-library>` manifest-bridge
 > interaction directly, since nothing further can be learned from ggml's own source at
-> `clGetPlatformIDs()`. **Cleanup item, not yet done:** two debug-only diagnostic patches
-> (`ggml-vulkan-instance-init-diag.patch`, `ggml-opencl-reg-diag.patch`) remain wired into
-> `fetch_llama_cpp.sh` and applied to every build — they're additive logging only (no behavior
-> change) but were explicitly meant to be temporary; remove them once no longer needed for this
-> investigation. If not resuming this thread, the next roadmap item is Bangla OCR (blocked on the
-> owner's dataset/licence decision) — see §4.2.
+> `clGetPlatformIDs()`. **Cleanup item — DONE:** the two debug-only diagnostic patches
+> (`ggml-vulkan-instance-init-diag.patch`, `ggml-opencl-reg-diag.patch`) have been deleted and
+> unwired from `fetch_llama_cpp.sh`'s patch loop — they were additive logging only, their findings
+> are fully preserved in the device-results docs cited above, and both are still recoverable from
+> git history (`b626303`, `2397d3f`) if the localization thread is resumed. The JNI-boundary
+> `LAI-diag` logging added in `c93ebda` (`runtime/llama/src/main/cpp/native_inference.cpp`) is a
+> separate, still-present temporary diagnostic — same "remove once no longer needed" framing in its
+> own commit message, not yet acted on; flagging here rather than removing unasked. If not resuming
+> this thread, the next roadmap item is Bangla OCR (blocked on the owner's dataset/licence
+> decision) — see §4.2.
 >
 > **Portfolio note:** `soobujmiah.github.io` commit `5f8f2f6` (NPU/Hexagon claim wording updated to
 > reflect the reproducible HTP finding above) exists locally in that repo but has **not been
