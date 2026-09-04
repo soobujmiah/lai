@@ -11,6 +11,7 @@ import dev.lai.runtime.privacy.LocalFirstPolicy
 import dev.lai.runtime.privacy.NetworkDecision
 import dev.lai.runtime.privacy.NetworkPurpose
 import dev.lai.runtime.privacy.NetworkRequest
+import dev.lai.runtime.workspace.ModelReclassificationPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
@@ -36,6 +37,25 @@ class ModelRepository private constructor(
     private val registryFile = File(modelDir, "registry.json")
 
     suspend fun list(): List<InstalledModel> = withContext(Dispatchers.IO) { readRegistry() }
+
+    /**
+     * Idempotently upgrades already-installed models whose SHA-256 now matches a canonical
+     * reviewed-catalog id different from what they're currently registered under (docs/
+     * device-results/2026-09-04-redmi-turbo-4-pro-opencl-revalidation.md — a model imported by an
+     * older build, before the catalog recognized its digest, otherwise stays on a filename-derived
+     * id forever). Pure decision in [ModelReclassificationPolicy]; only writes the registry file
+     * when at least one entry actually changed, so a no-op pass never touches disk. Never renames
+     * the underlying model file — only [InstalledModel.id] changes, [InstalledModel.fileName]
+     * (what actually resolves the file) is untouched, so a currently-loaded model's open session
+     * is unaffected; the caller is responsible for remapping any id-keyed state it holds (e.g. an
+     * active model id) using the returned [ModelReclassificationPolicy.Plan.idRemap].
+     */
+    suspend fun reclassify(reviewedBySha256: Map<String, String>): ModelReclassificationPolicy.Plan =
+        withContext(Dispatchers.IO) {
+            val plan = ModelReclassificationPolicy().reclassify(readRegistry(), reviewedBySha256)
+            if (plan.idRemap.isNotEmpty()) writeRegistry(plan.updatedRegistry)
+            plan
+        }
 
     suspend fun download(
         spec: ModelSpec,

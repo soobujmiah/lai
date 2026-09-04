@@ -521,7 +521,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
         try {
             if (!workspace.state.value.granted) return@launch
-            val reviewedBySha = state.value.supportedModels.associate { it.sha256.lowercase() to it.id }
+            val reviewedBySha = reviewedBySha256()
             val result = container.workspaceDiscovery.discoverModels(
                 reviewedBySha,
                 dev.lai.runtime.workspace.DiscoveryLimits(),
@@ -2062,14 +2062,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         evaluatedPromptTokens = evaluatedPromptTokens,
     )
 
+    /**
+     * SHA-256 (lowercased hex) -> reviewed catalog model id, shared by every caller that needs to
+     * match an installed/discovered file against the catalog (auto-import, and the reclassification
+     * pass below) so they can never drift out of sync with each other.
+     */
+    private fun reviewedBySha256(): Map<String, String> =
+        state.value.supportedModels.associate { it.sha256.lowercase() to it.id }
+
     private fun refreshModels() {
         viewModelScope.launch {
+            // Idempotent self-heal (docs/device-results/2026-09-04-redmi-turbo-4-pro-opencl-revalidation.md):
+            // a model imported before the catalog recognized its SHA-256 stays registered under a
+            // filename-derived id forever otherwise. Cheap (a small JSON file, not the model
+            // weights) and a no-op whenever nothing needs reclassifying, so running it on every
+            // refresh is fine. `activeModelId` is remapped in the SAME state update below so a
+            // currently-loaded model's id never goes stale mid-session -- the native session itself
+            // is keyed by file path, not this id, so an in-flight generation is unaffected either way.
+            val remap = container.modelRepository.reclassify(reviewedBySha256()).idRemap
+            if (remap.isNotEmpty()) {
+                LaiLog.i("LAI-model", "Reclassified installed model id(s) to canonical catalog id: $remap")
+            }
             val models = container.modelRepository.list()
             _state.update {
+                val activeModelId = it.activeModelId?.let { id -> remap[id] } ?: it.activeModelId
                 it.copy(
                     installedModels = models,
+                    activeModelId = activeModelId,
                     operation = when {
-                        it.activeModelId != null -> RuntimeOperation.READY
+                        activeModelId != null -> RuntimeOperation.READY
                         models.isEmpty() -> RuntimeOperation.NO_MODEL
                         it.operation == RuntimeOperation.ERROR -> RuntimeOperation.ERROR
                         else -> RuntimeOperation.IDLE
