@@ -1,7 +1,6 @@
 #include "include/lai/backend.h"
 #include "native_crash_handler.h"
 
-#include <android/log.h>
 #include <jni.h>
 
 #include <algorithm>
@@ -19,15 +18,6 @@
 #include <vector>
 
 namespace {
-
-// TEMPORARY, debug-only localization instrumentation for the 2026-09-04 llama_backend_init()
-// hang investigation (docs/device-results/2026-09-04-redmi-turbo-4-pro-opencl-revalidation.md,
-// the model-id-reclassification device revalidation). Brackets the two JNI entry points that can
-// trigger the shared, once-only initialize_llama_once() chain (llama_session.cpp) so a hung run
-// shows exactly which JNI function was entered, which backend's available()/open() was being
-// evaluated, and whether execution ever returned to the JNI boundary at all. Purely additive
-// logging -- no behavior, threading, or timing change. Remove once the hang is localized.
-constexpr const char* kDiagTag = "LAI-diag";
 
 std::mutex g_mutex;
 // Poll the Kotlin cancellation flag every N tokens instead of on every token: each poll is a JNI
@@ -198,22 +188,12 @@ std::vector<lai::ChatMessage> from_conversation(
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_dev_lai_runtime_inference_NativeBindings_runtimeInfo(JNIEnv* env, jclass) {
-    __android_log_print(ANDROID_LOG_INFO, kDiagTag, "jni: runtimeInfo ENTER");
     const auto backends = lai::create_backends();
     std::ostringstream json;
     json << "{\"backends\":[";
     bool first = true;
     for (const auto& backend : backends) {
-        __android_log_print(
-            ANDROID_LOG_INFO, kDiagTag, "jni: runtimeInfo checking available() ENTER backend=%s",
-            backend->name().c_str()
-        );
-        const bool is_available = backend->available();
-        __android_log_print(
-            ANDROID_LOG_INFO, kDiagTag, "jni: runtimeInfo checking available() EXIT backend=%s result=%d",
-            backend->name().c_str(), is_available ? 1 : 0
-        );
-        if (!is_available) continue;
+        if (!backend->available()) continue;
         if (!first) json << ',';
         json << '\"' << backend->name() << '\"';
         first = false;
@@ -222,7 +202,6 @@ Java_dev_lai_runtime_inference_NativeBindings_runtimeInfo(JNIEnv* env, jclass) {
     if (first) json << "JNI boundary ready; no concrete inference backend is compiled";
     else json << "llama.cpp CPU backend ready";
     json << "\"}";
-    __android_log_print(ANDROID_LOG_INFO, kDiagTag, "jni: runtimeInfo EXIT");
     return to_jstring(env, json.str());
 }
 
@@ -234,58 +213,38 @@ Java_dev_lai_runtime_inference_NativeBindings_createSession(
     jstring backend_value,
     jint context_size
 ) {
-    __android_log_print(ANDROID_LOG_INFO, kDiagTag, "jni: createSession ENTER");
     const std::string model_path = from_jstring(env, model_path_value);
     const std::string requested = from_jstring(env, backend_value);
     if (context_size < 256 || context_size > 131072) {
         set_error("Invalid context size");
-        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "jni: createSession EXIT (invalid context size)");
         return 0;
     }
     if (!std::filesystem::is_regular_file(model_path)) {
         set_error("Model file does not exist");
-        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "jni: createSession EXIT (model file missing)");
         return 0;
     }
     if (!is_gguf(model_path)) {
         set_error("Model file is not GGUF");
-        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "jni: createSession EXIT (not gguf)");
         return 0;
     }
 
     auto backends = lai::create_backends();
     for (auto& backend : backends) {
         if (requested != "auto" && requested != backend->name()) continue;
-        __android_log_print(
-            ANDROID_LOG_INFO, kDiagTag, "jni: createSession checking available() ENTER backend=%s",
-            backend->name().c_str()
-        );
-        const bool is_available = backend->available();
-        __android_log_print(
-            ANDROID_LOG_INFO, kDiagTag, "jni: createSession checking available() EXIT backend=%s result=%d",
-            backend->name().c_str(), is_available ? 1 : 0
-        );
-        if (!is_available) continue;
-        __android_log_print(ANDROID_LOG_INFO, kDiagTag, "jni: createSession open() ENTER backend=%s", backend->name().c_str());
+        if (!backend->available()) continue;
         std::string error;
         auto session = backend->open(model_path, context_size, error);
-        __android_log_print(
-            ANDROID_LOG_INFO, kDiagTag, "jni: createSession open() EXIT backend=%s result=%s",
-            backend->name().c_str(), session != nullptr ? "session" : "null"
-        );
         if (session != nullptr) {
             std::lock_guard<std::mutex> lock(g_mutex);
             const long long handle = g_next_handle++;
             g_sessions.emplace(handle, std::shared_ptr<lai::BackendSession>(std::move(session)));
             g_last_error.clear();
-            __android_log_print(ANDROID_LOG_INFO, kDiagTag, "jni: createSession EXIT (session created)");
             return static_cast<jlong>(handle);
         }
         if (!error.empty()) set_error(error);
     }
 
     set_error("No requested inference backend is available in this artifact");
-    __android_log_print(ANDROID_LOG_INFO, kDiagTag, "jni: createSession EXIT (no backend available)");
     return 0;
 }
 

@@ -78,16 +78,16 @@ by grep, not re-verified against the CI-reported figure) · 16 Gradle modules
 > `BuildConfig.VALIDATED_ACCELERATORS` (empty by default), so this is a low-priority curiosity, not
 > a blocker — or (b) investigate the ICD loader / `<uses-native-library>` manifest-bridge
 > interaction directly, since nothing further can be learned from ggml's own source at
-> `clGetPlatformIDs()`. **Cleanup item — DONE:** the two debug-only diagnostic patches
-> (`ggml-vulkan-instance-init-diag.patch`, `ggml-opencl-reg-diag.patch`) have been deleted and
-> unwired from `fetch_llama_cpp.sh`'s patch loop — they were additive logging only, their findings
-> are fully preserved in the device-results docs cited above, and both are still recoverable from
-> git history (`b626303`, `2397d3f`) if the localization thread is resumed. The JNI-boundary
-> `LAI-diag` logging added in `c93ebda` (`runtime/llama/src/main/cpp/native_inference.cpp`) is a
-> separate, still-present temporary diagnostic — same "remove once no longer needed" framing in its
-> own commit message, not yet acted on; flagging here rather than removing unasked. If not resuming
-> this thread, the next roadmap item is Bangla OCR (blocked on the owner's dataset/licence
-> decision) — see §4.2.
+> `clGetPlatformIDs()`. **Cleanup item — DONE:** all three debug-only diagnostics from this
+> investigation have been removed. The two ggml-level diagnostic patches
+> (`ggml-vulkan-instance-init-diag.patch`, `ggml-opencl-reg-diag.patch`) were deleted and unwired
+> from `fetch_llama_cpp.sh`'s patch loop; the JNI-boundary `LAI-diag` logging added in `c93ebda`
+> (`runtime/llama/src/main/cpp/native_inference.cpp`) was cleanly reverted (`git revert -n c93ebda`,
+> no later commits touched that file, clean apply, no `LAI-diag`/`kDiagTag` references remain). All
+> were additive logging only — their findings are fully preserved in the device-results docs cited
+> above, and all three are still recoverable from git history (`c93ebda`, `b626303`, `2397d3f`) if
+> the localization thread is resumed. If not resuming this thread, the next roadmap item is Bangla
+> OCR (blocked on the owner's dataset/licence decision) — see §4.2.
 >
 > **Portfolio note:** `soobujmiah.github.io` commit `5f8f2f6` (NPU/Hexagon claim wording updated to
 > reflect the reproducible HTP finding above) exists locally in that repo but has **not been
