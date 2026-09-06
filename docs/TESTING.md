@@ -50,6 +50,14 @@ appearing. Read logs with a tag/regex filter, not a full unfiltered dump.
 already built in — reuse it rather than hand-rolling raw `adb`/screenshot loops. Set `LAI_PKG`
 to `dev.lai.runtime.debug` when targeting a debug build.
 
+`launch`, `qualify`, and `probe` put LAI in the foreground, so each one ends by returning the
+workstation to Termux and verifying it (`dumpsys window`'s `mCurrentFocus`) — the mandatory
+target-app-excursion lifecycle in `standards/agent-device-testing.md` in `soobujmiah/skb`, wired
+as an EXIT trap so it runs on success, timeout, or an early/aborted exit alike. A failed
+restoration is reported on stderr as `WORKSTATION NOT RESTORED` without changing the
+subcommand's own exit code. `state` also reports the current foreground package for a direct
+verification check outside a full qualify/probe run.
+
 ### Backend qualification (accelerator device-testing)
 
 The model catalog always prefers `llama-cpu` (`core/model/.../ReviewedModelCatalog.kt`), so a

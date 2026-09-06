@@ -13,6 +13,8 @@ set -euo pipefail
 PKG="${LAI_PKG:-dev.lai.runtime}"
 ACTIVITY="$PKG/dev.lai.runtime.MainActivity"
 LOG_TAGS='LAI-qualify|LAI-model|LAI-llm|LAI-lifecycle|LAI-diag'
+TERMUX_PKG="com.termux"
+TERMUX_ACTIVITY_FALLBACK="com.termux/.app.TermuxActivity"
 
 usage() {
   cat <<'EOF'
@@ -141,6 +143,49 @@ cmd_state() {
   adb shell dumpsys package "$PKG" | grep -E "versionName|versionCode" | head -2
   echo "--- top activity ---"
   adb shell dumpsys activity activities 2>/dev/null | grep -E "topResumedActivity|mResumedActivity" | head -2
+  echo "--- foreground package ---"
+  foreground_package
+}
+
+# Least-invasive foreground-package identity check (standards/agent-device-testing.md, "Use
+# least-invasive identity checks"): mCurrentFocus names "<hash> <package>/<activity>" for the
+# window that actually owns input focus, which is what "is the target/workstation really
+# foreground" needs -- not a screenshot, not full unrelated app content.
+foreground_package() {
+  adb shell dumpsys window 2>/dev/null | grep -m1 'mCurrentFocus' | sed -E 's#.*[[:space:]]([a-zA-Z0-9_.]+)/[^}]*\}.*#\1#'
+}
+
+resolve_termux_activity() {
+  local resolved
+  resolved=$(adb shell cmd package resolve-activity --brief "$TERMUX_PKG" 2>/dev/null | tail -1 | tr -d '\r')
+  if [[ "$resolved" == "$TERMUX_PKG/"* ]]; then
+    echo "$resolved"
+  else
+    echo "$TERMUX_ACTIVITY_FALLBACK"
+  fi
+}
+
+# Mandatory end-of-excursion step (standards/agent-device-testing.md, "Target-app focus,
+# containment, and Termux workstation lifecycle -- mandatory"): a test is not cleanly completed
+# until the workstation is restored to *verified* Termux foreground. Wired as an EXIT trap on
+# every subcommand that can put the target app in the foreground (launch/qualify/probe) so it
+# runs on success, on a script-level timeout, on an app crash, and on `set -e` aborting the
+# script early alike -- not only the happy path. One retry before giving up, per the standard's
+# "detect -> restore -> verify -> continue" pattern.
+return_to_termux() {
+  local termux_activity fg attempt
+  termux_activity=$(resolve_termux_activity)
+  for attempt in 1 2; do
+    adb shell am start -n "$termux_activity" >/dev/null 2>&1 || true
+    sleep 1
+    fg=$(foreground_package)
+    if [[ "$fg" == "$TERMUX_PKG" ]]; then
+      echo "workstation restored: Termux ($fg) is foreground" >&2
+      return 0
+    fi
+  done
+  echo "WORKSTATION NOT RESTORED: foreground is '$fg', expected $TERMUX_PKG -- manual recovery needed" >&2
+  return 1
 }
 
 
@@ -244,13 +289,13 @@ main() {
   case "$command" in
     install) cmd_install "$@" ;;
     reset) cmd_reset "$@" ;;
-    launch) cmd_launch "$@" ;;
+    launch) trap return_to_termux EXIT; cmd_launch "$@" ;;
     wait-process) cmd_wait_process "$@" ;;
     wait-log) cmd_wait_log "$@" ;;
     logs) cmd_logs "$@" ;;
     state) cmd_state "$@" ;;
-    qualify) cmd_qualify "$@" ;;
-    probe) cmd_probe "$@" ;;
+    qualify) trap return_to_termux EXIT; cmd_qualify "$@" ;;
+    probe) trap return_to_termux EXIT; cmd_probe "$@" ;;
     -h|--help|help) usage ;;
     *) echo "Unknown command: $command" >&2; usage; exit 1 ;;
   esac
