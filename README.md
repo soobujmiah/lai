@@ -1,6 +1,10 @@
 # LAI — Local AI & Android Automation Runtime
 
+[![SEO audited](https://img.shields.io/badge/SEO-audited%202026--09--16-22c55e?style=flat-square)](docs/SEO.md)
+
 LAI is a source-only Android foundation for private, Bangla-first on-device AI and consent-driven Android automation. It targets modern arm64 Snapdragon devices, beginning with Snapdragon 8s Gen 4 (Hexagon NPU + Adreno GPU).
+
+In plain terms: LAI is a **local AI app for Android** — an offline, privacy-first local LLM runtime (llama.cpp, GGUF) with a Bangla-first interface and consent-gated Android automation. Inference runs on the device CPU today; GPU/NPU acceleration is **not claimed** until physically qualified. Built and maintained by [Sobuj Miah](https://soobujmiah.github.io/) ([@soobujmiah](https://github.com/soobujmiah)).
 
 > **Current status:** `v0.9.7` is the latest production-signed release (v0.9.0–v0.9.7, RSA-4096 V1–V4 signing). Snapdragon 8s Gen 4 has physically passed reviewed Qwen installation, CPU scheduling, memory preflight, multi-turn local inference, coherent Bangla output, ~20 tok/s decode, KV-prefix reuse (~0.6 s steady-state TTFT), and retained-model offline restore after uninstall. A closed-loop thermal governor, persistent chat history, background downloads and model management are build-verified (0.9.5–0.9.7). On 2026-08-18 `main` was repaired and CI-verified green (run #154): workspace auto-import of `storage/LAI/models/*.gguf` no longer crashes on unhashable files, and the GGML_VULKAN toolchain (SPIRV-Headers, glslc, Vulkan C++/SPIR-V headers) now builds — Vulkan still requires physical Adreno 825 qualification before any acceleration is claimed. See [status](docs/STATUS.md).
 
