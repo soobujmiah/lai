@@ -1524,7 +1524,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * ADB-first accelerator qualification entry point (docs/TESTING.md "Backend qualification").
+     * Accelerator qualification entry point (docs/TESTING.md "Backend qualification").
+     *
+     * NOTE (2026-09-21): retained feature, but a superseded tier-1 control mechanism
+     * (soobujmiah/skb -> DEC-2026-09-21-001) — not an authorized path for autonomous agent
+     * interaction with the application UI.
      * Driven by an intent extra on the exported, always-present MainActivity launcher activity —
      * no UI navigation or coordinate taps required. Forces [modelId] onto [backendIdValue],
      * bypassing the scheduler's CPU-first preference, then runs one real generation with

@@ -24,24 +24,26 @@ LAI shall be **evidence-based** — never invent results from tests that could n
 
 **Reports:** `docs/device-results/` (`run126` stall, `run139` `16 tok/s` validated) + `DiagnosticsReportV1` + `sbom-*.txt` (lightweight) → `CycloneDX` future.
 
-## ADB-first device testing (default methodology)
+## Device testing — human-operated interaction, ADB for observation
 
-For real-device interaction (install, launch, state inspection, backend qualification),
-**ADB-first is the default strategy** — not a Hexagon-specific workaround. Work through this
-priority order, falling back only when a higher tier genuinely cannot do the job:
+> **SUPERSEDED — HISTORICAL ONLY.** The "ADB-first device testing (default methodology)" section
+> that used to sit here stated a five-tier control priority order (app-native control → ADB →
+> instrumentation → UIAutomator → coordinate `input tap`/`swipe`) and presented it as the default
+> methodology. **All tiers are superseded as an input model.** See `soobujmiah/skb` →
+> `operations/decisions/2026-09-21--skb--human-operated-testing-model.md` (`DEC-2026-09-21-001`,
+> 2026-09-21). No agent may treat any tier as standing authorization, and no differently-named
+> mechanism may accomplish the same prohibited interaction.
 
-1. **App-native control** — an exported Activity/intent extra, a debug/instrumentation
-   interface, or a CLI/native call. LAI's `MainActivity` is the only exported component and
-   doubles as this surface: it accepts qualification intent extras (see below) so an agent can
-   drive a real load-and-generate run with one `adb shell am start`, no taps.
-2. **ADB** — `install`/`uninstall`, `am start`/`force-stop`, `pm`/`dumpsys`/`cmd` for state
-   inspection, targeted `logcat` (filtered to `LAI-*` tags, never a raw full dump).
-3. **Instrumentation/debug interfaces** — when they give a more deterministic path than ADB
-   alone (none exist yet in LAI; add under `androidTest/` if a future feature needs one).
-4. **UIAutomator** — only when the operation genuinely has no non-UI control path.
-5. **Coordinate-based `input tap`/`swipe`** — last resort only.
+**The owner performs all application interaction.** The Supervisor may launch, observe, collect
+scoped logs, use `logcat`/`dumpsys`, run permitted diagnostics, verify package/activity/foreground
+identity, collect permitted evidence, take gated screenshots, analyze, diagnose, modify project
+code, fix, and send builds through GitHub CI. It must **not** autonomously interact with the
+application UI by any mechanism — including LAI's own app-native surfaces: the `MainActivity`
+qualification intent extras (`adb shell am start …`, no taps) and any debug/test interface are
+**not** an authorized autonomous input path, though they remain valid app/debug functionality the
+owner may use.
 
-Never poll with an arbitrary fixed `sleep`. Wait on an observable condition instead: process
+**Observation discipline (retained).** Never poll with an arbitrary fixed `sleep`. Wait on an observable condition instead: process
 existence (`pidof`), activity draw completion (`am start -W`), or a specific logcat pattern
 appearing. Read logs with a tag/regex filter, not a full unfiltered dump.
 
@@ -52,13 +54,21 @@ to `dev.lai.runtime.debug` when targeting a debug build.
 
 `launch`, `qualify`, and `probe` put LAI in the foreground, so each one ends by returning the
 workstation to Termux and verifying it (`dumpsys window`'s `mCurrentFocus`) — the mandatory
-target-app-excursion lifecycle in `standards/agent-device-testing.md` in `soobujmiah/skb`, wired
+target-app-excursion lifecycle that remains in force in `standards/agent-device-testing.md` in
+`soobujmiah/skb` (its autonomous-interaction tiers are superseded; the workspace/lifecycle rules
+still apply), wired
 as an EXIT trap so it runs on success, timeout, or an early/aborted exit alike. A failed
 restoration is reported on stderr as `WORKSTATION NOT RESTORED` without changing the
 subcommand's own exit code. `state` also reports the current foreground package for a direct
 verification check outside a full qualify/probe run.
 
 ### Backend qualification (accelerator device-testing)
+
+> **NOT AUTHORIZED FOR AUTONOMOUS SUPERVISOR USE (2026-09-21).** This section documents a real,
+> retained LAI feature: a qualification run driven through app-native intent extras. That is a
+> superseded tier-1 mechanism (`soobujmiah/skb` → `DEC-2026-09-21-001`), so it must not be invoked
+> autonomously by an agent. The owner may run it by hand; the technical description below is kept
+> because it records how the feature works and because its evidence discipline still applies.
 
 The model catalog always prefers `llama-cpu` (`core/model/.../ReviewedModelCatalog.kt`), so a
 plain "Load" tap can never exercise a new accelerator — this is intentional: an accelerator only

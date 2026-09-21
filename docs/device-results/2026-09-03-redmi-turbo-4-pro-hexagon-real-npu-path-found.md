@@ -1,5 +1,12 @@
 # Redmi Turbo 4 Pro — a real, working third-party Hexagon NPU path exists (corrects the "verified blocker" conclusion)
 
+> **SUPERSEDED — HISTORICAL ONLY.** This record documents a session driven with the four-tier
+> autonomous control model (ADB `input tap`/`input text`, UIAutomator, app-native control), which
+> is superseded in full. See `soobujmiah/skb` →
+> `operations/decisions/2026-09-21--skb--human-operated-testing-model.md` (`DEC-2026-09-21-001`,
+> 2026-09-21). Preserved verbatim as evidence of that work; not an authorization and not a
+> description of current practice. The only operative input path is **owner human interaction**.
+
 **Date:** 2026-09-03
 **Status supersedes:** `docs/device-results/2026-09-03-redmi-turbo-4-pro-hexagon-v73.md`'s "verified external
 blocker" framing and `docs/HANDOFF-2026-09-03-npu-android-ecosystem-research.md`'s "no proven Android

@@ -52,13 +52,24 @@ SKB continuity does not impose a fixed technology template. Select the appropria
 
 ## Android device testing
 
-ADB-first is the default methodology for any real-device interaction — see `docs/TESTING.md`
-§"ADB-first device testing" for the full priority order (app-native intents/interfaces → ADB →
-instrumentation → UIAutomator → coordinate taps, last resort) and `scripts/device/lai_adb.sh`
-for the reusable helper. Discover → control → observe → verify, not click → wait → screenshot →
-click. Never poll with an arbitrary sleep; wait on an observable condition (process state,
-activity draw completion, a specific logcat pattern) instead, and read logs through a tag/regex
-filter, not a raw dump.
+**The owner performs all application interaction.** The Supervisor may launch, observe, collect
+scoped logs, use `logcat`/`dumpsys`, run permitted diagnostics, verify package/activity/foreground
+identity, collect permitted evidence, take gated screenshots, analyze, diagnose, modify project
+code, fix, and send builds through GitHub CI — but must **not** autonomously interact with the
+application UI by any mechanism: taps, swipes, button presses, key events, text injection,
+IME/test-IME, ADB keyboard bridges, UIAutomator, accessibility-driven actions, application-native
+deterministic controls (qualification intent extras, debug/test Activities, broadcast or service
+control surfaces, debug channels), or any equivalent mechanism. The priority order previously
+stated here (app-native intents/interfaces → ADB → instrumentation → UIAutomator → coordinate
+taps) is **superseded** as an input model — see `docs/TESTING.md` and `soobujmiah/skb` →
+`operations/decisions/2026-09-21--skb--human-operated-testing-model.md` (`DEC-2026-09-21-001`,
+2026-09-21).
+
+Observation and verification discipline is retained: discover → observe → verify, not
+click → wait → screenshot → click. Never poll with an arbitrary sleep; wait on an observable
+condition (process state, activity draw completion, a specific logcat pattern) instead, and read
+logs through a tag/regex filter, not a raw dump. `scripts/device/lai_adb.sh` remains the reusable
+**observation** helper.
 
 ## Engineering rules
 

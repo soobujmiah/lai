@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# ADB-first device-testing helper for LAI (docs/TESTING.md "ADB-first testing").
+# Device-testing helper for LAI (docs/TESTING.md, "Device testing — human-operated
+# interaction, ADB for observation"). Observation/diagnostic operations only: it never injects
+# application input. Autonomous application interaction is superseded as an input model — see
+# soobujmiah/skb -> DEC-2026-09-21-001.
 #
 # Reuses plain `adb`/`am`/`pm`/`dumpsys` — no new dependency, no UIAutomator, no coordinate
 # taps. Every subcommand waits on an observable condition (process state, activity draw

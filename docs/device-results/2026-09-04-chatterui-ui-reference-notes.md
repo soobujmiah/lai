@@ -1,5 +1,13 @@
 # ChatterUI UI reference notes (for future LAI model-settings UI work)
 
+> **SUPERSEDED — HISTORICAL ONLY.** This record documents a session driven with the four-tier
+> autonomous control model (ADB/UIAutomator/`input tap`) against a third-party app's UI, which is
+> superseded in full. See `soobujmiah/skb` →
+> `operations/decisions/2026-09-21--skb--human-operated-testing-model.md` (`DEC-2026-09-21-001`,
+> 2026-09-21). Its lessons — including the ones that recommend `uiautomator dump` bounds for
+> automated tapping — are **not** current guidance. Preserved verbatim as evidence; the only
+> operative input path is **owner human interaction**, confined to the target app.
+
 **Date:** 2026-09-04
 **Source:** live UI walkthrough of `com.Vali98.ChatterUI` v0.8.9-beta9b on the Redmi Turbo 4 Pro,
 done alongside the OpenCL backend investigation

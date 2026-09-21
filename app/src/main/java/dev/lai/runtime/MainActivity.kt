@@ -31,7 +31,12 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * ADB-first accelerator qualification trigger (docs/TESTING.md "Backend qualification").
+     * Accelerator qualification trigger (docs/TESTING.md "Backend qualification").
+     *
+     * NOTE (2026-09-21): this is an application-native deterministic control surface — a
+     * superseded tier-1 mechanism (soobujmiah/skb -> DEC-2026-09-21-001). The feature is retained;
+     * it is NOT an authorized path for autonomous agent interaction with the application UI.
+     * The owner may run it by hand; the only operative input path is owner human interaction.
      * MainActivity is already the app's only exported, always-present component, so it doubles
      * as the app-native control surface instead of adding a new one: a device-testing agent
      * qualifies a backend with one command and no UI navigation —
