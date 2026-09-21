@@ -1,5 +1,12 @@
 # Redmi Turbo 4 Pro — Vulkan warptile-clamp qualification (Build 1 follow-up)
 
+> **SUPERSEDED — HISTORICAL ONLY.** This record documents a session driven with the four-tier
+> autonomous control model (ADB `input tap`/`input text`, UIAutomator, app-native control), which
+> is superseded in full. See `soobujmiah/skb` →
+> `operations/decisions/2026-09-21--skb--human-operated-testing-model.md` (`DEC-2026-09-21-001`,
+> 2026-09-21). Preserved verbatim as evidence of that work; not an authorization and not a
+> description of current practice. The only operative input path is **owner human interaction**.
+
 **Date:** 2026-09-03
 **Package:** `dev.lai.runtime` (release, `versionCode=292`, `versionName=0.1.292`)
 **Commit under test:** `6066bd2` ("feat: enable KleidiAI and qualify Vulkan warptile clamp"), artifact `lai-release-292` (run `33606821023`, `validated_accelerators=llama-vulkan`)
