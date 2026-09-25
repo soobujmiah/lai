@@ -1,0 +1,30 @@
+schema_version: 1
+project_id: lai
+repository: soobujmiah/lai
+generated_at: '2026-09-25T12:25:08Z'
+generated_by: tools/repo_knowledge init
+version: v0.9.7-195-g966d515
+head:
+  commit: 966d5157d5f2fcd0799d4e4c2e1325d0e86d57d4
+  branch: main
+  committed_at: '2026-09-21T03:14:35Z'
+phases:
+  source: not_configured
+  completed: []
+  active: null
+  next: null
+build:
+  status: unknown
+  run_id: null
+  at: null
+test:
+  status: unknown
+  run_id: null
+  at: null
+  summary: null
+last_successful_build: null
+last_failed_build: null
+sync:
+  status: pending
+  last_synced_at: '2026-09-25T12:25:08Z'
+  source: local

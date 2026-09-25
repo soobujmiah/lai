@@ -201,3 +201,31 @@ remaining driver failure. Vulkan remains opt-in (`validated_accelerators=llama-v
 the driver crash at `vkCmdBindPipeline` (MUL_MAT bind) is unresolved on the pinned llama.cpp;
 the **primary GPU qualification track is now OpenCL** (`validated_accelerators=llama-opencl`,
 see "GPU enablement — Adreno OpenCL track" above).
+
+## Deterministic repository state (added 2026-09-25)
+
+This repository has `.repo/` — a machine-generated, non-LLM record of the exact head commit,
+build/test status, and event history, produced by `tools/repo_knowledge/` (vendored from
+canonical `soobujmiah/skb`, see `tools/repo_knowledge/README.md`) and kept current by
+`.github/workflows/repo-knowledge-sync.yml`. Canonical policy: `soobujmiah/skb` →
+`governance/DETERMINISTIC_STATE_SYNC_POLICY.md`.
+
+Unlike GGEN/OnSkillIT, this sync workflow does **not** re-run the Android build itself — the
+existing `android_build.yml` pipeline is a 45-minute native/Vulkan/OpenCL/Hexagon toolchain build
+that fetches gigabytes of dependencies and can publish real GitHub Releases; duplicating it just
+to get a status signal would be wasteful and risks unwanted side effects. Instead,
+`repo-knowledge-sync.yml` triggers via `workflow_run` when the "Android build" workflow completes
+on `main`, and reads that run's own job/step conclusions via the GitHub API:
+
+- `build.status` comes from the "Source and documentation policy" job plus the "Unit tests and
+  lint" step's conclusion in the "Compile Kotlin, C++ and APK" job — if either failed, nothing
+  downstream could have produced a valid build.
+- `test.status` comes specifically from the "Unit tests and lint" step's own conclusion.
+- If a step's conclusion can't be determined for a given run (e.g. it was skipped), the
+  corresponding status is left alone rather than guessed — `.repo/project.yaml` keeps the last
+  real result instead of a fabricated one.
+
+`catalog_publish.yml` (the signed model-catalog release) is not wired into this sync; it's a rare,
+manually-scoped event, not a routine build/test signal. `.repo/phases.yaml` is not configured —
+this repository's `v0.x` Git tags are release versions, not phase-completion markers, and
+inventing that mapping would misrepresent them.

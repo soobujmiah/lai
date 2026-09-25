@@ -1,0 +1,265 @@
+"""Deterministic collection/merge logic for the .repo/ state protocol.
+
+Every function here is pure Git/filesystem derivation. Nothing in this module calls an LLM or
+makes a judgment call about priority, status, or maturity -- those stay human-authored per
+governance/DETERMINISTIC_STATE_SYNC_POLICY.md. A function that cannot derive a fact returns an
+explicit "unknown"/None rather than guessing.
+"""
+from __future__ import annotations
+
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+try:
+    import yaml
+except ImportError as exc:  # pragma: no cover - exercised only when PyYAML is missing
+    raise SystemExit("tools/repo_knowledge requires PyYAML (see tools/requirements.txt)") from exc
+
+SCHEMA_VERSION = 1
+STATUS_VALUES = ("passed", "failed", "unknown")
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def run_git(args: list[str], root: Path) -> str | None:
+    """Run a git command in ``root``; return stripped stdout, or None on any failure."""
+    try:
+        result = subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, text=True, check=False
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def get_head(root: Path) -> dict[str, str | None]:
+    commit = run_git(["rev-parse", "HEAD"], root)
+    branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"], root)
+    committed_at_raw = run_git(["show", "-s", "--format=%cI", "HEAD"], root)
+    committed_at = _to_utc_z(committed_at_raw) if committed_at_raw else None
+    return {"commit": commit, "branch": branch, "committed_at": committed_at}
+
+
+def _to_utc_z(iso_with_offset: str) -> str:
+    """Normalize a git %cI timestamp (has a numeric offset) to a Z-suffixed UTC string."""
+    dt = datetime.fromisoformat(iso_with_offset)
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def get_version(root: Path) -> str | None:
+    """Return `git describe --tags --always`, or None if not in a git repository at all."""
+    return run_git(["describe", "--tags", "--always"], root)
+
+
+def get_commit_summary(root: Path, commit: str | None = None) -> str | None:
+    return run_git(["show", "-s", "--format=%s", commit or "HEAD"], root)
+
+
+def load_yaml(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    with path.open("r", encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
+
+
+def dump_yaml(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        yaml.safe_dump(data, fh, sort_keys=False, default_flow_style=False)
+
+
+def compute_phases(root: Path) -> dict[str, Any]:
+    """Read the optional, human-authored .repo/phases.yaml and mark completion from tags.
+
+    A phase is "completed" only when its declared `complete_tag` exists in the repository's
+    tag list. Nothing here infers an active/next phase from anything but that same declared
+    order -- the first not-completed phase (if any) is "active" and the one after it is "next".
+    Never invents a phase name.
+    """
+    phases_path = root / ".repo" / "phases.yaml"
+    declared = load_yaml(phases_path)
+    if not declared or "phases" not in declared:
+        return {"source": "not_configured", "completed": [], "active": None, "next": None}
+
+    tags_raw = run_git(["tag", "--list"], root)
+    tags = set(tags_raw.splitlines()) if tags_raw else set()
+
+    ordered = declared["phases"]
+    completed: list[str] = []
+    active: str | None = None
+    next_phase: str | None = None
+    for i, phase in enumerate(ordered):
+        name = phase["name"]
+        tag = phase.get("complete_tag")
+        if tag and tag in tags:
+            completed.append(name)
+            continue
+        if active is None:
+            active = name
+            if i + 1 < len(ordered):
+                next_phase = ordered[i + 1]["name"]
+            break
+    return {
+        "source": ".repo/phases.yaml",
+        "completed": completed,
+        "active": active,
+        "next": next_phase,
+    }
+
+
+def _run_block(
+    status: str | None,
+    run_id: str | None,
+    existing: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if status is None:
+        # No new result reported this invocation: keep whatever was already recorded rather
+        # than downgrading a known result to "unknown" just because this run didn't check it.
+        return existing or {"status": "unknown", "run_id": None, "at": None}
+    if status not in STATUS_VALUES:
+        raise ValueError(f"invalid status {status!r}; expected one of {STATUS_VALUES}")
+    return {"status": status, "run_id": run_id, "at": now_iso()}
+
+
+def build_project_state(
+    root: Path,
+    project_id: str,
+    repository: str,
+    generated_by: str,
+    sync_source: str,
+    existing: dict[str, Any] | None,
+    build_status: str | None = None,
+    build_run_id: str | None = None,
+    test_status: str | None = None,
+    test_run_id: str | None = None,
+    test_summary: str | None = None,
+) -> dict[str, Any]:
+    """Compute the next .repo/project.yaml content.
+
+    Applies policy rules 5-7: a successful run promotes last_successful_build; a failed run
+    updates last_failed_build and never clears last_successful_build; a run that reports
+    nothing for build/test leaves the previous block untouched.
+    """
+    head = get_head(root)
+    existing = existing or {}
+
+    build = _run_block(build_status, build_run_id, existing.get("build"))
+    test_existing = existing.get("test")
+    test = _run_block(test_status, test_run_id, test_existing)
+    if test_status is not None and test_summary is not None:
+        test["summary"] = test_summary
+    elif test_existing and "summary" in test_existing and test_status is None:
+        test["summary"] = test_existing["summary"]
+    else:
+        test.setdefault("summary", None)
+
+    last_successful_build = existing.get("last_successful_build")
+    last_failed_build = existing.get("last_failed_build")
+    if build_status == "passed":
+        last_successful_build = {"commit": head["commit"], "at": build["at"], "run_id": build_run_id}
+    elif build_status == "failed":
+        last_failed_build = {"commit": head["commit"], "at": build["at"], "run_id": build_run_id}
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "project_id": project_id,
+        "repository": repository,
+        "generated_at": now_iso(),
+        "generated_by": generated_by,
+        "version": get_version(root),
+        "head": head,
+        "phases": compute_phases(root),
+        "build": build,
+        "test": test,
+        "last_successful_build": last_successful_build,
+        "last_failed_build": last_failed_build,
+        "sync": {
+            "status": "ok",
+            "last_synced_at": now_iso(),
+            "source": sync_source,
+        },
+    }
+
+
+def make_event(
+    repository: str,
+    commit: str,
+    kind: str,
+    status: str | None = None,
+    summary: str | None = None,
+    run_id: str | None = None,
+    evidence_level: str | None = None,
+) -> dict[str, Any]:
+    occurred_at = now_iso()
+    short_commit = commit[:7] if commit else "unknown"
+    suffix = run_id or occurred_at.replace("-", "").replace(":", "").replace("T", "").replace("Z", "Z")
+    event_id = f"{kind}-{short_commit}-{suffix}"
+    event: dict[str, Any] = {
+        "event_id": event_id,
+        "repository": repository,
+        "commit": commit,
+        "kind": kind,
+        "occurred_at": occurred_at,
+    }
+    if status is not None:
+        event["status"] = status
+    if summary is not None:
+        event["summary"] = summary
+    if evidence_level is not None:
+        event["evidence_level"] = evidence_level
+    return event
+
+
+def write_event(root: Path, event: dict[str, Any]) -> Path:
+    """Append-only write: an existing event file with the same event_id is never overwritten
+    with different content silently -- same id + same content is a no-op; a real conflict
+    (same id, different content) raises, because that would mean the id scheme collided.
+    """
+    path = root / ".repo" / "events" / f"{event['event_id']}.yaml"
+    if path.exists():
+        existing = load_yaml(path)
+        if existing == event:
+            return path
+        raise RuntimeError(f"event id collision with differing content: {path}")
+    dump_yaml(path, event)
+    return path
+
+
+def render_status_markdown(state: dict[str, Any]) -> str:
+    lines = [
+        "<!-- GENERATED by tools/repo_knowledge -- do not hand-edit. -->",
+        f"# {state['project_id']} -- deterministic status",
+        "",
+        f"- Repository: `{state['repository']}`",
+        f"- Generated at: {state['generated_at']} (by `{state['generated_by']}`)",
+        f"- Version: `{state['version'] or 'unknown'}`",
+        f"- Head: `{state['head']['commit']}` on `{state['head']['branch']}` ({state['head']['committed_at']})",
+        "",
+        "## Build / test",
+        "",
+        f"- Build: **{state['build']['status']}**" + (f" (run `{state['build']['run_id']}`)" if state['build'].get('run_id') else ""),
+        f"- Test: **{state['test']['status']}**" + (f" -- {state['test']['summary']}" if state['test'].get('summary') else ""),
+    ]
+    if state.get("last_successful_build"):
+        lsb = state["last_successful_build"]
+        lines.append(f"- Last successful build: `{lsb['commit']}` at {lsb['at']}")
+    if state.get("last_failed_build"):
+        lfb = state["last_failed_build"]
+        lines.append(f"- Last failed build: `{lfb['commit']}` at {lfb['at']}")
+    phases = state.get("phases", {})
+    lines += ["", "## Phases"]
+    if phases.get("source") == "not_configured":
+        lines.append("- Not configured (no `.repo/phases.yaml`).")
+    else:
+        lines.append(f"- Completed: {', '.join(phases['completed']) or 'none'}")
+        lines.append(f"- Active: {phases['active'] or 'none'}")
+        lines.append(f"- Next: {phases['next'] or 'none'}")
+    sync = state.get("sync", {})
+    lines += ["", "## Sync", "", f"- Status: {sync.get('status')}", f"- Source: {sync.get('source')}", f"- Last synced at: {sync.get('last_synced_at')}"]
+    return "\n".join(lines) + "\n"
