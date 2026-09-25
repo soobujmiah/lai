@@ -54,6 +54,14 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
+      # Checking out an exact SHA (needed so .repo/ reflects precisely the commit the
+      # triggering Android build actually validated, not whatever main has moved to since)
+      # leaves Git in detached-HEAD state, which made head.branch record the literal string
+      # "HEAD" instead of the real branch name. Point a local branch ref at the checked-out
+      # commit so core.py's `git rev-parse --abbrev-ref HEAD` reports the true branch.
+      - name: Restore branch name after exact-SHA checkout
+        run: git checkout -B "${{ github.event.workflow_run.head_branch || github.ref_name }}"
+
       - name: Install dependencies
         run: pip install --quiet pyyaml
 
