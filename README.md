@@ -8,6 +8,12 @@ In plain terms: LAI is a **local AI app for Android** — an offline, privacy-fi
 
 > **Current status:** `v0.9.7` is the latest production-signed release (v0.9.0–v0.9.7, RSA-4096 V1–V4 signing). Snapdragon 8s Gen 4 has physically passed reviewed Qwen installation, CPU scheduling, memory preflight, multi-turn local inference, coherent Bangla output, ~20 tok/s decode, KV-prefix reuse (~0.6 s steady-state TTFT), and retained-model offline restore after uninstall. A closed-loop thermal governor, persistent chat history, background downloads and model management are build-verified (0.9.5–0.9.7). On 2026-08-18 `main` was repaired and CI-verified green (run #154): workspace auto-import of `storage/LAI/models/*.gguf` no longer crashes on unhashable files, and the GGML_VULKAN toolchain (SPIRV-Headers, glslc, Vulkan C++/SPIR-V headers) now builds — Vulkan still requires physical Adreno 825 qualification before any acceleration is claimed. See [status](docs/STATUS.md).
 
+![LAI system architecture](docs/assets/lai-system-architecture.svg)
+
+## Architecture at a glance
+
+The visual below shows the current trust and inference boundaries. The detailed Mermaid component graph remains below for repository-level technical detail.
+
 ## Product principles
 
 - **Local first:** prompts, screen structures, captures, and models stay on the phone.
@@ -35,7 +41,7 @@ LAI has one application ID and upgrade path. Internet is used only when the user
 | Bangla OCR | Screenshot path, plugin interface, versioned structured JSON | Recognition model/runtime is a clearly reported placeholder |
 | Delivery | GitHub-only SDK/NDK/CMake/Gradle setup, tests, lint, APK artifacts, tag releases | Release signing requires repository secrets |
 
-## Architecture at a glance
+### Detailed component graph
 
 ```mermaid
 flowchart LR
