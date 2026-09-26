@@ -2,15 +2,15 @@
 # lai -- deterministic status
 
 - Repository: `soobujmiah/lai`
-- Generated at: 2026-09-26T12:41:32Z (by `tools/repo_knowledge collect`)
-- Version: `v0.9.7-206-g6cedb42`
-- Head: `6cedb420aaae0634b9b65cb8ee57bea693b84034` on `main` (2026-09-26T12:40:59Z)
+- Generated at: 2026-09-26T21:53:58Z (by `tools/repo_knowledge collect`)
+- Version: `v0.9.7-208-g48af7d9`
+- Head: `48af7d9d524a9f16cc1c2cf80e335d293d288e1b` on `main` (2026-09-26T21:44:42Z)
 
 ## Build / test
 
-- Build: **failed** (run `36242697383`)
-- Test: **passed** -- Unit tests and lint (android_build.yml)
-- Last successful build: `f7f9b5ad28adb92e684a7a82e8ae552a4c913826` at 2026-09-26T08:28:03Z
+- Build: **passed** (run `36273975880`)
+- Test: **passed** -- Android build: Unit tests and lint
+- Last successful build: `48af7d9d524a9f16cc1c2cf80e335d293d288e1b` at 2026-09-26T21:53:58Z
 - Last failed build: `6cedb420aaae0634b9b65cb8ee57bea693b84034` at 2026-09-26T12:41:32Z
 
 ## Phases
@@ -20,4 +20,4 @@
 
 - Status: ok
 - Source: ci
-- Last synced at: 2026-09-26T12:41:32Z
+- Last synced at: 2026-09-26T21:53:58Z

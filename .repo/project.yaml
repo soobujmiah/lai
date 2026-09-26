@@ -1,36 +1,42 @@
 schema_version: 1
 project_id: lai
 repository: soobujmiah/lai
-generated_at: '2026-09-26T12:41:32Z'
+generated_at: '2026-09-26T21:53:58Z'
 generated_by: tools/repo_knowledge collect
-version: v0.9.7-206-g6cedb42
+version: v0.9.7-208-g48af7d9
 head:
-  commit: 6cedb420aaae0634b9b65cb8ee57bea693b84034
+  commit: 48af7d9d524a9f16cc1c2cf80e335d293d288e1b
   branch: main
-  committed_at: '2026-09-26T12:40:59Z'
+  committed_at: '2026-09-26T21:44:42Z'
 phases:
   source: not_configured
   completed: []
   active: null
   next: null
 build:
-  status: failed
-  run_id: '36242697383'
-  at: '2026-09-26T12:41:32Z'
+  status: passed
+  run_id: '36273975880'
+  commit: 48af7d9d524a9f16cc1c2cf80e335d293d288e1b
+  run_attempt: '1'
+  at: '2026-09-26T21:53:58Z'
+  timestamp_source: ci
 test:
   status: passed
-  run_id: null
-  at: '2026-09-26T08:28:03Z'
-  summary: Unit tests and lint (android_build.yml)
+  run_id: '36273975880'
+  commit: 48af7d9d524a9f16cc1c2cf80e335d293d288e1b
+  run_attempt: '1'
+  at: '2026-09-26T21:46:30Z'
+  timestamp_source: ci
+  summary: 'Android build: Unit tests and lint'
 last_successful_build:
-  commit: f7f9b5ad28adb92e684a7a82e8ae552a4c913826
-  at: '2026-09-26T08:28:03Z'
-  run_id: '36229316331'
+  commit: 48af7d9d524a9f16cc1c2cf80e335d293d288e1b
+  at: '2026-09-26T21:53:58Z'
+  run_id: '36273975880'
 last_failed_build:
   commit: 6cedb420aaae0634b9b65cb8ee57bea693b84034
   at: '2026-09-26T12:41:32Z'
   run_id: '36242697383'
 sync:
   status: ok
-  last_synced_at: '2026-09-26T12:41:32Z'
+  last_synced_at: '2026-09-26T21:53:58Z'
   source: ci
