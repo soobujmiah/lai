@@ -4,12 +4,13 @@ SKB's convention (tools/continuity, scripts/) is stdlib-plus-PyYAML, no extra de
 This implements only the subset of JSON Schema draft 2020-12 that
 schemas/project-registry.schema.json and schemas/project-event.schema.json actually use:
 type, required, properties, additionalProperties, enum, const, pattern, minLength, format
-(date-time, checked structurally, not calendar-validated). It is not a general-purpose
+(date-time, UTC and calendar-validated). It is not a general-purpose
 validator and should not be reused for a schema outside this pair without re-checking coverage.
 """
 from __future__ import annotations
 
 import json
+from datetime import datetime
 import re
 from pathlib import Path
 from typing import Any
@@ -45,8 +46,12 @@ def validate(instance: Any, schema: dict[str, Any], path: str = "$") -> list[str
         return errors
 
     if schema.get("format") == "date-time" and isinstance(instance, str):
-        if not _DATE_TIME_RE.match(instance):
-            errors.append(f"{path}: {instance!r} is not a Z-suffixed date-time")
+        try:
+            if not _DATE_TIME_RE.match(instance):
+                raise ValueError("not UTC Z form")
+            datetime.fromisoformat(instance.replace("Z", "+00:00"))
+        except ValueError:
+            errors.append(f"{path}: {instance!r} is not a valid Z-suffixed date-time")
 
     if "pattern" in schema and isinstance(instance, str):
         if not re.match(schema["pattern"], instance):
