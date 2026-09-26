@@ -1,0 +1,6 @@
+event_id: build-6cedb42-36242697383
+repository: soobujmiah/lai
+commit: 6cedb420aaae0634b9b65cb8ee57bea693b84034
+kind: build
+occurred_at: '2026-09-26T12:41:32Z'
+status: failed
