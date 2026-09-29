@@ -1,13 +1,13 @@
 schema_version: 1
 project_id: lai
 repository: soobujmiah/lai
-generated_at: '2026-09-26T21:53:58Z'
+generated_at: '2026-09-29T17:29:13Z'
 generated_by: tools/repo_knowledge collect
-version: v0.9.7-208-g48af7d9
+version: v0.9.7-210-g15c9f61
 head:
-  commit: 48af7d9d524a9f16cc1c2cf80e335d293d288e1b
+  commit: 15c9f61410bb4f7345e10c341eb3640640f54f6b
   branch: main
-  committed_at: '2026-09-26T21:44:42Z'
+  committed_at: '2026-09-29T17:17:07Z'
 phases:
   source: not_configured
   completed: []
@@ -15,28 +15,44 @@ phases:
   next: null
 build:
   status: passed
-  run_id: '36273975880'
-  commit: 48af7d9d524a9f16cc1c2cf80e335d293d288e1b
+  run_id: '36603854183'
+  commit: 15c9f61410bb4f7345e10c341eb3640640f54f6b
   run_attempt: '1'
-  at: '2026-09-26T21:53:58Z'
+  at: '2026-09-29T17:29:13Z'
   timestamp_source: ci
+  conclusion: success
+  workflow_name: Android build
+  workflow_id: '335296642'
+  event_type: push
+  started_at: '2026-09-29T17:17:12Z'
+  completed_at: '2026-09-29T17:29:13Z'
+  actor: soobujmiah
+  run_url: https://github.com/soobujmiah/lai/actions/runs/36603854183
 test:
   status: passed
-  run_id: '36273975880'
-  commit: 48af7d9d524a9f16cc1c2cf80e335d293d288e1b
+  run_id: '36603854183'
+  commit: 15c9f61410bb4f7345e10c341eb3640640f54f6b
   run_attempt: '1'
-  at: '2026-09-26T21:46:30Z'
+  at: '2026-09-29T17:21:33Z'
   timestamp_source: ci
+  conclusion: success
+  workflow_name: Android build
+  workflow_id: '335296642'
+  event_type: push
+  started_at: '2026-09-29T17:17:12Z'
+  completed_at: '2026-09-29T17:29:13Z'
+  actor: soobujmiah
+  run_url: https://github.com/soobujmiah/lai/actions/runs/36603854183
   summary: 'Android build: Unit tests and lint'
 last_successful_build:
-  commit: 48af7d9d524a9f16cc1c2cf80e335d293d288e1b
-  at: '2026-09-26T21:53:58Z'
-  run_id: '36273975880'
+  commit: 15c9f61410bb4f7345e10c341eb3640640f54f6b
+  at: '2026-09-29T17:29:13Z'
+  run_id: '36603854183'
 last_failed_build:
   commit: 6cedb420aaae0634b9b65cb8ee57bea693b84034
   at: '2026-09-26T12:41:32Z'
   run_id: '36242697383'
 sync:
   status: ok
-  last_synced_at: '2026-09-26T21:53:58Z'
+  last_synced_at: '2026-09-29T17:29:13Z'
   source: ci

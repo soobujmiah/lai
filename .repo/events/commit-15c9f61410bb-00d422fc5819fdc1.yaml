@@ -1,0 +1,8 @@
+event_id: commit-15c9f61410bb-00d422fc5819fdc1
+repository: soobujmiah/lai
+commit: 15c9f61410bb4f7345e10c341eb3640640f54f6b
+kind: commit
+occurred_at: '2026-09-29T17:17:07Z'
+status: completed
+summary: 'feat(repo-knowledge): upgrade vendored tooling, schemas, and final-run sync
+  contract'
