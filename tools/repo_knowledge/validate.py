@@ -10,8 +10,8 @@ validator and should not be reused for a schema outside this pair without re-che
 from __future__ import annotations
 
 import json
-from datetime import datetime
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -53,13 +53,11 @@ def validate(instance: Any, schema: dict[str, Any], path: str = "$") -> list[str
         except ValueError:
             errors.append(f"{path}: {instance!r} is not a valid Z-suffixed date-time")
 
-    if "pattern" in schema and isinstance(instance, str):
-        if not re.match(schema["pattern"], instance):
-            errors.append(f"{path}: {instance!r} does not match pattern {schema['pattern']!r}")
+    if "pattern" in schema and isinstance(instance, str) and not re.match(schema["pattern"], instance):
+        errors.append(f"{path}: {instance!r} does not match pattern {schema['pattern']!r}")
 
-    if "minLength" in schema and isinstance(instance, str):
-        if len(instance) < schema["minLength"]:
-            errors.append(f"{path}: {instance!r} shorter than minLength {schema['minLength']}")
+    if "minLength" in schema and isinstance(instance, str) and len(instance) < schema["minLength"]:
+        errors.append(f"{path}: {instance!r} shorter than minLength {schema['minLength']}")
 
     if isinstance(instance, dict):
         properties = schema.get("properties", {})

@@ -23,7 +23,10 @@ jobs:
     needs: test
     if: >-
       always() && github.event_name == 'workflow_run' &&
-      github.event.workflow_run.event == 'push' &&
+      (github.event.workflow_run.event == 'push' ||
+       github.event.workflow_run.event == 'schedule' ||
+       github.event.workflow_run.event == 'workflow_dispatch' ||
+       github.event.workflow_run.event == 'repository_dispatch') &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
@@ -43,6 +46,8 @@ jobs:
             --branch main --test-step "Unit tests and lint"
       - run: python3 -m tools.repo_knowledge verify
       - name: Publish validated state only
+        env:
+          SKB_DISPATCH_TOKEN: ${{ secrets.SKB_DISPATCH_TOKEN || secrets.SKB_RETURN_TOKEN || '' }}
         run: |
           set -euo pipefail
           python3 -m tools.repo_knowledge verify
@@ -52,3 +57,10 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m "chore(repo-knowledge): record source CI run ${{ github.event.workflow_run.id }}"
           git push origin HEAD:main
+          if [ -n "$SKB_DISPATCH_TOKEN" ]; then
+            curl -fsSL -X POST \
+              -H "Authorization: Bearer $SKB_DISPATCH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/soobujmiah/skb/dispatches \
+              -d "{\"event_type\":\"repo-state-updated\",\"client_payload\":{\"project_id\":\"lai\",\"repository\":\"${{ github.repository }}\",\"run_id\":\"${{ github.event.workflow_run.id }}\",\"sha\":\"${{ github.event.workflow_run.head_sha }}\"}}" || true
+          fi

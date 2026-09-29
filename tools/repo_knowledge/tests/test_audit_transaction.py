@@ -1,12 +1,13 @@
 """Audit regressions for stable identities and all-or-nothing state publication."""
-import json
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
 from tools.repo_knowledge import cli, core
 from tools.repo_knowledge.tests.test_core import make_git_repo
+
 
 class TransactionTests(unittest.TestCase):
     def setUp(self):
@@ -46,13 +47,13 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual(before,self.snapshot())
     def test_event_write_exception_does_not_publish_partial_state(self):
         self.call('sync');before=self.snapshot()
-        with patch.object(core,'write_event',side_effect=OSError('fixture disk failure')):
-            with self.assertRaises(OSError):self.call('sync','--build-status','passed')
+        with patch.object(core,'write_event',side_effect=OSError('fixture disk failure')), self.assertRaises(OSError):
+            self.call('sync','--build-status','passed')
         self.assertEqual(before,self.snapshot())
     def test_publication_failure_leaves_previous_directory_unchanged(self):
         self.call('sync');before=self.snapshot()
-        with patch.object(cli,'_publish',side_effect=OSError('fixture unsupported exchange')):
-            with self.assertRaises(OSError):self.call('sync','--build-status','passed')
+        with patch.object(cli,'_publish',side_effect=OSError('fixture unsupported exchange')), self.assertRaises(OSError):
+            self.call('sync','--build-status','passed')
         self.assertEqual(before,self.snapshot())
     def test_invalid_timestamp_is_rejected_before_publication(self):
         self.call('sync');before=self.snapshot()

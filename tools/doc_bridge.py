@@ -16,9 +16,8 @@ the very top of the file if there is no frontmatter), before the first # heading
 from __future__ import annotations
 
 import argparse
-import re
-import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -74,8 +73,9 @@ def cmd_check(argv: list[str]) -> int:
         return 1
     if args.strict:
         # Validate the managed paragraph, not repeated links in human prose.
-        paragraph = next((line for line in text.splitlines()
-                          if line.startswith("**Machine-generated operational state:**")), "")
+        paragraph_match = re.match(r"\s*(\*\*Machine-generated operational state:\*\*[^\n]*)",
+                                   text[BRIDGE_PATTERN.search(text).end():])
+        paragraph = paragraph_match.group(1) if paragraph_match else ""
         if not paragraph:
             print("FAIL: managed bridge paragraph missing")
             return 1
@@ -107,10 +107,27 @@ def cmd_fix(argv: list[str]) -> int:
         if len(markers) != 1 or (args.project_id and markers[0] != args.project_id):
             print("FAIL: refusing to rewrite duplicate/wrong-identity bridge", file=sys.stderr)
             return 1
-        print(f"skip: bridge already present in {path.name}")
+        marker = BRIDGE_PATTERN.search(text)
+        paragraph = re.match(r"\s*(\*\*Machine-generated operational state:\*\*[^\n]*)", text[marker.end():])
+        if paragraph is None:
+            print("FAIL: bridge paragraph missing; refusing to rewrite human content", file=sys.stderr)
+            return 1
+        repo_root = next((p for p in [path.parent, *path.parents] if (p / ".repo").is_dir()), path.parent)
+        status_link = os.path.relpath(repo_root / ".repo/STATUS.md", path.parent)
+        replacement = BRIDGE_SECTION_TEMPLATE.format(project_id=markers[0], base_url=SKB_REGISTRY_BASE_URL).splitlines()[2]
+        replacement = replacement.replace("./.repo/STATUS.md", status_link)
+        start, end = marker.end() + paragraph.start(1), marker.end() + paragraph.end(1)
+        new_text = text[:start] + replacement + text[end:]
+        if new_text != text:
+            path.write_text(new_text, encoding="utf-8")
+            print(f"repaired: generated bridge paragraph in {path.name}")
+        else:
+            print(f"skip: bridge already correct in {path.name}")
         return 0
     pm = args.project_id or path.stem
     bridge = BRIDGE_SECTION_TEMPLATE.format(project_id=pm, base_url=SKB_REGISTRY_BASE_URL)
+    repo_root = next((p for p in [path.parent, *path.parents] if (p / ".repo").is_dir()), path.parent)
+    bridge = bridge.replace("./.repo/STATUS.md", os.path.relpath(repo_root / ".repo/STATUS.md", path.parent))
     fm, body = _extract_frontmatter(text)
     sep = "\n" if fm else ""
     insert_pos = _find_first_heading_offset(body)
