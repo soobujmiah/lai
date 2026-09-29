@@ -1,0 +1,8 @@
+event_id: commit-adc46960655a-9202fb709a537661
+repository: soobujmiah/lai
+commit: adc46960655a60515e9b49c5e63b495694e65ebe
+kind: commit
+occurred_at: '2026-09-29T22:37:04Z'
+status: completed
+summary: Declare the repository's canonical type and add the documentation scaffold
+  (migration waves 2/3)
