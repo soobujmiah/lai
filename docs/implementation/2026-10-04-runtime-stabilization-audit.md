@@ -82,6 +82,11 @@ v68/v69/v73/v75/v79/v81 HTP skel/stub assets. Earlier real-device logs show
 QNN DSP device/context creation and a 20-step 512×512 NPU image generation in
 5.7 seconds. This proves a QNN-based route for that image workload, not GGUF
 LLM compatibility. Its app-private QNN binaries must not be copied into LAI.
+An owner-operated 2026-10-04 recheck on installed Local Dream 2.8.1 again
+confirmed v73 HTP loading, three QNN contexts and 28 successful graph executions.
+The owner deliberately stopped after UNET step 13, so that session did not
+verify complete image output or the claimed 1–2 s time. See
+`docs/device-results/2026-10-04-local-dream-qnn-reference-recheck.md`.
 
 LAI already implements a different direct GGUF route through `ggml-hexagon`:
 `hexagon_backend.cpp` selects `HTP0`, sets full layer offload for the reviewed

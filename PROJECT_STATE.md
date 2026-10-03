@@ -24,6 +24,10 @@ LAI's two earlier ggml-hexagon DSP qualification runs remain valid, but reply
 sanity was not recorded. The existing Tesseract Bangla/English OCR engine still
 lacks a real-image device result. These gates remain open until owner-operated
 device tests produce scoped evidence.
+An owner-operated Local Dream 2.8.1 recheck on 2026-10-04 confirmed QNN v73
+runtime use and 28 successful graph executions before the owner manually stopped
+at UNET step 13. No completed image or 1–2 s timing was verified in that run;
+see `docs/device-results/2026-10-04-local-dream-qnn-reference-recheck.md`.
 The subsequent chat-template fail-closed guard is CI-compiled but has no device
 result. Release 413 contains only the CPU device pin; its artifact remains the
 clean discriminating test for the release-411 output defect.
