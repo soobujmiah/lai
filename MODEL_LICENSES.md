@@ -2,7 +2,16 @@
 
 Last audited: 2026-08-17
 
-LAI stores no model weights in Git. Model acquisition is an explicit user action, and artifact integrity/provenance metadata does not by itself grant redistribution rights.
+LAI stores no model weights in Git. LLM model acquisition is an explicit user action. The offline OCR models below are bundled by GitHub CI with verified hashes after the owner authorized an openly licensed model choice. Artifact integrity/provenance metadata does not by itself prove model accuracy.
+
+## Bundled OCR models
+
+| Language | Source | SHA-256 | License | Status |
+|---|---|---|---|---|
+| Bengali (`ben`) | `tesseract-ocr/tessdata_fast` @ `87416418657359cb625c412a48b6e1d6d41c29bd` | `31163084c279aaebd376216f0c3d5c17ad4b5fee8db49dae79c20000b5de5964` | Apache-2.0 | Source integrated; named-device quality pending |
+| English (`eng`) | same commit | `7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2` | Apache-2.0 | Source integrated; named-device quality pending |
+
+The upstream [tessdata_fast license](https://github.com/tesseract-ocr/tessdata_fast/blob/main/LICENSE) applies to both files. Handwriting is not claimed.
 
 ## Reviewed catalog artifact
 

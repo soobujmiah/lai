@@ -1,5 +1,7 @@
 # Implementation status
 
+> **2026-10-03 source update:** Printed Bangla/English OCR now has a real offline Tesseract adapter with SHA-256-pinned Apache-2.0 models staged in GitHub CI. The owner has not yet installed and tested the resulting APK, so OCR quality and device behavior are pending. Vulkan on `onyx` is rejected before the known native crash path; GPU inference remains unqualified. See `PROJECT_STATE.md` and `docs/implementation/2026-10-03-ocr-inference-audit.md` for current evidence. The dated table below is historical.
+
 Last reviewed: 2026-08-19
 
 > The directive-aligned, source-audited status is maintained in [`implementation/current-state.md`](implementation/current-state.md). The canonical full roadmap is [`ROADMAP.md`](ROADMAP.md). The authoritative handoff snapshot is [`PROJECT_STATE.md`](../PROJECT_STATE.md). This legacy evidence table is retained for detailed build/device history and uses its original evidence vocabulary.

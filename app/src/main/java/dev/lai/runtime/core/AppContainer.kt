@@ -37,7 +37,7 @@ class AppContainer(context: Context) {
     val inferenceScheduler = InferenceScheduler()
     val memoryEstimator = ModelMemoryEstimator()
     val runtimeEnvironment = AndroidRuntimeEnvironmentProvider(context)
-    val ocrService = BanglaOcrService()
+    val ocrService = BanglaOcrService(context)
     val agentRuntime = AgentRuntime(elevatedShell, shizukuController, ocrService)
     val workspaceRepository = WorkspaceRepository(context)
     val workspaceSettingsStore = WorkspaceSettingsStore(workspaceRepository)

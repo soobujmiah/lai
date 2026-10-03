@@ -16,4 +16,6 @@ android {
 dependencies {
     api(project(":core:contracts"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")
+    testImplementation(libs.junit)
 }

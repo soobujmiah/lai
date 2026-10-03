@@ -28,7 +28,7 @@ data class DashboardTool(
 
 private val dashboardTools = listOf(
     DashboardTool("screen.snapshot", "Read screen", "Capture the visible accessibility tree (text omitted for passwords)", ToolRisk.READ_ONLY, false, "Vision"),
-    DashboardTool("ocr.current_screen", "Recognize text", "Local OCR placeholder — structured JSON, no cloud", ToolRisk.READ_ONLY, false, "Vision"),
+    DashboardTool("ocr.current_screen", "Recognize text", "Offline printed Bangla and English OCR", ToolRisk.READ_ONLY, false, "Vision"),
     DashboardTool("screen.click", "Tap control", "Click a button or field by id / text / path", ToolRisk.INTERACTION, true, "Interaction"),
     DashboardTool("screen.type", "Enter text", "Type into a focused field — sensitive text requires approval", ToolRisk.SENSITIVE, true, "Interaction"),
     DashboardTool("screen.scroll", "Scroll", "Scroll the visible container forward or backward", ToolRisk.INTERACTION, false, "Interaction"),

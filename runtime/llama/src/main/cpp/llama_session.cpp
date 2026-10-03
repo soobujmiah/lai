@@ -400,16 +400,15 @@ public:
         if (options.temperature <= 0.0F) {
             llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
         } else {
-            llama_sampler_chain_add(sampler, llama_sampler_init_top_p(std::clamp(options.top_p, 0.05F, 1.0F), 1));
-            // Mild repetition penalty: 1.5B-class models loop visibly, and worst in low-resource
-            // languages (device report: partly incoherent, repetitive Bangla). Applied AFTER
-            // top-p on purpose — the pinned header warns the penalty scan is slow on a full
-            // (151k Qwen) candidate list. 1.1 over the last 64 tokens is the conservative
-            // llama.cpp community default; freq/present stay off. llama_sampler_sample accepts
-            // each sampled token into the chain, so the penalty window tracks automatically.
+            // Apply penalties before nucleus filtering. If top-p first discards alternatives,
+            // the penalty can only reweight the already truncated set and may leave a repeated
+            // token with no useful alternative. This affects output quality, particularly in
+            // short or repetitive conversations. llama_sampler_sample accepts each selected
+            // token into this chain, so the penalty window tracks generated tokens.
             llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
                 llama_vocab_n_tokens(vocab_), 64, 1.1F, 0.0F, 0.0F
             ));
+            llama_sampler_chain_add(sampler, llama_sampler_init_top_p(std::clamp(options.top_p, 0.05F, 1.0F), 1));
             llama_sampler_chain_add(sampler, llama_sampler_init_temp(std::clamp(options.temperature, 0.05F, 2.0F)));
             const uint32_t seed = options.seed < 0
                 ? LLAMA_DEFAULT_SEED
