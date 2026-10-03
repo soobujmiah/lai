@@ -98,8 +98,11 @@ returns, actual offload and sensible repeated generation.
 The first opt-in CI run (`37158138201`) compiled the release APK but failed the
 explicit packaging assertion: AGP bundled the link-only ICD `libOpenCL.so`.
 The experiment now excludes that one library at the app packaging boundary;
-the follow-up CI must pass both absence and `DT_NEEDED` checks before anyone
-tests the artifact on a device.
+follow-up run `37159233807` passed both checks: the APK has no bundled
+`libOpenCL.so`, and ELF inspection printed `NEEDED libOpenCL.so` for
+`liblai_runtime.so`. The full run passed and produced `lai-release-417`.
+This confirms the build/link boundary only. No device run of this APK has
+occurred; use it only after the CPU-only release-413 correctness comparison.
 
 ## NPU reference and LAI boundary
 
