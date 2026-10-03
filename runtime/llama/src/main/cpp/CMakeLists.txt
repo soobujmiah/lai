@@ -3,10 +3,13 @@ project(lai_runtime LANGUAGES C CXX)
 
 option(LAI_ENABLE_LLAMA_CPP "Compile the pinned llama.cpp CPU adapter" OFF)
 set(LAI_LLAMA_CPP_DIR "" CACHE PATH "Path to a CI-fetched llama.cpp checkout")
-# Adreno OpenCL track: when CI provides the Khronos headers + a static ICD loader,
-# ggml-opencl is compiled into liblai_runtime.so (docs/BUILD_AND_RELEASE.md).
+# Adreno OpenCL track: available only in explicitly opted-in diagnostic builds.
 set(LAI_OPENCL_INCLUDE_DIR "" CACHE PATH "Path to CI-fetched Khronos OpenCL-Headers")
 set(LAI_OPENCL_LIBRARY "" CACHE FILEPATH "Path to CI-built static OpenCL ICD loader (libOpenCL.a)")
+option(LAI_ENABLE_OPENCL "Compile experimental ggml OpenCL backend" OFF)
+if(LAI_ENABLE_OPENCL AND (NOT EXISTS "${LAI_OPENCL_LIBRARY}" OR NOT EXISTS "${LAI_OPENCL_INCLUDE_DIR}/CL/cl.h"))
+    message(FATAL_ERROR "LAI_ENABLE_OPENCL=ON requires the pinned OpenCL headers and ICD loader")
+endif()
 # Hexagon NPU track (docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md): when CI extracts the
 # Hexagon SDK from the public ghcr.io/snapdragon-toolchain image, ggml-hexagon is compiled
 # into liblai_runtime.so. Compile-only gate for now (no llama-hexagon backend selectable
@@ -58,7 +61,7 @@ if(LAI_ENABLE_LLAMA_CPP)
     # headers and the CI-built STATIC ICD loader, which gets linked into liblai_runtime.so
     # (no separate .so is packaged). At runtime the loader discovers the vendor Adreno
     # driver through /vendor/etc/OpenCL/drivers/*.icd, like every Android OpenCL app.
-    if(EXISTS "${LAI_OPENCL_LIBRARY}" AND EXISTS "${LAI_OPENCL_INCLUDE_DIR}/CL/cl.h")
+    if(LAI_ENABLE_OPENCL AND EXISTS "${LAI_OPENCL_LIBRARY}" AND EXISTS "${LAI_OPENCL_INCLUDE_DIR}/CL/cl.h")
         set(GGML_OPENCL ON CACHE BOOL "" FORCE)
         set(GGML_OPENCL_EMBED_KERNELS ON CACHE BOOL "" FORCE)
         # Adreno-optimized matmul kernels are the point of this track; keep the default ON
@@ -69,7 +72,7 @@ if(LAI_ENABLE_LLAMA_CPP)
         message(STATUS "LAI: ggml-opencl enabled (Adreno track)")
     else()
         set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
-        message(STATUS "LAI: ggml-opencl disabled (no OpenCL headers/ICD loader provided)")
+        message(STATUS "LAI: ggml-opencl disabled (experimental backend not opted in or dependencies unavailable)")
     endif()
     # Hexagon NPU track. ggml-hexagon's CMakeLists does include(${HEXAGON_SDK_ROOT}/build/cmake/hexagon_fun.cmake)
     # and cross-compiles four HTP skels (v73/v75/v79/v81) via its own ExternalProject_Add sub-build with

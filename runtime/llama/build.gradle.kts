@@ -34,6 +34,7 @@ android {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
                     "-DLAI_ENABLE_LLAMA_CPP=${providers.gradleProperty("lai.enableLlamaCpp").orNull ?: "OFF"}",
+                    "-DLAI_ENABLE_OPENCL=${providers.gradleProperty("lai.enableOpencl").orNull ?: "OFF"}",
                     // ggml-vulkan does find_package(SPIRV-Headers CONFIG REQUIRED). The apt-installed
                     // spirv-headers package puts its CMake config in /usr/share/cmake/SPIRV-Headers,
                     // but the NDK toolchain isolates package search to the NDK sysroot
@@ -48,8 +49,9 @@ android {
                 }
                 // Adreno OpenCL track (docs/BUILD_AND_RELEASE.md): CI fetches the pinned Khronos
                 // OpenCL-Headers and builds the Khronos ICD loader as a static arm64 library; both
-                // arrive as absolute paths. When both are present the native build compiles
-                // ggml-opencl and links the loader into liblai_runtime.so.
+                // arrive as absolute paths. The backend is only compiled when
+                // lai.enableOpencl=ON is also set; probing it currently blocks CPU model loads
+                // on the Redmi Turbo 4 Pro during llama_backend_init().
                 val openclIncludeDir = providers.gradleProperty("lai.openclIncludeDir").orNull
                 val openclLibrary = providers.gradleProperty("lai.openclLibrary").orNull
                 if (!openclIncludeDir.isNullOrBlank() && !openclLibrary.isNullOrBlank()) {

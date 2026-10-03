@@ -96,6 +96,17 @@ driver crash cannot be caught by the app, which is why GPU defaults off on unqua
 
 ## GPU enablement — Adreno OpenCL track (2026-08-20)
 
+**2026-10-03 device correction:** OpenCL is now opt-in at compile time. The
+0.1.409 release on Redmi Turbo 4 Pro never completed `llama_backend_init()`;
+its Qwen model loads stayed pending, including the CPU path. Earlier
+diagnostics localized the non-returning registration call to
+`clGetPlatformIDs()`; its internal ICD/vendor cause remains unknown. Normal
+GitHub Actions builds set `lai.enableOpencl=OFF`, and a manual diagnostic
+dispatch must set `enable_opencl=true` to compile it. Scheduler validation
+alone does not protect CPU loading because llama.cpp registers compiled
+backends before opening the selected one. Verify CPU loading on the device
+with a new build before claiming this regression closed.
+
 The Adreno 825 Vulkan driver bug is addr2line-verified (release-183): SIGSEGV at
 `vkCmdBindPipeline+0x4` inside `vulkan.adreno.so` while binding the MUL_MAT pipeline, after
 every compile-time failure mode (coopmat, MMVQ, f16, integer dot product, async, fusion,
