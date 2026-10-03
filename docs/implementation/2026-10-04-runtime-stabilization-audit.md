@@ -51,6 +51,16 @@ The native adapter now rejects a missing or unapplicable GGUF chat template
 with an actionable error instead of silently serializing role labels in a
 generic format. The reviewed Qwen models have template metadata, so this guard
 does not itself explain their bad release-411 replies.
+
+| Correctness factor | Evidence from release 411/source | Status |
+| --- | --- | --- |
+| GGUF architecture and tokenizer | Qwen 2.5 model loaded; metadata reported `qwen2`, `qwen2` tokenizer pre-processing and GPT-2 vocabulary type | Load compatible; output quality still failed |
+| BOS/EOS and chat template | GGUF reported BOS 151643, EOS/EOT 151645, `add_bos_token=false` and `tokenizer.chat_template`; native code applies the model template | Metadata present; exact rendered prompt not captured |
+| Context | 4096 configured; observed 93/360 prompt tokens plus 256 output limit | No observed overflow |
+| KV cache | Bad `hi` reply started with zero reused prompt tokens | KV-prefix reuse alone cannot explain that first turn |
+| Sampling | Penalty-before-top-p source fix present; release 411 used configurable temperature/top-p; greedy comparison not yet run | Still an open discriminating test |
+| Quantization | Both reviewed Q4_K_M and Q4_0 gave unrelated greetings | Single-quant corruption is unlikely; hashes are catalog pinned |
+| llama.cpp version | Pinned source `ad1de39e0708e3ced9c71bb3c82d93a2c046a73f` | Build compatible; no identical-prompt CLI result yet |
 The fix commit `e2fe6c7` passed Android CI (push run `37137362566`); a
 CPU-only signed release build also passed (dispatch run `37156520247`, artifact
 `lai-release-413`). Neither result is a device inference test.
@@ -64,6 +74,9 @@ offload, although a per-operation trace was not recorded. A fresh read-only ELF
 inspection of its installed APK found direct `DT_NEEDED` entries for
 `libOpenCL.so` and `libcdsprpc.so` in
 `librnllama_v8_2_dotprod_i8mm_hexagon_opencl.so`.
+Its exact embedded llama.cpp commit was not identified from the installed APK;
+the app/package version and native library identity are the verified reference
+coordinates.
 
 LAI's experimental OpenCL build instead statically links the Khronos ICD loader;
 the last device trace enters `clGetPlatformIDs()` and never returns. Direct
@@ -82,6 +95,11 @@ the vendor library, as ChatterUI's ELF already does. These are build checks,
 not a device result. A CI failure will identify whether the stub was packaged
 or the dependency was lost; a device run must still prove `clGetPlatformIDs`
 returns, actual offload and sensible repeated generation.
+The first opt-in CI run (`37158138201`) compiled the release APK but failed the
+explicit packaging assertion: AGP bundled the link-only ICD `libOpenCL.so`.
+The experiment now excludes that one library at the app packaging boundary;
+the follow-up CI must pass both absence and `DT_NEEDED` checks before anyone
+tests the artifact on a device.
 
 ## NPU reference and LAI boundary
 

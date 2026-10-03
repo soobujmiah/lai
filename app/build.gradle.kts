@@ -94,6 +94,10 @@ android {
             "META-INF/LICENSE.md",
             "META-INF/NOTICE.md",
         )
+        // The experimental OpenCL build links against a CI-built shared ABI
+        // stub, but Android must load the device's real vendor libOpenCL.so
+        // through the manifest bridge. Never ship the stub inside the APK.
+        jniLibs.excludes += "**/libOpenCL.so"
         // Hexagon DSP-side skel discovery (docs/device-results/
         // 2026-09-03-redmi-turbo-4-pro-hexagon-session-open-diagnosis.md): the DSP-side loader
         // needs a real file on disk for libggml-htp-v*.so, which this app's default packaging
