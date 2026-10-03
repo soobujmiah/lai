@@ -1,0 +1,7 @@
+event_id: commit-acbcf37676c1-f15a546acd46ee34
+repository: soobujmiah/lai
+commit: acbcf37676c1eedd64938a85d3a605215ef5d44d
+kind: commit
+occurred_at: '2026-10-03T23:17:03Z'
+status: completed
+summary: 'Merge pull request #40 from soobujmiah/exp/opencl-direct-link-20261004'
