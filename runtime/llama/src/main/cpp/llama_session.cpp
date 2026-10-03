@@ -83,16 +83,14 @@ std::string apply_chat_template(const llama_model* model, const std::vector<Chat
     }
 
     const char* chat_template = llama_model_chat_template(model, nullptr);
+    if (chat_template == nullptr || chat_template[0] == '\0') {
+        throw std::runtime_error("GGUF model has no chat template; use an instruct/chat model with tokenizer.chat_template metadata");
+    }
     int32_t required = llama_chat_apply_template(
         chat_template, messages.data(), messages.size(), true, nullptr, 0
     );
     if (required <= 0) {
-        std::string fallback = std::string(kSystemPrompt) + "\n";
-        for (size_t index = 1; index < roles.size(); ++index) {
-            fallback += roles[index] + ": " + contents[index] + "\n";
-        }
-        fallback += "assistant:";
-        return fallback;
+        throw std::runtime_error("GGUF chat template could not format this conversation; check model metadata and supported roles");
     }
     std::vector<char> formatted(static_cast<size_t>(required) + 1U);
     const int32_t written = llama_chat_apply_template(
