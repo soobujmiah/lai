@@ -1,13 +1,13 @@
 schema_version: 1
 project_id: lai
 repository: soobujmiah/lai
-generated_at: '2026-09-29T22:49:32Z'
+generated_at: '2026-10-03T15:28:47Z'
 generated_by: tools/repo_knowledge collect
-version: v0.9.7-214-gadc4696
+version: v0.9.7-217-gf40ea4a
 head:
-  commit: adc46960655a60515e9b49c5e63b495694e65ebe
+  commit: f40ea4a70d3a3135b2a2c3c777877f6e4e434c1b
   branch: main
-  committed_at: '2026-09-29T22:37:04Z'
+  committed_at: '2026-10-03T15:18:04Z'
 phases:
   source: not_configured
   completed: []
@@ -15,44 +15,44 @@ phases:
   next: null
 build:
   status: passed
-  run_id: '36640630797'
-  commit: adc46960655a60515e9b49c5e63b495694e65ebe
+  run_id: '37132759835'
+  commit: f40ea4a70d3a3135b2a2c3c777877f6e4e434c1b
   run_attempt: '1'
-  at: '2026-09-29T22:49:32Z'
+  at: '2026-10-03T15:28:47Z'
   timestamp_source: ci
   conclusion: success
   workflow_name: Android build
   workflow_id: '335296642'
   event_type: push
-  started_at: '2026-09-29T22:37:06Z'
-  completed_at: '2026-09-29T22:49:32Z'
+  started_at: '2026-10-03T15:18:07Z'
+  completed_at: '2026-10-03T15:28:47Z'
   actor: soobujmiah
-  run_url: https://github.com/soobujmiah/lai/actions/runs/36640630797
+  run_url: https://github.com/soobujmiah/lai/actions/runs/37132759835
 test:
   status: passed
-  run_id: '36640630797'
-  commit: adc46960655a60515e9b49c5e63b495694e65ebe
+  run_id: '37132759835'
+  commit: f40ea4a70d3a3135b2a2c3c777877f6e4e434c1b
   run_attempt: '1'
-  at: '2026-09-29T22:42:06Z'
+  at: '2026-10-03T15:21:20Z'
   timestamp_source: ci
   conclusion: success
   workflow_name: Android build
   workflow_id: '335296642'
   event_type: push
-  started_at: '2026-09-29T22:37:06Z'
-  completed_at: '2026-09-29T22:49:32Z'
+  started_at: '2026-10-03T15:18:07Z'
+  completed_at: '2026-10-03T15:28:47Z'
   actor: soobujmiah
-  run_url: https://github.com/soobujmiah/lai/actions/runs/36640630797
+  run_url: https://github.com/soobujmiah/lai/actions/runs/37132759835
   summary: 'Android build: Unit tests and lint'
 last_successful_build:
-  commit: adc46960655a60515e9b49c5e63b495694e65ebe
-  at: '2026-09-29T22:49:32Z'
-  run_id: '36640630797'
+  commit: f40ea4a70d3a3135b2a2c3c777877f6e4e434c1b
+  at: '2026-10-03T15:28:47Z'
+  run_id: '37132759835'
 last_failed_build:
   commit: 6cedb420aaae0634b9b65cb8ee57bea693b84034
   at: '2026-09-26T12:41:32Z'
   run_id: '36242697383'
 sync:
   status: ok
-  last_synced_at: '2026-09-29T22:49:32Z'
+  last_synced_at: '2026-10-03T15:28:47Z'
   source: ci
