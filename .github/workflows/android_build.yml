@@ -21,12 +21,20 @@ on:
           Accelerators the scheduler may select (DEVICE_VALIDATED evidence).
           Default EMPTY = CPU-only (stable; the Adreno 825 Vulkan driver crashes
           at compute time on this llama.cpp revision — see docs/BUILD_AND_RELEASE).
-          Set llama-opencl to opt into the Adreno OpenCL qualification build, or
+          Set llama-opencl with enable_opencl=true for an OpenCL qualification build, or
           llama-vulkan for Vulkan experimentation on a qualified device/driver.
           Comma-separate to grant several (e.g. llama-opencl,llama-vulkan).
         required: false
         default: ''
         type: string
+      enable_opencl:
+        description: >-
+          Compile experimental OpenCL. Leave false for CPU-safe builds: on the
+          Redmi Turbo 4 Pro its backend registration blocks llama_backend_init()
+          before CPU model loading can start.
+        required: false
+        default: false
+        type: boolean
       hexagon_recon:
         description: >-
           Run ONLY the isolated Hexagon SDK reconnaissance job (pulls the public
@@ -366,6 +374,7 @@ jobs:
         run: >-
           gradle --no-daemon --stacktrace coverageCheck :runtime:ocr:testDebugUnitTest :platform:audit:testDebugUnitTest :platform:download:testDebugUnitTest :platform:workspace:testDebugUnitTest :platform:history:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug
           -Plai.enableLlamaCpp=ON
+          -Plai.enableOpencl=${{ inputs.enable_opencl && 'ON' || 'OFF' }}
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
@@ -384,6 +393,7 @@ jobs:
           -Plai.versionCode=${{ github.run_number }}
           -Plai.versionName=0.6.${{ github.run_number }}
           -Plai.enableLlamaCpp=ON
+          -Plai.enableOpencl=${{ inputs.enable_opencl && 'ON' || 'OFF' }}
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR"
@@ -416,6 +426,7 @@ jobs:
             -Plai.versionCode="${GITHUB_RUN_NUMBER}" \
             -Plai.versionName="$VERSION_NAME" \
             -Plai.enableLlamaCpp=ON \
+            -Plai.enableOpencl=${{ inputs.enable_opencl && 'ON' || 'OFF' }} \
             -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR" \
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR" \
           -Plai.spirvHeadersDir="$LAI_SPIRV_HEADERS_DIR" \
