@@ -73,6 +73,16 @@ but crashed at `vkCmdBindPipeline` on first decode. No LAI GPU path meets the
 load → offload → inference → correct-output gate, so production builds keep GPU
 selection disabled.
 
+The isolated `exp/opencl-direct-link-20261004` branch changes only the opt-in
+OpenCL build's link method: CI builds a shared Khronos `libOpenCL.so` for ABI
+symbols, links LAI against it, then requires the APK to omit that stub and
+`liblai_runtime.so` to declare `DT_NEEDED libOpenCL.so`. Android must then
+resolve the dependency through the existing `<uses-native-library>` bridge to
+the vendor library, as ChatterUI's ELF already does. These are build checks,
+not a device result. A CI failure will identify whether the stub was packaged
+or the dependency was lost; a device run must still prove `clGetPlatformIDs`
+returns, actual offload and sensible repeated generation.
+
 ## NPU reference and LAI boundary
 
 Local Dream `2.8.1` currently packages `libQnnHtp.so`, `libQnnSystem.so`, and
