@@ -6,7 +6,9 @@
 ## 2026-10-04 runtime stabilization audit and CPU handoff
 
 Commit `e2fe6c7` (explicit CPU-only ggml device list) passed Android CI run
-`37137362566`. A signed, CPU-only release build from the same commit passed
+`37137362566`. The subsequent GGUF-template guard commit `19250c1` and OCR
+audit update `8d22021` passed every PR #39 check, including the Android build,
+in run `37157910915`. A signed, CPU-only release build from `e2fe6c7` passed
 workflow-dispatch run `37156520247`; its artifact is `lai-release-413`.
 The owner deferred the artifact handoff, so it has **not** been installed or
 device-tested. Release 411's incoherent responses remain the last observed
@@ -22,8 +24,9 @@ LAI's two earlier ggml-hexagon DSP qualification runs remain valid, but reply
 sanity was not recorded. The existing Tesseract Bangla/English OCR engine still
 lacks a real-image device result. These gates remain open until owner-operated
 device tests produce scoped evidence.
-The subsequent chat-template fail-closed source guard in this worktree has not
-yet been compiled by CI; release 413 contains only the CPU device pin.
+The subsequent chat-template fail-closed guard is CI-compiled but has no device
+result. Release 413 contains only the CPU device pin; its artifact remains the
+clean discriminating test for the release-411 output defect.
 
 ## 2026-10-03 device test: 0.1.411 CPU load restored, responses incoherent
 

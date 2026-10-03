@@ -54,6 +54,8 @@ does not itself explain their bad release-411 replies.
 The fix commit `e2fe6c7` passed Android CI (push run `37137362566`); a
 CPU-only signed release build also passed (dispatch run `37156520247`, artifact
 `lai-release-413`). Neither result is a device inference test.
+The later chat-template guard passed PR #39's Android build and checks in run
+`37157910915`; it is not in the release-413 device-test artifact.
 
 ## GPU reference and LAI boundary
 
