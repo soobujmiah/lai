@@ -58,9 +58,9 @@ if(LAI_ENABLE_LLAMA_CPP)
     set(GGML_VULKAN ON CACHE BOOL "" FORCE)
     # Adreno OpenCL track. ggml-opencl's CMakeLists does find_package(OpenCL REQUIRED) and
     # find_package(Python3 REQUIRED); the hints below point at the CI-fetched Khronos
-    # headers and the CI-built STATIC ICD loader, which gets linked into liblai_runtime.so
-    # (no separate .so is packaged). At runtime the loader discovers the vendor Adreno
-    # driver through /vendor/etc/OpenCL/drivers/*.icd, like every Android OpenCL app.
+    # headers and a CI-built shared ABI stub. The stub is link-time only, never packaged:
+    # liblai_runtime.so must have DT_NEEDED libOpenCL.so and Android's native-library
+    # manifest bridge must resolve that name to the real vendor Adreno implementation.
     if(LAI_ENABLE_OPENCL AND EXISTS "${LAI_OPENCL_LIBRARY}" AND EXISTS "${LAI_OPENCL_INCLUDE_DIR}/CL/cl.h")
         set(GGML_OPENCL ON CACHE BOOL "" FORCE)
         set(GGML_OPENCL_EMBED_KERNELS ON CACHE BOOL "" FORCE)

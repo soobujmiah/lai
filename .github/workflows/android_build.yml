@@ -241,10 +241,12 @@ jobs:
           echo "LAI_SPIRV_HEADERS_DIR=$RUNNER_TEMP/spirv-headers" >> "$GITHUB_ENV"
 
       # ggml-opencl (Adreno OpenCL track): the NDK ships no OpenCL headers or library.
-      # Fetch the pinned Khronos headers, then build the Khronos ICD loader as a STATIC
-      # arm64 library and link it into liblai_runtime.so. No OpenCL bytes are committed —
-      # both sources are fetched by immutable commit SHA on the runner only.
-      - name: Fetch OpenCL headers and build ICD loader (arm64 static)
+      # Fetch the pinned Khronos headers, then build the Khronos ICD loader as an
+      # arm64 shared library only for link-time ABI symbols. Do not package it: the
+      # installed app must resolve its DT_NEEDED libOpenCL.so through the
+      # Android manifest bridge to the device's vendor implementation, matching
+      # the working ChatterUI reference. No OpenCL bytes are committed.
+      - name: Fetch OpenCL headers and build link-time ABI stub (arm64 shared)
         shell: bash
         run: |
           set -euo pipefail
@@ -263,14 +265,14 @@ jobs:
             -DANDROID_PLATFORM=28 \
             -DANDROID_STL=c++_shared \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_SHARED_LIBS=ON \
             -DBUILD_TESTING=OFF \
             -DOPENCL_ICD_LOADER_HEADERS_DIR="$HEADERS_DIR"
           cmake --build "$ICD_DIR/build" -- -j"$(nproc)"
-          test -f "$ICD_DIR/build/libOpenCL.a" || { echo "ICD loader static lib missing" >&2; exit 1; }
+          test -f "$ICD_DIR/build/libOpenCL.so" || { echo "OpenCL link-time stub missing" >&2; exit 1; }
           {
             echo "LAI_OPENCL_INCLUDE_DIR=$HEADERS_DIR"
-            echo "LAI_OPENCL_LIBRARY=$ICD_DIR/build/libOpenCL.a"
+            echo "LAI_OPENCL_LIBRARY=$ICD_DIR/build/libOpenCL.so"
           } >> "$GITHUB_ENV"
 
       # Hexagon NPU track (docs/HANDOFF-2026-09-03-npu-hexagon-scoping.md): opt-in only, via
@@ -450,6 +452,21 @@ jobs:
           echo "::group::Final APK lib/ contents"
           find app/build/outputs/apk -name '*.apk' -exec unzip -l {} \; 2>/dev/null | grep -i '\.so$' || true
           echo "::endgroup::"
+
+      - name: Verify opt-in OpenCL uses vendor library, not bundled ICD loader
+        if: inputs.enable_opencl
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk -name '*.apk' -print -quit)"
+          test -n "$APK"
+          if unzip -Z1 "$APK" | grep -q '^lib/arm64-v8a/libOpenCL.so$'; then
+            echo "OpenCL ICD loader was packaged; vendor OpenCL would be shadowed" >&2
+            exit 1
+          fi
+          unzip -p "$APK" lib/arm64-v8a/liblai_runtime.so > "$RUNNER_TEMP/lai-runtime-opencl-inspect.so"
+          "$ANDROID_HOME/ndk/$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -d "$RUNNER_TEMP/lai-runtime-opencl-inspect.so" | grep 'Shared library: \[libOpenCL.so\]'
 
       - name: Generate dependency SBOM (lightweight)
         if: always()
