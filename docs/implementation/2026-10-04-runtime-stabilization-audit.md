@@ -24,6 +24,11 @@ Apache-2.0 `ben` and `eng` `tessdata_fast` hashes, runs printed-text OCR on a
 bitmap, and returns text, line bounds and confidence. This existing OCR pipeline
 does not use a GGUF vision encoder, projector or LLM. It has CI source/build
 evidence but no recorded real-image device result yet.
+The primary printed-text OCR model remains the existing `tessdata_fast` Bengali
+plus English pair: it is small, offline, hash-verified, Apache-2.0 and has a CPU
+fallback on this phone. It does not meet a llama.cpp/GGUF-vision criterion;
+switching to a vision LLM would replace a completed OCR implementation and
+requires separate evidence that its recognition quality and memory are better.
 
 ## CPU response defect
 
