@@ -526,6 +526,24 @@ std::unique_ptr<BackendSession> build_llama_session(
         );
         llama_model_params model_params = llama_model_default_params();
         model_params.n_gpu_layers = gpu_layers;
+        // Zero offloaded weight layers is not a CPU-only device selection. A null devices
+        // list means "all available devices" in the pinned llama.cpp API. On the Redmi
+        // Turbo 4 Pro that made a llama-cpu session allocate a Vulkan0 compute buffer and
+        // schedule work across Vulkan and CPU, despite reporting 0/29 GPU layers. Keep the
+        // validated CPU path entirely on CPU, including KV/compute operations.
+        if (gpu_layers == 0) {
+            ggml_backend_dev_t cpu_device = ggml_backend_dev_by_name("CPU");
+            if (cpu_device == nullptr) {
+                cpu_device = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+            }
+            if (cpu_device == nullptr) {
+                error = "No ggml CPU device is registered";
+                return nullptr;
+            }
+            static ggml_backend_dev_t cpu_only_devices[2] = {cpu_device, nullptr};
+            model_params.devices = cpu_only_devices;
+            __android_log_print(ANDROID_LOG_INFO, kLogTag, "device: pinned CPU session to '%s' only", ggml_backend_dev_name(cpu_device));
+        }
         // When several GPU backends are compiled into one artifact (Vulkan + OpenCL on the
         // Adreno track) llama.cpp's default device selection is ambiguous. Pin the model to
         // exactly the accelerator this LAI backend represents (plus CPU for the non-offloaded
