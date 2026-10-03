@@ -21,6 +21,7 @@ secrets.properties
 # Models and generated native artifacts
 *.gguf
 *.onnx
+*.traineddata
 *.tflite
 *.bin
 *.dlc

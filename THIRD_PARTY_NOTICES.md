@@ -13,6 +13,7 @@ LAI is licensed under Apache License 2.0. The repository references third-party 
 | OkHttp | 4.12.0 | catalog/model HTTPS | Apache-2.0 | verify Okio/transitives |
 | Shizuku API/provider | 13.1.5 | privileged binder integration | Apache-2.0 | Shizuku app/service is separate software |
 | llama.cpp | pinned commit `ad1de39e0708e3ced9c71bb3c82d93a2c046a73f` | local GGUF inference | MIT | include upstream MIT notice in distributed native artifact notices |
+| Tesseract4Android / Tesseract OCR | 4.9.0 | offline Bengali/English OCR | Apache-2.0 | Android runtime includes native Tesseract, Leptonica, libjpeg and libpng; review transitive notices before production distribution |
 
 ## Test/build dependencies
 
@@ -20,7 +21,7 @@ JUnit 4.13.2, Android Gradle Plugin, Gradle, Android SDK/NDK/CMake, GitHub Actio
 
 ## Models and vendor components
 
-The repository contains no model weights or Qualcomm SDK/runtime binaries. The reviewed Qwen artifact is acquired separately by explicit user action and is documented in [`MODEL_LICENSES.md`](MODEL_LICENSES.md). Future QAIRT/QNN components require separate licensed acquisition and redistribution review.
+The repository contains no model weights or Qualcomm SDK/runtime binaries. The reviewed Qwen artifact is acquired separately by explicit user action and is documented in [`MODEL_LICENSES.md`](MODEL_LICENSES.md). GitHub CI stages SHA-256-pinned Apache-2.0 Bengali and English Tesseract OCR traineddata into the APK; these binaries are not committed. Future QAIRT/QNN components require separate licensed acquisition and redistribution review.
 
 ## Release gate
 

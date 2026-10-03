@@ -204,6 +204,10 @@ jobs:
           bash scripts/ci/fetch_llama_cpp.sh "$LLAMA_CPP_COMMIT" "$RUNNER_TEMP/llama.cpp"
           echo "LAI_LLAMA_CPP_DIR=$RUNNER_TEMP/llama.cpp" >> "$GITHUB_ENV"
 
+      - name: Stage pinned Bangla and English OCR models
+        shell: bash
+        run: bash scripts/ci/stage_ocr_models.sh
+
       # ggml-vulkan.cpp includes <vulkan/vulkan.hpp> (the Vulkan C++ bindings), which neither
       # the NDK sysroot nor apt libvulkan-dev provides (C API only). Fetch the Khronos headers
       # pinned to a tag and inject the include dir via -Plai.vulkanHeadersDir.
@@ -360,7 +364,7 @@ jobs:
 
       - name: Unit tests and lint
         run: >-
-          gradle --no-daemon --stacktrace coverageCheck :platform:audit:testDebugUnitTest :platform:download:testDebugUnitTest :platform:workspace:testDebugUnitTest :platform:history:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug
+          gradle --no-daemon --stacktrace coverageCheck :runtime:ocr:testDebugUnitTest :platform:audit:testDebugUnitTest :platform:download:testDebugUnitTest :platform:workspace:testDebugUnitTest :platform:history:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug
           -Plai.enableLlamaCpp=ON
           -Plai.llamaCppDir="$LAI_LLAMA_CPP_DIR"
           -Plai.vulkanHeadersDir="$LAI_VULKAN_HEADERS_DIR"

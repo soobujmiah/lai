@@ -2,7 +2,11 @@
 
 ## Current contract
 
-Phase 1 provides the complete capture-to-engine boundary but no weight file. `PlaceholderBanglaOcrEngine` returns `OcrModelRequiredException`, which the UI and tool interface report honestly.
+The screen capture → `BanglaOcrService` → `OcrResult` tool path now uses Tesseract4Android 4.9.0 with offline Bengali and English `tessdata_fast` models. This is a real printed-text OCR implementation. The GitHub build fetches the model files at pinned source commit `87416418657359cb625c412a48b6e1d6d41c29bd`, verifies SHA-256, and packages them as Android assets. At first use, LAI verifies and copies the models into app-private storage; screenshots are never written to disk. No network access is needed at runtime.
+
+The selected runtime and both models are Apache-2.0 licensed. The Bengali model SHA-256 is `31163084c279aaebd376216f0c3d5c17ad4b5fee8db49dae79c20000b5de5964`; English is `7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2`. See [Tesseract4Android](https://github.com/adaptech-cz/Tesseract4Android/tree/4.9.0) and [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast/tree/87416418657359cb625c412a48b6e1d6d41c29bd).
+
+Source and CI verification do not establish OCR accuracy. Printed Bangla, mixed English, reading order, latency and memory need owner-operated testing on the Redmi Turbo 4 Pro after manual APK handoff. Handwriting is not a validated capability and the result explicitly says so. The `OcrResult` line blocks include Tesseract's line bounds and confidence; in mixed-language mode their language remains null rather than making up per-line language detection.
 
 `OcrResult` schema version 1:
 
@@ -61,9 +65,9 @@ Report character error rate (CER), word error rate (WER), detection F1, end-to-e
 - secure/DRM surfaces may deny screenshots and must remain denied;
 - future debug capture export requires explicit per-capture consent and redaction guidance.
 
-## Planned adapters
+## Future adapters
 
-1. TFLite baseline for broad device compatibility.
+1. A measured TFLite alternative for broad device compatibility if it outperforms this baseline.
 2. QNN-quantized detector/recognizer for Hexagon HTP.
 3. optional handwriting-specific recognizer selected by classifier or user mode.
 

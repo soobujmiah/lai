@@ -1,6 +1,7 @@
 #include "include/lai/backend.h"
 
 #include <android/log.h>
+#include <sys/system_properties.h>
 #include <dlfcn.h>
 
 #include <cstdlib>
@@ -15,6 +16,16 @@ namespace lai {
 namespace {
 
 constexpr const char* kLogTag = "LAI-llama";
+
+// On the one device qualified by LAI, decode reproducibly SIGSEGVs inside the
+// vendor's vkCmdBindPipeline after a successful model load and prefill. A native
+// signal cannot be converted to a Kotlin Result, so reject this known crash path
+// before opening a session. Requalification requires new driver/backend evidence.
+bool known_crashing_vulkan_device() {
+    char device[PROP_VALUE_MAX] = {};
+    __system_property_get("ro.product.device", device);
+    return std::string(device) == "onyx";
+}
 
 #ifdef LAI_HAS_VULKAN
 
@@ -55,6 +66,11 @@ public:
     std::string name() const override { return "vulkan"; }
 
     bool available() const override {
+        if (known_crashing_vulkan_device()) {
+            __android_log_print(ANDROID_LOG_WARN, kLogTag,
+                "vulkan: blocked on onyx: decode crashes in vendor vkCmdBindPipeline; CPU remains available");
+            return false;
+        }
         void* handle = dlopen("libvulkan.so", RTLD_NOW);
         if (handle == nullptr) {
             __android_log_print(ANDROID_LOG_INFO, kLogTag, "vulkan: libvulkan.so not found — Adreno 825 unavailable");
@@ -96,6 +112,10 @@ public:
         std::string& error
     ) override {
 #ifdef LAI_HAS_VULKAN
+        if (known_crashing_vulkan_device()) {
+            error = "Vulkan is blocked on onyx after a reproducible vendor vkCmdBindPipeline crash; use CPU";
+            return nullptr;
+        }
         // Adreno driver workarounds (SM8735 / Adreno 825, device evidence 2026-08-19).
         // ggml-vulkan reads these env vars when the device is first created; set them before any
         // Vulkan use so the safest shader paths are used:

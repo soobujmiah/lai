@@ -11,7 +11,7 @@ fi
 
 forbidden=$(find . -path './.git' -prune -o -type f \( \
   -name '*.apk' -o -name '*.aab' -o -name '*.aar' -o -name '*.so' -o \
-  -name '*.gguf' -o -name '*.onnx' -o -name '*.tflite' -o -name '*.dlc' -o \
+  -name '*.gguf' -o -name '*.onnx' -o -name '*.tflite' -o -name '*.traineddata' -o -name '*.dlc' -o \
   -name '*.jks' -o -name '*.keystore' -o -name 'gradle-wrapper.jar' \
 \) -print)
 if [[ -n "$forbidden" ]]; then
@@ -38,6 +38,7 @@ if grep -RInE '(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})' \
 fi
 
 python3 scripts/check_architecture_boundaries.py
+python3 scripts/check_native_inference_contract.py
 python3 scripts/validate_model_catalog.py
 python3 scripts/validate_documentation.py
 
