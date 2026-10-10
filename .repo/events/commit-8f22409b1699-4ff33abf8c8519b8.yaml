@@ -1,0 +1,7 @@
+event_id: commit-8f22409b1699-4ff33abf8c8519b8
+repository: soobujmiah/lai
+commit: 8f22409b1699f20cdd4ea87f686ceff6e40f81d5
+kind: commit
+occurred_at: '2026-10-10T18:18:41Z'
+status: completed
+summary: 'docs(research): phone-first NPU qualification plan'

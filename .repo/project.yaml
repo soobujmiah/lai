@@ -1,13 +1,13 @@
 schema_version: 1
 project_id: lai
 repository: soobujmiah/lai
-generated_at: '2026-10-03T23:26:52Z'
+generated_at: '2026-10-10T18:27:37Z'
 generated_by: tools/repo_knowledge collect
-version: v0.9.7-228-gacbcf37
+version: v0.9.7-230-g8f22409
 head:
-  commit: acbcf37676c1eedd64938a85d3a605215ef5d44d
+  commit: 8f22409b1699f20cdd4ea87f686ceff6e40f81d5
   branch: main
-  committed_at: '2026-10-03T23:17:03Z'
+  committed_at: '2026-10-10T18:18:41Z'
 phases:
   source: not_configured
   completed: []
@@ -15,44 +15,44 @@ phases:
   next: null
 build:
   status: passed
-  run_id: '37161271338'
-  commit: acbcf37676c1eedd64938a85d3a605215ef5d44d
+  run_id: '38075263802'
+  commit: 8f22409b1699f20cdd4ea87f686ceff6e40f81d5
   run_attempt: '1'
-  at: '2026-10-03T23:26:52Z'
+  at: '2026-10-10T18:27:37Z'
   timestamp_source: ci
   conclusion: success
   workflow_name: Android build
   workflow_id: '335296642'
   event_type: push
-  started_at: '2026-10-03T23:17:06Z'
-  completed_at: '2026-10-03T23:26:52Z'
+  started_at: '2026-10-10T18:18:44Z'
+  completed_at: '2026-10-10T18:27:37Z'
   actor: soobujmiah
-  run_url: https://github.com/soobujmiah/lai/actions/runs/37161271338
+  run_url: https://github.com/soobujmiah/lai/actions/runs/38075263802
 test:
   status: passed
-  run_id: '37161271338'
-  commit: acbcf37676c1eedd64938a85d3a605215ef5d44d
+  run_id: '38075263802'
+  commit: 8f22409b1699f20cdd4ea87f686ceff6e40f81d5
   run_attempt: '1'
-  at: '2026-10-03T23:19:30Z'
+  at: '2026-10-10T18:20:19Z'
   timestamp_source: ci
   conclusion: success
   workflow_name: Android build
   workflow_id: '335296642'
   event_type: push
-  started_at: '2026-10-03T23:17:06Z'
-  completed_at: '2026-10-03T23:26:52Z'
+  started_at: '2026-10-10T18:18:44Z'
+  completed_at: '2026-10-10T18:27:37Z'
   actor: soobujmiah
-  run_url: https://github.com/soobujmiah/lai/actions/runs/37161271338
+  run_url: https://github.com/soobujmiah/lai/actions/runs/38075263802
   summary: 'Android build: Unit tests and lint'
 last_successful_build:
-  commit: acbcf37676c1eedd64938a85d3a605215ef5d44d
-  at: '2026-10-03T23:26:52Z'
-  run_id: '37161271338'
+  commit: 8f22409b1699f20cdd4ea87f686ceff6e40f81d5
+  at: '2026-10-10T18:27:37Z'
+  run_id: '38075263802'
 last_failed_build:
   commit: 6cedb420aaae0634b9b65cb8ee57bea693b84034
   at: '2026-09-26T12:41:32Z'
   run_id: '36242697383'
 sync:
   status: ok
-  last_synced_at: '2026-10-03T23:26:52Z'
+  last_synced_at: '2026-10-10T18:27:37Z'
   source: ci
