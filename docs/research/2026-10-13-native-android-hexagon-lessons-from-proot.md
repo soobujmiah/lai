@@ -241,3 +241,9 @@ qualification continue under its existing product state, Android artifact
 handoff, packaging contracts and owner-operated test model. This note preserves
 reusable research; it is not an ADR accepting a new architecture or a release gate
 claim.
+
+## Later standalone Bionic VAE execution evidence (2026-10-13)
+
+An independently written helper built by Ternux's pinned Android NDK CI, then launched from Debian PRoot on the physical SM8735, loaded the existing QNN 2.28 VAE encoder and decoder contexts using Qualcomm's licensed QNN 2.29 V73 runtime files in scratch. Both graph handles were retrieved from CDSP and cleaned up with status 0. The encoder graph executed twice for the same raw-zero `uint16` input; output buffers changed and repeated bitwise (FNV64 `mean` `ae97b25a95bdac33`, `std` `7fb11db45bb92b10`). The model stayed in its original `/sdcard/Llms/` archive and was streamed to sealed anonymous FDs. [Ternux's experiment](https://github.com/soobujmiah/ternux/blob/main/experiments/qnn-native/README.md) and [SKB evidence](https://github.com/soobujmiah/skb/blob/main/devices/redmi-turbo-4-pro/evidence/debian-proot-npu-investigation-2026-10-13.md) retain reproduction details.
+
+For LAI's future native Android work, this validates a Bionic QNN HTP/CDSP execution route on this phone outside the LAI app. It does **not** validate LAI's app UID/namespace, model integration, decoded tensor correctness, full image generation, or a correct ggml Q4 model answer. The immediately useful lesson is to keep graph execution, independent numerical oracle, and application integration as separate device gates. No LAI runtime code changed.

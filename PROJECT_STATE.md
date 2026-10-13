@@ -12,8 +12,9 @@ and created/freed an HTP backend with status 0. Its measured runtime is
 external helper evidence, not LAI app namespace or inference validation. The
 standalone helper later streamed the existing VAE encoder context into a sealed
 memfd and loaded it on SM8735 HTP with a licensed Qualcomm 2.29 V73 runtime
-in scratch; device/context create and cleanup returned status 0. Graph execution
-and known-output image inference remain unverified, and this is not LAI app
+in scratch; device/context create and cleanup returned status 0. The CI-built standalone helper later executed the VAE encoder graph twice on
+CDSP with repeatable output buffers. Independent known-output numerical
+correctness and image inference remain unverified, and this is not LAI app
 validation. The
 research note now records stage attribution for the existing QNN image archive,
 standalone IPC/ABI lessons, compatibility gaps and later LAI reuse boundaries.
