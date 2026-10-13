@@ -130,3 +130,8 @@ This section is the entry map for a future engineering agent. Existing topical d
 7. Only then modify code.
 
 Required sequence for implementation: documented plan → approved decision → implementation → test → documentation update → audit.
+
+
+## Supplementary accelerator research
+
+- [2026-10-13 native Android Hexagon lessons from Debian FastRPC qualification](research/2026-10-13-native-android-hexagon-lessons-from-proot.md) — verified external DSP calculator results, native Android/Bionic reuse boundaries and unverified QAIRT/QNN compatibility; no new LAI runtime or inference claim.
