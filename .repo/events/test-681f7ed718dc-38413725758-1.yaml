@@ -1,0 +1,17 @@
+event_id: test-681f7ed718dc-38413725758-1
+repository: soobujmiah/lai
+commit: 681f7ed718dc8cc10102a8966f7886b5a5e51b95
+kind: test
+occurred_at: '2026-10-13T14:31:04Z'
+run_id: '38413725758'
+run_attempt: '1'
+status: passed
+summary: 'Android build: Unit tests and lint'
+conclusion: success
+workflow_name: Android build
+workflow_id: '335296642'
+event_type: push
+started_at: '2026-10-13T14:28:57Z'
+completed_at: '2026-10-13T14:38:04Z'
+actor: soobujmiah
+run_url: https://github.com/soobujmiah/lai/actions/runs/38413725758
