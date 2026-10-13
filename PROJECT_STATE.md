@@ -14,9 +14,9 @@ standalone helper later streamed the existing VAE encoder context into a sealed
 memfd and loaded it on SM8735 HTP with a licensed Qualcomm 2.29 V73 runtime
 in scratch; device/context create and cleanup returned status 0. The CI-built standalone helper later executed the VAE encoder graph twice on
 CDSP with repeatable output buffers; it also loaded and retrieved the existing
-UNet graph without executing it. Independent known-output numerical
-correctness and image inference remain unverified, and this is not LAI app
-validation. The
+UNet graph without executing it. A separate 64-element QNN HTP Add graph now passed an independent
+known-output check on CDSP. VAE/UNet output correctness and image inference
+remain unverified, and this is not LAI app validation. The
 research note now records stage attribution for the existing QNN image archive,
 standalone IPC/ABI lessons, compatibility gaps and later LAI reuse boundaries.
 LAI runtime work remains deferred as requested by the owner.
