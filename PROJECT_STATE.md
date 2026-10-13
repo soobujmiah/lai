@@ -13,7 +13,8 @@ external helper evidence, not LAI app namespace or inference validation. The
 standalone helper later streamed the existing VAE encoder context into a sealed
 memfd and loaded it on SM8735 HTP with a licensed Qualcomm 2.29 V73 runtime
 in scratch; device/context create and cleanup returned status 0. The CI-built standalone helper later executed the VAE encoder graph twice on
-CDSP with repeatable output buffers. Independent known-output numerical
+CDSP with repeatable output buffers; it also loaded and retrieved the existing
+UNet graph without executing it. Independent known-output numerical
 correctness and image inference remain unverified, and this is not LAI app
 validation. The
 research note now records stage attribution for the existing QNN image archive,
