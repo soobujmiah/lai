@@ -200,6 +200,14 @@ context deserialization. An initial successful-load process crashed during HTP
 `dlclose`; the short-lived helper retains the library through process exit and
 its repeat run exited 0.
 
+The owner clarified that PRoot Debian is the workstation. The first exploratory
+helper was compiled through a Termux Android compiler path, so it is not a
+portable package qualification. Ternux now has a pinned NDK GitHub build:
+[run 38405297620](https://github.com/soobujmiah/ternux/actions/runs/38405297620)
+passed and produced an ARM64/Bionic test artifact. The owner-mediated handoff
+and physical-device repeat with that artifact are pending. No LAI app build
+was involved.
+
 For LAI, this is useful evidence that a compatible VAE HTP context can load
 from an Android/Bionic process on this device. It does not prove graph execution,
 correct tensors, image output, LAI app namespace access or a shippable runtime.
