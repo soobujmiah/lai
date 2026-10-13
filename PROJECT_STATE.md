@@ -12,11 +12,12 @@ and created/freed an HTP backend with status 0. Its measured runtime is
 external helper evidence, not LAI app namespace or inference validation. The
 standalone helper later streamed the existing VAE encoder context into a sealed
 memfd and loaded it on SM8735 HTP with a licensed Qualcomm 2.29 V73 runtime
-in scratch; device/context create and cleanup returned status 0. The CI-built standalone helper later executed the VAE encoder graph twice on
-CDSP with repeatable output buffers; it also loaded and retrieved the existing
-UNet graph without executing it. A separate 64-element QNN HTP Add graph now passed an independent
-known-output check on CDSP. VAE/UNet output correctness and image inference
-remain unverified, and this is not LAI app validation. The
+in scratch; device/context create and cleanup returned status 0. The CI-built
+helper executed fixed-input VAE encoder, decoder and UNet graphs on CDSP. A
+zero-latent decoder tensor crossed an anonymous FD for a scratch PNG preview.
+A separate 64-element QNN HTP Add graph passed an independent known-output
+check on CDSP. VAE/UNet output correctness and prompt-to-image inference
+remain unverified; none of these probes validated LAI app inference. The
 research note now records stage attribution for the existing QNN image archive,
 standalone IPC/ABI lessons, compatibility gaps and later LAI reuse boundaries.
 LAI runtime work remains deferred as requested by the owner.
