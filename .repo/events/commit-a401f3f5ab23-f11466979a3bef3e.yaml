@@ -1,0 +1,7 @@
+event_id: commit-a401f3f5ab23-f11466979a3bef3e
+repository: soobujmiah/lai
+commit: a401f3f5ab23a09c8d877ea7239c37b0e2ed5eb8
+kind: commit
+occurred_at: '2026-10-13T08:52:02Z'
+status: completed
+summary: 'docs(hexagon): record native Android lessons from Debian DSP research'
