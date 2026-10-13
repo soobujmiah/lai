@@ -112,6 +112,34 @@ Upstream references:
 - [QAIRT/QNN platform overview](https://docs.qualcomm.com/nav/home/QNN_general_overview.html?product=924033590759186372)
 - [QNN target-platform artifact distinction](https://docs.qualcomm.com/nav/home/qnn_tutorial_windows_host_linux_target.html?product=924033590759186372)
 
+## External Android QNN bridge reference: DroidRunner
+
+I inspected DroidRunner's README, QNN service/client, HTP generation table,
+verification flow and tests at upstream main commit
+`5126eacf2855a252d38121238d787eacec6f3965`. Its native Android app runs QNN in
+a separate `:qnn` process and lets its Linux PRoot runner request model work
+through a loopback, per-job-token HTTP service. This is a useful fault-isolation
+and measurement reference for a native Android project. It is not a dependency
+or architecture decision for LAI, and no DroidRunner source was copied; its
+repository is GPL-2.0-only.
+
+The implementation pins QNN 2.49.0 artifacts, records which operators the QNN
+delegate accepted, and supports explicit input/output files for comparing a
+device result with a golden output. Its SoC-to-HTP table currently maps SM8550
+to V73 and SM8650 to V75, but has no SM8735 entry. The README's measured QNN
+example is from an SM8650/Snapdragon 8 Gen 3 phone. Thus this source confirms a
+working Android-side QNN design pattern and a useful correctness contract, but
+does not establish SM8735 compatibility. DroidRunner was not installed or run
+on my device. LAI's active CPU correctness gate and existing native Android
+state remain unchanged.
+
+Source inspected:
+
+- [DroidRunner at the inspected commit](https://github.com/m96-chan/DroidRunner/tree/5126eacf2855a252d38121238d787eacec6f3965)
+- [HTP generation mapping](https://github.com/m96-chan/DroidRunner/blob/5126eacf2855a252d38121238d787eacec6f3965/app/src/main/java/io/github/m96chan/droidrunner/device/HexagonVersion.kt)
+- [QNN client/service boundary](https://github.com/m96-chan/DroidRunner/blob/5126eacf2855a252d38121238d787eacec6f3965/app/src/main/java/io/github/m96chan/droidrunner/npu/QnnClient.kt)
+- [QNN verification contract](https://github.com/m96-chan/DroidRunner/blob/5126eacf2855a252d38121238d787eacec6f3965/app/src/main/java/io/github/m96chan/droidrunner/npu/QnnVerification.kt)
+
 ## Existing LAI evidence and next relevant gate
 
 - [September Hexagon pass](../device-results/2026-09-04-redmi-turbo-4-pro-hexagon-htp-qualify-pass.md)
