@@ -5,6 +5,20 @@
 
 ## 2026-10-13 supplementary native Android Hexagon research note
 
+Later supplementary results: my standalone Android/Bionic helper, launched from
+PRoot, loaded existing vendor QNN HTP/System libraries, queried their providers
+and created/freed an HTP backend with status 0. Its measured runtime is
+`v2.29.0.241129103708_105762`, core API 2.22.0, backend API 5.29.0. This is
+external helper evidence, not LAI app namespace or inference validation. The
+standalone helper later streamed the existing VAE encoder context into a sealed
+memfd and loaded it on SM8735 HTP with a licensed Qualcomm 2.29 V73 runtime
+in scratch; device/context create and cleanup returned status 0. Graph execution
+and known-output image inference remain unverified, and this is not LAI app
+validation. The
+research note now records stage attribution for the existing QNN image archive,
+standalone IPC/ABI lessons, compatibility gaps and later LAI reuse boundaries.
+LAI runtime work remains deferred as requested by the owner.
+
 My standalone Debian/glibc FastRPC investigation now has verified brokered CDSP
 access, user-PD initialization, DMA mapping, application DSP ELF/file callbacks
 and correct calculator sum/max outputs. These are external DSP research results;

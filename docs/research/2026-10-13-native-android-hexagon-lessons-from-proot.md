@@ -140,6 +140,86 @@ Source inspected:
 - [QNN client/service boundary](https://github.com/m96-chan/DroidRunner/blob/5126eacf2855a252d38121238d787eacec6f3965/app/src/main/java/io/github/m96chan/droidrunner/npu/QnnClient.kt)
 - [QNN verification contract](https://github.com/m96-chan/DroidRunner/blob/5126eacf2855a252d38121238d787eacec6f3965/app/src/main/java/io/github/m96chan/droidrunner/npu/QnnVerification.kt)
 
+## Standalone Android/Bionic QNN discovery — later 2026-10-13 follow-up
+
+I built an independently written C diagnostic helper and invoked it from Debian
+PRoot through Android's `/system/bin/linker64`, using the existing vendor
+libraries in place. Local Dream was not required or installed in this test.
+The source and exact sanitized discovery output are in
+[Ternux's standalone experiment](https://github.com/soobujmiah/ternux/tree/main/experiments/qnn-native).
+
+Both `/vendor/lib64/libQnnHtp.so` and `/vendor/lib64/libQnnSystem.so` loaded and
+returned provider status 0, count 1. HTP reported core API **2.22.0**, backend
+API **5.29.0**, and runtime build **v2.29.0.241129103708_105762**. The API-version
+getter matched the public provider prefix; backend create returned status 0
+with a handle, and backend free returned status 0. The helper was compiled
+with existing Android-target Clang 21.1.8; its output is Bionic ARM64, not a
+glibc library loaded into Debian. Provider discovery and backend initialization
+are **device-validated for this helper only**. Later device/context results are
+recorded below; graph execution and correct image generation remain unverified.
+
+Useful lessons for later native LAI work:
+
+- Record QNN **SDK/build identity** separately from **core/backend API versions**.
+  A core API number of 2.22.0 does not mean the SDK is QNN 2.22.
+- A helper launched in the Termux process context has a different linker/SELinux
+  context from LAI's Android app. Vendor library load success here is not proof
+  that LAI can load the same path. LAI needs its own packaged-runtime and device
+  namespace qualification, preserving licensing and ABI boundaries.
+- The existing `AbsoluteReality_qnn2.28_8gen2.zip` contains MNN CLIP, tokenizer
+  and embedding files, and QNN UNet/VAE contexts. Its entries match the reference
+  SD1.5 QNN layout, but its filename does not prove the compiled SoC or runtime
+  compatibility. It stayed in place and was later streamed member-by-member into anonymous memory.
+- Local Dream source at `647dc6f54b2859e4af59000746fde9c047627ff1` explicitly
+  assigns SD1.5 CLIP to MNN CPU and UNet/VAE to QNN HTP. Do not label every
+  image-generation stage as NPU execution. Its current build requests QAIRT
+  2.50.0.260828; that is different from my observed vendor runtime 2.29.0.
+- CPU/GPU inference needs compatible model/backend pairs; a compiled HTP
+  context is not automatically a CPU/OpenCL model. Context loading, actual
+  graph attribution, correct output and cleanup are separate gates.
+- For Ternux I am pursuing my own standalone helper with bounded process IPC
+  and a ZIP-member-to-anonymous-memory loader to preserve the original
+  model path. The loader and VAE context test are implemented; image inference
+  pipeline and known-output graph test are not.
+  This is a research candidate for LAI, not an accepted LAI architecture.
+
+### VAE context load through the standalone helper
+
+The authorized QNN archive stayed at `/sdcard/Llms/AbsoluteReality_qnn2.28_8gen2.zip`.
+Ternux's own `archive_input.py` streamed `vae_encoder.bin` into a sealed memfd;
+CRC and SHA-256 were checked, with no model copy. QNN System API 1.2.0 read
+compiled QNN 2.28.0 context metadata (core API 2.21.0, backend API 5.28.0).
+The runtime is vendor QNN 2.29.0. The first HTP device create **failed** status
+14001 because the existing vendor V73 stub was not loadable by the Termux
+process's Android linker. Qualcomm's 2.29.0 Maven AAR has a V73 stub/skel;
+two licensed files were placed in local scratch only, with no repository copy
+or standalone redistribution. With those paths, backend/device/VAE context
+create and explicit cleanup all returned status 0 on the physical SM8735.
+The runtime log identified CDSP transport, the model graph and successful
+context deserialization. An initial successful-load process crashed during HTP
+`dlclose`; the short-lived helper retains the library through process exit and
+its repeat run exited 0.
+
+For LAI, this is useful evidence that a compatible VAE HTP context can load
+from an Android/Bionic process on this device. It does not prove graph execution,
+correct tensors, image output, LAI app namespace access or a shippable runtime.
+The public AAR license allows development/benchmarking use but prohibits
+standalone redistribution; LAI packaging would need its own license review.
+The next standalone test is fixed-input/fixed-output VAE graph execution with
+matching QNN headers and per-stage HTP logs. See [Ternux's experiment](https://github.com/soobujmiah/ternux/tree/main/experiments/qnn-native)
+and [Qualcomm's 2.29.0 POM](https://repo.maven.apache.org/maven2/com/qualcomm/qti/qnn-runtime/2.29.0/qnn-runtime-2.29.0.pom).
+
+No LAI runtime, model catalog, Android manifest, backend default or APK was
+changed. The owner requested recording these findings for later LAI work;
+LAI's current CPU response-correctness and owner-operated app tests remain open.
+
+References:
+
+- [Public QNN interface API](https://docs.qualcomm.com/bundle/publicresource/topics/80-63442-10/api-rst_file_include_QNN_QnnInterface_h.html)
+- [Public version types](https://docs.qualcomm.com/nav/home/api-rst_program_listing_file_include_QNN_QnnTypes_h.html?product=924033590759186372)
+- [Reference stage assignment](https://github.com/xororz/local-dream/blob/647dc6f54b2859e4af59000746fde9c047627ff1/app/src/main/cpp/src/PipelineSd15Npu.hpp)
+- [Reference SDK build](https://github.com/xororz/local-dream/blob/647dc6f54b2859e4af59000746fde9c047627ff1/app/src/main/cpp/CMakeLists.txt)
+
 ## Existing LAI evidence and next relevant gate
 
 - [September Hexagon pass](../device-results/2026-09-04-redmi-turbo-4-pro-hexagon-htp-qualify-pass.md)
