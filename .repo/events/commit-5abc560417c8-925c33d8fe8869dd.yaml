@@ -1,0 +1,7 @@
+event_id: commit-5abc560417c8-925c33d8fe8869dd
+repository: soobujmiah/lai
+commit: 5abc560417c8c9c301c49f76c8de7288e8cf7c3d
+kind: commit
+occurred_at: '2026-10-13T13:32:11Z'
+status: completed
+summary: Note NDK CI handoff for external QNN helper
