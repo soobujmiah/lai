@@ -1,0 +1,7 @@
+event_id: commit-b0b6d0a81698-15d0a827f45a5f23
+repository: soobujmiah/lai
+commit: b0b6d0a816988d5fca41f202c6d3e31efd8cb58d
+kind: commit
+occurred_at: '2026-10-13T09:35:15Z'
+status: completed
+summary: 'docs: add DroidRunner QNN bridge reference'
