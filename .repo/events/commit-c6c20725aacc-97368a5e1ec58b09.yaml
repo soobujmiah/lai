@@ -1,0 +1,7 @@
+event_id: commit-c6c20725aacc-97368a5e1ec58b09
+repository: soobujmiah/lai
+commit: c6c20725aacc7855f9e5546717c5464d8e3aab41
+kind: commit
+occurred_at: '2026-11-02T11:09:23Z'
+status: completed
+summary: 'docs: preserve llama.cpp release and Snapdragon reference (#41)'
