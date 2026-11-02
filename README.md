@@ -128,7 +128,7 @@ No Android SDK, NDK, CMake, Gradle distribution, QNN SDK, or model is installed 
 
 ## Release build and signing
 
-Tagging a semantic version such as `v0.2.0` builds and publishes an APK. Without signing secrets the workflow uses the Android debug key so the artifact is installable for testing but **not production signed**.
+Tagging a semantic version such as `v0.2.0` builds an APK artifact in GitHub Actions; it does not create a GitHub Release. Without signing secrets the workflow uses the Android debug key so the artifact is installable for testing but **not production signed**.
 
 Configure these GitHub Actions secrets for production signing:
 
