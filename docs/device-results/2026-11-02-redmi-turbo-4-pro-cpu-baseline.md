@@ -1,4 +1,41 @@
-# 2026-11-02 Redmi Turbo 4 Pro CPU baseline smoke test
+# 2026-11-02 Redmi Turbo 4 Pro CPU baseline and prompt-fix retest
+
+## Candidate build 458 retest
+
+- App: `dev.lai.runtime` `0.1.458` / versionCode `458`
+- Source: `143fccb8471093bb91a74bb8709c49cda66724cc`
+- GitHub Actions: [run 41447878524](https://github.com/soobujmiah/lai/actions/runs/41447878524), workflow-dispatch release-variant build; CI checks and APK build passed
+- Install: `adb install -r`; existing app data retained, no uninstall
+- Device: same Redmi Turbo 4 Pro, Android 15, arm64
+- Settings: temperature `0.7`, top-P `0.9`, max reply `256`, default seed; developer mode was turned off after testing
+
+The corrected system prompt passed English language adherence on both catalog
+quantizations. Q4_K_M loaded on `llama-cpu` in 544 ms; arithmetic returned `42`
+(2 tokens; prefill 20.27 tok/s, decode 12.99 tok/s, TTFT 3.46 s, total 3.61 s).
+The same short English story request returned English text at the 256-token
+limit (prefill 23.23 tok/s, decode 8.66 tok/s, TTFT 0.99 s, total 30.56 s).
+Its response was cut off by the configured token cap and included inconsistent
+story details, so this passes language selection only, not creative correctness.
+
+Q4_0 loaded on `llama-cpu` in 1166 ms and returned an English response to the
+same story prompt in 91 tokens (prefill 19.93 tok/s, decode 9.02 tok/s, TTFT
+3.37 s, total 13.46 s). It completed coherently at a basic narrative level,
+though some phrasing was strained. Q4_0 then streamed a longer reply visibly;
+Stop produced `Generation stopped locally`, and the following arithmetic turn
+again returned `42` (2 tokens; prefill 18.58 tok/s, decode 10.81 tok/s, TTFT
+1.14 s, total 1.32 s). Stop-to-terminal latency was not independently timed.
+The app process remained alive. Logs show the scheduler selected CPU: CPU KV
+buffer 112.00 MiB, compute buffer 151.38 MiB, and output buffer 0.58 MiB; the
+generation thread used big cores 0-3 and returned to idle little core 7. Vulkan
+device enumeration appeared in logs, but no `Vulkan0` compute allocation was
+observed in the captured CPU sessions.
+
+This candidate retest confirms the prompt change fixes the observed language
+drift for these two Qwen quantizations, but overall CPU quality and the CPU
+acceptance gate remain open. Bangla input/response, broader factual checks,
+context limits, memory pressure, thermal stability, repeatable benchmarking,
+and bounded cancellation timing still need evidence. Prompts and raw outputs
+are not retained.
 
 ## Build and device
 
@@ -66,16 +103,18 @@ not retained.
 Source trace found conflicting language instructions in
 `runtime/llama/src/main/cpp/llama_session.cpp`: the prompt said to use Bangla
 when the user writes Bangla, then unconditionally instructed the model in
-Bangla to answer in Bangla. I changed it locally to instruct the model to use
-the user's language and keep simple Bangla conditional on Bangla input. This
-is a focused, evidence-based prompt fix; CI and on-device comparison on both
-quantizations are still pending, so no cause is declared resolved yet.
+Bangla to answer in Bangla. The source prompt now instructs the model to use
+the user's language and keeps simple Bangla conditional on Bangla input. This
+focused prompt fix passed CI and the English language-control comparison on
+both quantizations on build 458. This
+supports the prompt conflict as the cause of the observed language drift in
+that scenario; it does not prove all earlier inaccurate replies are resolved.
 
 ## Limits and next checks
 
 This is smoke evidence, not CPU acceptance. It does not validate Bangla output
-(ADB text injection could not enter Bengali reliably, so no Bengali prompt was
-submitted), bounded stop latency, context limits, memory pressure,
+(ADB Gboard initially used Bangla layout; no Bengali prompt was submitted),
+bounded stop latency, context limits, memory pressure,
 thermal/thread-governor stability, or benchmark repeatability. Two Q4_K_M
 unload/reload cycles completed in 486 and 490 ms, followed by a successful
 arithmetic generation. A temperature-zero story run reproduced the English
@@ -88,4 +127,5 @@ and NPU qualification.
 Content-free local logs (Termux temp, not committed):
 `lai-cpu-owner-test-20261102T120304Z.log` and
 `lai-cpu-valid-20261102.log`, `lai-cpu-followup-20261102.log`, and
-`lai-cpu-q4_0-20261102.log`.
+`lai-cpu-q4_0-20261102.log`; build-458 capture:
+`lai-cpu-build458-20261102.log`.

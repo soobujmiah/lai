@@ -6,6 +6,18 @@ catalog; it does not claim that every arbitrary GGUF is supported.
 
 ## Current evidence
 
+Build `0.1.458` / versionCode `458` (source
+`143fccb8471093bb91a74bb8709c49cda66724cc`, Actions run `41447878524`) passed
+source policy, lint/unit checks, and the CPU release-variant APK build. It was
+installed with `adb install -r`, preserving app data. On the Redmi Turbo 4 Pro,
+Q4_K_M loaded in 544 ms and Q4_0 in 1166 ms on `llama-cpu`. The language-fix
+English story comparison passed language selection on both; Q4_K_M output was
+cut off at 256 tokens and had inconsistent details, while Q4_0 returned a
+shorter, basically coherent story with strained phrasing. Q4_0 Stop ended with
+`Generation stopped locally`; a subsequent arithmetic answer passed. Stop
+latency was not timed. This is partial retest evidence, not CPU acceptance.
+See the candidate section in the [device result](../device-results/2026-11-02-redmi-turbo-4-pro-cpu-baseline.md).
+
 Build `0.1.456` / versionCode `456` (source
 `c6c20725aacc7855f9e5546717c5464d8e3aab41`, Actions run `41434515200`) was
 exercised on the Redmi Turbo 4 Pro. Both catalog CPU quantizations of Qwen 2.5
@@ -28,13 +40,13 @@ the Qwen smoke result does not resolve it.
 
 | Area | Required evidence | Current status |
 |---|---|---|
-| Supported model/quantization load | Load each catalog CPU-compatible model/quantization on the named device; record model ID, quant, context, load outcome/time and memory | Partial: recommended Qwen Q4_K_M loaded in 470 ms and Q4_0 in 1433 ms on build 456; other catalog combinations remain untested |
-| CPU-only placement | Explicit CPU pin; CPU context/compute buffers; no accelerator compute allocation; actual scheduler decision matches CPU | Pass for Qwen Q4_K_M and Q4_0 build 456 sessions only; see device result |
-| Single-turn correctness | Fixed, privacy-safe prompt set with expected factual/format properties; owner reviews actual responses; record model/settings and outcome without committing private response text | Arithmetic/format answer passed on both Qwen quantizations; Q4_K_M passed four linked turns. A harmless English creative prompt produced off-target Bengali/refusal output on Q4_K_M at default and greedy settings, while Q4_0 produced a coherent English answer. A source-level language-instruction conflict is being corrected; candidate build/device retest pending |
-| Bangla/English quality | Owner-reviewed Bangla and English checks on the recommended catalog model; verify instruction following, factual answer and concise response | English arithmetic and Q4_0 story checks passed; Q4_K_M failed English-language adherence on a synthetic prompt. Bangla prompt not tested because ADB did not inject Bengali text reliably. Catalog flag remains `banglaQualityValidated = false` |
+| Supported model/quantization load | Load each catalog CPU-compatible model/quantization on the named device; record model ID, quant, context, load outcome/time and memory | Partial: Q4_K_M 544 ms and Q4_0 1166 ms on build 458; other catalog combinations and memory peaks remain untested |
+| CPU-only placement | Explicit CPU pin; CPU context/compute buffers; no accelerator compute allocation; actual scheduler decision matches CPU | Pass for Qwen Q4_K_M and Q4_0 build 458 sessions; earlier build-456 evidence also available. See device result |
+| Single-turn correctness | Fixed, privacy-safe prompt set with expected factual/format properties; owner reviews actual responses; record model/settings and outcome without committing private response text | Arithmetic passed on both quantizations; Q4_K_M passed four linked turns. Build-458 English story now follows English on both; Q4_K_M was truncated at 256 tokens and inconsistent, while Q4_0 was basic/coherent with awkward phrasing. Broader accuracy/quality review remains open |
+| Bangla/English quality | Owner-reviewed Bangla and English checks on the recommended catalog model; verify instruction following, factual answer and concise response | English language selection passed on both quantizations after prompt fix; arithmetic passed. No Bengali prompt submitted because ADB Gboard was in Bangla layout during initial injection. Catalog flag remains `banglaQualityValidated = false` |
 | Multi-turn/context | At least three linked turns; verify prior user facts are retained and unrelated facts are not invented | Four linked English turns retained the answer and one derived fact correctly; longer context/unrelated-fact checks remain open |
-| Streaming | Tokens arrive incrementally, final completion is correct, no dropped/corrupted UTF-8 | Partial: long output appeared incrementally in LAI and Bangla Unicode rendered; the Q4_K_M content was incoherent. Q4_0 coherent story completed. Need a controlled UTF-8/streaming pass after the prompt fix |
-| Stop/cancel and recovery | Stop during prefill and decode; verify bounded stop, usable session, and successful next generation | Decode stop returned `Generation stopped locally` at 219 and 231 tokens; process/model stayed usable. Tap-to-stop latency was not instrumented. After two unload/reload cycles, a new arithmetic generation passed. The inactive-model request/reload observation remains unexplained |
+| Streaming | Tokens arrive incrementally, final completion is correct, no dropped/corrupted UTF-8 | Partial: build-458 Q4_0 output was visibly incremental; a 91-token story completed, while a longer generation was intentionally stopped. No controlled Unicode-output test yet |
+| Stop/cancel and recovery | Stop during prefill and decode; verify bounded stop, usable session, and successful next generation | Build-458 Q4_0 decode Stop logged `Generation stopped locally`; process stayed alive and following arithmetic returned `42`. Stop-to-terminal latency not timed; prefill cancellation and longer recovery remain open. Build-456 partial evidence and unexplained inactive-model observation remain documented |
 | Repeated load/unload | Repeated cycles without stale handles, leaked session state, crash, or wrong model identity | Two Q4_K_M unload/reload cycles passed in one clean MainActivity session (reloads 486 and 490 ms); post-cycle generation passed. Longer/memory-stress cycles remain open |
 | Context limits | Near-capacity prompt succeeds when within budget; over-budget prompt fails clearly without corrupting the next turn | Not tested |
 | Memory pressure | Record peak memory and behavior under realistic competing memory use; low-memory failure must be clean and recoverable | Not tested |
