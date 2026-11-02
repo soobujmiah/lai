@@ -1,0 +1,7 @@
+event_id: commit-c0d9ffa5af53-b7f5e3fde1d9e7f4
+repository: soobujmiah/lai
+commit: c0d9ffa5af53d422cb5325f8d376c8bd432be134
+kind: commit
+occurred_at: '2026-11-02T10:40:54Z'
+status: completed
+summary: 'ci: stop automatic app GitHub releases (#49)'
