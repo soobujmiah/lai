@@ -10,7 +10,7 @@ The repository is source-only. `gradle-wrapper.jar`, Android SDK/NDK, CMake, QAI
 
 - pushes and pull requests to `main`;
 - manual `workflow_dispatch` for debug/release/both;
-- tags matching `v*`, which create or update a GitHub Release.
+- tags matching `v*`, which build and upload an APK artifact only; they do not create or update a GitHub Release.
 
 The build performs:
 
@@ -21,7 +21,7 @@ The build performs:
 5. pure-JVM coverage tests, private-audit Android unit tests, app unit tests, and Android lint;
 6. Kotlin/Compose resources and arm64 C++/llama.cpp JNI compilation;
 7. **both** APK variants in a single run — `debug` and `release` (release uses the production keystore on tags, else the debug key) — plus the release R8 `mapping.txt` artifact;
-8. version-tag release.
+8. version-tag APK artifact upload (no GitHub Release is created).
 
 A separate `catalog_publish.yml` validates `catalog/models-v1.json`, signs its exact bytes with the encrypted `MODEL_CATALOG_SIGNING_KEY`, verifies the committed public key matches, and publishes stable `catalog-v1` assets.
 
@@ -29,14 +29,14 @@ A separate `catalog_publish.yml` validates `catalog/models-v1.json`, signs its e
 
 GitHub → **Actions** → **Android build** → **Run workflow**. The default `build_type` is **`both`**, so one run produces the installable `lai-debug-<run>` and `lai-release-<run>` APKs (debug retained 14 days, release 30 days) plus `lai-release-mapping-<run>`. Every push to `main` also builds both variants; pull requests stay debug-only.
 
-## Create a release
+## Build from a version tag
 
 ```bash
 git tag -a v0.1.0 -m "LAI 0.1.0"
 git push origin v0.1.0
 ```
 
-The workflow uses `GITHUB_RUN_NUMBER` as monotonically increasing `versionCode` and the tag without `v` as `versionName`.
+The workflow builds and uploads an APK artifact; it does not publish a GitHub Release. The workflow uses `GITHUB_RUN_NUMBER` as monotonically increasing `versionCode` and the tag without `v` as `versionName`. Publish a GitHub Release manually only when you intend to distribute a version.
 
 ## Production signing
 
