@@ -77,6 +77,7 @@ This section is the entry map for a future engineering agent. Existing topical d
 *   **Product structure options** — [`product/COMMERCIAL_PRODUCT_STRUCTURE.md`](product/COMMERCIAL_PRODUCT_STRUCTURE.md)
 *   **Product boundaries** — [`legal/PUBLIC_VS_COMMERCIAL_BOUNDARY.md`](legal/PUBLIC_VS_COMMERCIAL_BOUNDARY.md), [`PRIVACY_INVARIANTS.md`](PRIVACY_INVARIANTS.md)
 *   **Current implementation state** — [`implementation/current-state.md`](implementation/current-state.md), [`STATUS.md`](STATUS.md), [`PROJECT_STATE.md`](../PROJECT_STATE.md)
+*   **CPU backend qualification** — [`implementation/cpu-backend-qualification.md`](implementation/cpu-backend-qualification.md) — active CPU acceptance gate; GPU/NPU deferred until CPU passes
 *   **Implementation preparation / next milestone** — [`implementation/IMPLEMENTATION_PREPARATION.md`](implementation/IMPLEMENTATION_PREPARATION.md)
 
 ### ARCHITECTURE

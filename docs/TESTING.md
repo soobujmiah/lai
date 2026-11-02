@@ -34,14 +34,19 @@ LAI shall be **evidence-based** — never invent results from tests that could n
 > 2026-09-21). No agent may treat any tier as standing authorization, and no differently-named
 > mechanism may accomplish the same prohibited interaction.
 
-**The owner performs all application interaction.** The Supervisor may launch, observe, collect
-scoped logs, use `logcat`/`dumpsys`, run permitted diagnostics, verify package/activity/foreground
-identity, collect permitted evidence, take gated screenshots, analyze, diagnose, modify project
-code, fix, and send builds through GitHub CI. It must **not** autonomously interact with the
-application UI by any mechanism — including LAI's own app-native surfaces: the `MainActivity`
-qualification intent extras (`adb shell am start …`, no taps) and any debug/test interface are
-**not** an authorized autonomous input path, though they remain valid app/debug functionality the
-owner may use.
+**Default model: the owner performs all application interaction.** The sole
+scoped exception is the active LAI CPU → GPU → NPU readiness goal: under owner
+decision `DEC-2026-11-02-001`, the Supervisor may tap/type in LAI for that
+goal's tests only. The decision and limits are recorded in SKB at
+`operations/decisions/2026-11-02--lai--scoped-autonomous-test-input.md`; it does
+not authorize autonomous UI input for other LAI work or other projects. Use
+synthetic prompts and do not persist prompt/output text. The owner separately
+authorized uninstalling `dev.lai.runtime` only if required to install a
+candidate build; prefer `adb install -r` because uninstall erases LAI-private
+app data.
+
+For this goal, the assistant performs the test interactions and scoped log
+capture; elsewhere, the human-operated interaction model remains in force.
 
 **Observation discipline (retained).** Never poll with an arbitrary fixed `sleep`. Wait on an observable condition instead: process
 existence (`pidof`), activity draw completion (`am start -W`), or a specific logcat pattern

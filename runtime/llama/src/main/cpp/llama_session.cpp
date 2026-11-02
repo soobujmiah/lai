@@ -28,8 +28,7 @@ using Clock = std::chrono::steady_clock;
 constexpr const char* kLogTag = "LAI-llama";
 constexpr const char* kSystemPrompt =
     "You are LAI, a private on-device assistant. Be concise and accurate. "
-    "When the user writes in Bangla, reply in simple natural Bangla with short sentences. "
-    "আপনি LAI। বাংলায় সহজ, ছোট বাক্যে উত্তর দিন।";
+    "Reply in the language the user used. When the user writes in Bangla, use simple natural Bangla with short sentences.";
 
 long long elapsed_us(Clock::time_point start, Clock::time_point end) {
     return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
