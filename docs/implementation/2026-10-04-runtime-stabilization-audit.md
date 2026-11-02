@@ -151,3 +151,41 @@ normal build does not select Hexagon automatically.
 4. For NPU, a new qualification build can repeat the Q4_0 HTP test and record
    reply sanity. Keep QNN context-binary conversion as a separate evaluated path;
    Local Dream's image context is not an LAI LLM artifact.
+
+## Upstream llama.cpp release reference (2026-10-05)
+
+Owner-supplied link, preserved exactly:
+[llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/?utm_source=chatgpt.com).
+The linked [Snapdragon setup guide](https://github.com/ggml-org/llama.cpp/blob/master/docs/backend/snapdragon/README.md)
+documents Android arm64 CPU, Adreno OpenCL, and Hexagon builds, ADB deployment,
+`llama-cli`, `llama-bench`, backend operation tests, and
+`GGML_HEXAGON_VERBOSE=1` per-operation logging. The releases page showed
+pre-release `b11393` when reviewed; both pages can change, so pin a tag and
+asset before using them as test evidence.
+
+This is a reference for isolated qualification, not an LAI dependency update.
+LAI currently builds against immutable llama.cpp commit
+`ad1de39e0708e3ced9c71bb3c82d93a2c046a73f`. The upstream Android
+packages are command-line tools rather than a drop-in LAI APK/runtime module.
+The guide's example Hexagon runs use v79 hardware; LAI's target device reports
+HTP v73, so example throughput is not a device-specific prediction.
+
+Potential uses after the pending CPU-only device check:
+
+1. Compare `llama-cli` against LAI with the same reviewed GGUF, rendered chat
+   prompt, seed, sampler settings, and CPU-only device selection. Record the
+   exact upstream tag/commit and outputs to distinguish an LAI integration
+   defect from model/runtime behavior.
+2. Use Hexagon verbose operation logs and `test-backend-ops` on the reviewed
+   Q4_0 model to strengthen per-operation NPU attribution and record reply
+   sanity. Existing LAI evidence proves DSP engagement and generation, but
+   does not yet establish either of those details.
+3. Use a standalone OpenCL run only as a comparison for LAI's
+   `clGetPlatformIDs()` hang and direct-link experiment. A successful upstream
+   CLI run would be new evidence for investigation, not proof that LAI's APK
+   works; LAI still needs a device run with offload and sensible replies.
+
+Do not promote a new llama.cpp release, Vulkan, OpenCL, or Hexagon to a
+production default based on release availability or the guide's examples.
+Preserve LAI's current pinned-source, patch, packaging, licensing, and
+physical-device qualification gates for any proposed upgrade.
