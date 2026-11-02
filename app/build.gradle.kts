@@ -22,7 +22,7 @@ val isProductionSigning = System.getenv("LAI_SIGNING_PRODUCTION") == "true"
 
 android {
     namespace = "dev.lai.runtime"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.lai.runtime"
