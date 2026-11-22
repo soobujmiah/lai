@@ -345,7 +345,7 @@ jobs:
       # stable fallback for months for the same reason.
       - name: Install pinned CMake 3.31.6 for ggml-hexagon HTP (requires >=3.22.2)
         id: pinned_cmake
-        uses: lukka/get-cmake@f86dd60acae0d132056913e248bdabf0e0580b7a # v4.4.5
+        uses: lukka/get-cmake@16e8153a8b4918849d92aad131befe67a3705daa # v4.5.0
         with:
           cmakeVersion: '3.31.6'
 
